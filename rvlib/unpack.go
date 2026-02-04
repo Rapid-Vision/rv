@@ -12,7 +12,7 @@ var embeddedRVLib embed.FS
 
 func UnpackRVLib(targetDir string) error {
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		panic(err)
+		return err
 	}
 
 	err := fs.WalkDir(embeddedRVLib, "rvlib", func(path string, d fs.DirEntry, err error) error {
