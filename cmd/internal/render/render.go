@@ -46,8 +46,8 @@ func Render(scriptPathRel string, imgNum int, procs int, outputDir string) {
 		logs.Err.Fatalln("--number is less then one")
 	}
 
-	if procs < 0 {
-		procs = 1
+	if procs < 1 {
+		logs.Err.Fatalln("--procs must be at least 1")
 	}
 
 	if imgNum < procs {
