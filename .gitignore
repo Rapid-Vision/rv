@@ -48,3 +48,5 @@ out/
 
 # macos
 .DS_Store
+
+.local
