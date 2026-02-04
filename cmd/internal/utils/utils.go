@@ -130,7 +130,8 @@ func WaitCmdBuff(buff []*exec.Cmd) <-chan error {
 	n := len(buff)
 	ch := make(chan error, n)
 	for i := 0; i < n; i += 1 {
-		go func() { ch <- buff[i].Wait() }()
+		cmd := buff[i]
+		go func(c *exec.Cmd) { ch <- c.Wait() }(cmd)
 	}
 	return ch
 }
