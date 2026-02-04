@@ -28,7 +28,7 @@ func WatchFile(ctx context.Context, path string, callback func()) error {
 		case <-ctx.Done():
 			return nil
 		case ev := <-w.Events:
-			if ev.Op&fsnotify.Write == fsnotify.Write && ev.Name == abs {
+			if ev.Name == abs && (ev.Op&fsnotify.Write == fsnotify.Write || ev.Op&fsnotify.Create == fsnotify.Create || ev.Op&fsnotify.Rename == fsnotify.Rename) {
 				callback()
 			}
 		case err = <-w.Errors:
