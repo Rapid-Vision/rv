@@ -4,7 +4,7 @@ Module for describing an `rv` scenes. To create a scene implement a class derriv
 - To preview scene use the `rv preview <scene.py>` command.
 - To render resulting dataset use the `rv render <scene.py>` command.
 
-## Scene example
+### Scene example
 Here is a basic non-random scene with a cube and a sphere.
 To preview resulting segmentation masks see the `PreviewIndexOB0001.png` after rendering.
 ```
@@ -26,7 +26,7 @@ class BasicScene(rv.Scene):
         cam = self.get_camera().set_location((7, 7, 3)).point_at(empty)
 ```
 
-## Results
+### Results
 | Image | Segmentation |
 | :-: | :-: |
 | ![resulting image](/examples/1_primitives/1_res.png) | ![resulting image](/examples/1_primitives/1_segs.png)|
