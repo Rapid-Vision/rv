@@ -1,0 +1,143 @@
+model Task {
+    id: int
+    task_name: string
+    payload: raw?
+    status: string
+    worker_id: int?
+    result: raw?
+    retry_count: int
+    max_attempts: int?
+    backoff_base_seconds: int?
+    max_timeout: int?
+    timeout_set_at: string?
+    progress: int?
+    progress_message: string?
+    progress_payload: raw?
+    available_at: string?
+    created_at: string
+    updated_at: string
+}
+
+model TasksStatus {
+    total: int
+    pending: int
+    deleted: int
+    completed: int
+    claimed: int
+    failed: int
+    rejected: int
+}
+
+model HealthStatus {
+    db: string
+}
+
+model Status {
+    tasks: TasksStatus
+    health: HealthStatus
+}
+
+model Worker {
+    id: int
+    name: string
+    task_name: string
+    status: string
+    created_at: string
+    last_seen: string
+}
+
+model History {
+    id: int
+    entity_type: string
+    entity_id: int
+    event_type: string
+    data: string
+    created_at: string
+}
+
+model TaskDispatch {
+    task: Task?
+    dispatch_token: string?
+}
+
+rpc status() Status
+
+rpc health() HealthStatus
+
+rpc list_tasks(
+    statuses: list[string]?,
+    limit: int?,
+    offset: int?,
+) list[Task]
+
+rpc show_task(
+    task_id: int,
+) Task
+
+rpc show_task_history(
+    task_id: int,
+    limit: int?,
+    offset: int?,
+) list[History]
+
+rpc submit_task(
+    task_name: string,
+    payload: raw,
+    max_attempts: int?,
+    backoff_base_seconds: int?,
+) Task
+
+rpc delete_task(
+    task_id: int,
+)
+
+rpc unclaim_task(
+    task_id: int,
+)
+
+rpc declare_worker(
+    name: string,
+    task_name: string,
+) Worker
+
+rpc list_workers(
+    limit: int?,
+    offset: int?,
+) list[Worker]
+
+rpc request_task(
+    worker_id: int,
+) TaskDispatch
+
+rpc submit_result(
+    worker_id: int,
+    task_id: int,
+    dispatch_token: string,
+    status: string,
+    result: raw,
+) Task
+
+rpc update_task_timeout(
+    worker_id: int,
+    task_id: int,
+    dispatch_token: string,
+    max_timeout: int,
+) Task
+
+rpc update_task_progress(
+    worker_id: int,
+    task_id: int,
+    dispatch_token: string,
+    progress: int,
+    progress_message: string?,
+    progress_payload: raw?,
+) Task
+
+rpc update_worker_status(
+    worker_id: int,
+    status: string?,
+) Worker
+
+rpc stop_worker(
+    worker_id: int,
+)
