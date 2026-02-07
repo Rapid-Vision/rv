@@ -706,7 +706,7 @@ class WorldSky(World):
     altitude: float = None
 
     air: float = 0.1
-    dust: float = 0.01
+    aerosol_density: float = 0.01
     ozone: float = 10.0
 
     def __init__(self):
@@ -754,8 +754,8 @@ class WorldSky(World):
 
         if self.air is not None:
             node_sky_tex.air_density = self.air
-        if self.dust is not None:
-            node_sky_tex.dust_density = self.dust
+        if self.aerosol_density is not None:
+            node_sky_tex.aerosol_density = self.aerosol_density
         if self.ozone is not None:
             node_sky_tex.ozone_density = self.ozone
 
@@ -767,7 +767,7 @@ class WorldSky(World):
         sun_elevation: float = None,  # Sun elevation
         rotation_z: float = None,  # Angle representing the sun direction
         air: float = None,  # Air density
-        dust: float = None,  # Dust density
+        aerosol_density: float = None,  # Aerosol density
         ozone: float = None,  # Ozone density
     ):
         if strength is not None:
@@ -782,8 +782,8 @@ class WorldSky(World):
             self.rotation_z = rotation_z
         if air is not None:
             self.air = air
-        if dust is not None:
-            self.dust = dust
+        if aerosol_density is not None:
+            self.aerosol_density = aerosol_density
         if ozone is not None:
             self.ozone = ozone
 
