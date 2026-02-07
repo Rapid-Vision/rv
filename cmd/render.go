@@ -24,7 +24,9 @@ var renderCmd = &cobra.Command{
 			logs.Err.Fatalln("Failed to parse output path:", err)
 		}
 
-		render.Render(scriptPath, imageNum, procs, outputDirAbs)
+		if err := render.Render(scriptPath, imageNum, procs, outputDirAbs); err != nil {
+			logs.Err.Fatalln("Render failed:", err)
+		}
 	},
 }
 

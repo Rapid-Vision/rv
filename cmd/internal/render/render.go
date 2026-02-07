@@ -12,7 +12,7 @@ import (
 	"github.com/Rapid-Vision/rv/cmd/internal/utils"
 )
 
-func Render(scriptPathRel string, imgNum int, procs int, outputDir string) {
+func Render(scriptPathRel string, imgNum int, procs int, outputDir string) error {
 	scriptPath, err := filepath.Abs(scriptPathRel)
 	if err != nil {
 		logs.Err.Fatalln("Failed to get script absolute path:", err)
@@ -87,6 +87,7 @@ func Render(scriptPathRel string, imgNum int, procs int, outputDir string) {
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	waitCh := utils.WaitCmdBuff(cmdBuff)
+	var renderErr error
 
 	// Wait for either all Blender instances exit or signal
 	for i := 0; i < procs; i += 1 {
@@ -100,9 +101,14 @@ func Render(scriptPathRel string, imgNum int, procs int, outputDir string) {
 		case err = <-waitCh:
 			if err != nil {
 				logs.Info.Println("Blender exited with error:", err)
+				if renderErr == nil {
+					renderErr = err
+				}
 			} else {
 				logs.Info.Println("Blender exited.")
 			}
 		}
 	}
+
+	return renderErr
 }
