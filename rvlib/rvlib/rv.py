@@ -940,73 +940,247 @@ def _configure_compositor(
     output_dir: str,  # Directory where rendered output files will be saved
 ) -> None:
     """
-    Configures compositor nodes in Blender for saving results.å
+    Configure compositor nodes in Blender 5 for saving render outputs.
     """
-
-    bpy.context.scene.use_nodes = True
-    tree = bpy.context.scene.node_tree
+    scene = bpy.context.scene
+    tree = _get_compositor_tree(scene)
     tree.nodes.clear()
     tree.links.clear()
 
-    render_layers = tree.nodes.new("CompositorNodeRLayers")
+    dx, dy = 350, 60
+
+    render_layers = tree.nodes.new(type="CompositorNodeRLayers")
     render_layers.location = (0, 0)
 
-    comp = tree.nodes.new("CompositorNodeComposite")
+    _connect_group_output_image(tree, render_layers, dx, dy)
 
-    dx, dy = 350, 60
-    comp.location = (dx, dy)
-    tree.links.new(render_layers.outputs["Image"], comp.inputs["Image"])
-
-    file_out_node = tree.nodes.new("CompositorNodeOutputFile")
-    file_out_node.file_slots.clear()
+    file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
     file_out_node.location = (2 * dx, 0)
-    if output_dir is not None:
-        file_out_node.base_path = output_dir
+    _reset_file_output_node(file_out_node, output_dir)
+    _configure_file_output_node_format(
+        file_out_node,
+        file_format="PNG",
+        color_mode="RGBA",
+        color_depth="8",
+    )
+
+    index_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
+    index_file_out_node.location = (2 * dx, -350)
+    _reset_file_output_node(index_file_out_node, output_dir)
+    _configure_file_output_node_format(
+        index_file_out_node,
+        file_format="PNG",
+        color_mode="RGB",
+        color_depth="16",
+    )
+
+    index_ob = _find_socket_by_name(render_layers.outputs, "Object Index")
+    index_ma = _find_socket_by_name(render_layers.outputs, "Material Index")
+    index_sockets = [index_ob, index_ma]
 
     for output in render_layers.outputs:
-        name = output.name
-        if name not in render_layers.outputs:
-            continue
-        if name in ["IndexOB", "IndexMA"]:
+        if output in index_sockets:
             continue
 
-        slot = file_out_node.file_slots.new(name)
-        tree.links.new(render_layers.outputs[name], file_out_node.inputs[name])
+        slot_name = output.name
+        out_input = _add_file_output_item(file_out_node, slot_name, output)
+        _configure_file_output_item(
+            file_out_node,
+            slot_name,
+            file_path=slot_name,
+        )
+        tree.links.new(output, out_input)
 
-    index_file_out_node = tree.nodes.new("CompositorNodeOutputFile")
-    index_file_out_node.file_slots.clear()
-    index_file_out_node.location = (2 * dx, -350)
-    index_file_out_node.format.color_mode = "BW"
-    index_file_out_node.format.color_depth = "16"
-    if output_dir is not None:
-        index_file_out_node.base_path = output_dir
-
-    for i, name in enumerate(["IndexOB", "IndexMA"]):
-        if name not in render_layers.outputs:
+    preview_group = bpy.data.node_groups.get("PreviewIndex")
+    for i, index_output in enumerate(index_sockets):
+        if index_output is None:
             continue
 
-        preview_node = tree.nodes.new("CompositorNodeGroup")
-        preview_node.node_tree = bpy.data.node_groups.get("PreviewIndex")
-        preview_node.location = (dx, -200 - dy * i)
-        preview_node.label = f"{name} Preview"
-        preview_node.hide = True
-
-        divider_node = tree.nodes.new("CompositorNodeMath")
+        divider_node = tree.nodes.new(type="ShaderNodeMath")
         divider_node.operation = "DIVIDE"
         divider_node.inputs[1].default_value = 2**16
         divider_node.location = (dx, -350 - dy * i)
         divider_node.hide = True
 
-        preview_name = f"Preview{name}"
-        slot = file_out_node.file_slots.new(preview_name)
-        tree.links.new(render_layers.outputs[name], preview_node.inputs["Index"])
-        tree.links.new(
-            preview_node.outputs["Preview"], file_out_node.inputs[preview_name]
+        index_name = _index_slot_name(i)
+        index_input = _add_file_output_item(
+            index_file_out_node, index_name, index_output
         )
+        _configure_file_output_item(
+            index_file_out_node,
+            index_name,
+            file_path=index_name,
+        )
+        tree.links.new(index_output, divider_node.inputs[0])
+        tree.links.new(divider_node.outputs[0], index_input)
 
-        slot = index_file_out_node.file_slots.new(name)
-        tree.links.new(render_layers.outputs[name], divider_node.inputs[0])
-        tree.links.new(divider_node.outputs[0], index_file_out_node.inputs[name])
+        if preview_group is not None:
+            preview_node = tree.nodes.new(type="CompositorNodeGroup")
+            preview_node.node_tree = preview_group
+            preview_node.location = (dx, -200 - dy * i)
+            preview_node.label = f"{index_name} Preview"
+            preview_node.hide = True
+
+            preview_input = _find_socket_by_name(preview_node.inputs, "Index")
+            preview_output = _find_socket_by_name(preview_node.outputs, "Preview")
+            if preview_input is not None and preview_output is not None:
+                preview_name = _preview_slot_name(i)
+                preview_file_input = _add_file_output_item(
+                    file_out_node, preview_name, preview_output
+                )
+                _configure_file_output_item(
+                    file_out_node,
+                    preview_name,
+                    file_path=preview_name,
+                )
+                tree.links.new(index_output, preview_input)
+                tree.links.new(preview_output, preview_file_input)
+
+
+def _get_compositor_tree(scene: bpy.types.Scene):
+    tree = scene.compositing_node_group
+    if tree is None:
+        tree = bpy.data.node_groups.new(
+            name=f"RVCompositor_{scene.name}",
+            type="CompositorNodeTree",
+        )
+        scene.compositing_node_group = tree
+    return tree
+
+
+def _connect_group_output_image(tree, render_layers, dx: float, dy: float):
+    group_output = tree.nodes.new(type="NodeGroupOutput")
+    group_output.location = (dx, dy)
+
+    _ensure_group_output_socket(tree, "Image")
+    image_input = _find_socket_by_name(group_output.inputs, "Image")
+    image_output = _find_socket_by_name(render_layers.outputs, "Image")
+    if image_input is None or image_output is None:
+        raise RuntimeError("Failed to bind compositor Image output socket.")
+    tree.links.new(image_output, image_input)
+
+
+def _ensure_group_output_socket(tree, socket_name: str):
+    target = _normalize_socket_name(socket_name)
+    for item in tree.interface.items_tree:
+        item_name = getattr(item, "name", None)
+        if item_name is not None and _normalize_socket_name(item_name) == target:
+            return
+
+    tree.interface.new_socket(
+        name=socket_name,
+        in_out="OUTPUT",
+        socket_type="NodeSocketColor",
+    )
+
+
+def _reset_file_output_node(node, output_dir: str | None):
+    node.file_output_items.clear()
+    if output_dir is not None:
+        node.directory = output_dir
+    node.file_name = ""
+
+
+def _add_file_output_item(node, slot_name: str, source_socket):
+    node.file_output_items.new(_socket_type_for_output_item(source_socket), slot_name)
+    output_input = _find_socket_by_name(node.inputs, slot_name)
+    if output_input is None:
+        raise RuntimeError(f"File output socket '{slot_name}' was not created.")
+    return output_input
+
+
+def _configure_file_output_item(
+    node,
+    slot_name: str,
+    file_path: str,
+):
+    item = _find_file_output_item(node, slot_name)
+    if item is None:
+        raise RuntimeError(f"File output item '{slot_name}' not found.")
+
+    if hasattr(item, "override_node_format"):
+        item.override_node_format = False
+    if hasattr(item, "path"):
+        item.path = file_path
+    if hasattr(item, "name"):
+        item.name = file_path
+
+
+def _configure_file_output_node_format(
+    node,
+    file_format: str,
+    color_mode: str,
+    color_depth: str,
+):
+    if hasattr(node.format, "media_type"):
+        node.format.media_type = "IMAGE"
+    node.format.file_format = file_format
+    node.format.color_mode = color_mode
+    node.format.color_depth = color_depth
+
+
+def _find_file_output_item(node, slot_name: str):
+    target = _normalize_socket_name(slot_name)
+    for item in node.file_output_items:
+        if _normalize_socket_name(item.name) == target:
+            return item
+    return None
+
+
+def _socket_type_for_output_item(source_socket) -> str:
+    socket_type = str(getattr(source_socket, "type", "RGBA")).upper()
+    mapping = {
+        "VALUE": "FLOAT",
+        "COLOR": "RGBA",
+    }
+    socket_type = mapping.get(socket_type, socket_type)
+
+    valid = {
+        "FLOAT",
+        "INT",
+        "BOOLEAN",
+        "VECTOR",
+        "RGBA",
+        "ROTATION",
+        "MATRIX",
+        "STRING",
+        "MENU",
+        "SHADER",
+        "OBJECT",
+        "IMAGE",
+        "GEOMETRY",
+        "COLLECTION",
+        "TEXTURE",
+        "MATERIAL",
+        "BUNDLE",
+        "CLOSURE",
+    }
+    if socket_type not in valid:
+        return "RGBA"
+    return socket_type
+
+
+def _index_slot_name(idx: int) -> str:
+    return "IndexOB" if idx == 0 else "IndexMA"
+
+
+def _preview_slot_name(idx: int) -> str:
+    return "PreviewIndexOB" if idx == 0 else "PreviewIndexMA"
+
+
+def _normalize_socket_name(name: str) -> str:
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
+def _find_socket_by_name(sockets, candidate: str):
+    if candidate in sockets:
+        return sockets[candidate]
+
+    target = _normalize_socket_name(candidate)
+    for socket in sockets:
+        if _normalize_socket_name(socket.name) == target:
+            return socket
+    return None
 
 
 def _load_single_object(path: str):
