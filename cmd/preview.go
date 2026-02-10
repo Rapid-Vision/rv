@@ -10,11 +10,13 @@ var previewCmd = &cobra.Command{
 	Short: "Run live preview",
 	Long:  `Open a separate blender window which updates preview on each script file change.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		preview.Preview(args[0])
-	},
+	Run:   runPreview,
 }
 
 func init() {
 	rootCmd.AddCommand(previewCmd)
+}
+
+func runPreview(cmd *cobra.Command, args []string) {
+	preview.Preview(args[0])
 }

@@ -15,6 +15,35 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	workerURL               string
+	workerToken             string
+	workerName              string
+	workerTaskName          string
+	workerPollInterval      time.Duration
+	workerHeartbeatInterval time.Duration
+	workerRunOnce           bool
+)
+
+var workerCmd = &cobra.Command{
+	Use:   "worker",
+	Short: "Run an rv worker using rtasks",
+	Long:  "Poll rtasks for render jobs and execute them using rv render.",
+	Run:   runWorker,
+}
+
+func init() {
+	rootCmd.AddCommand(workerCmd)
+
+	workerCmd.Flags().StringVar(&workerURL, "url", "", "rtasks server URL")
+	workerCmd.Flags().StringVar(&workerToken, "token", os.Getenv("RTASKS_API_TOKEN"), "rtasks API token")
+	workerCmd.Flags().StringVar(&workerName, "worker-name", "", "worker name")
+	workerCmd.Flags().StringVar(&workerTaskName, "task-name", "", "task name")
+	workerCmd.Flags().DurationVar(&workerPollInterval, "poll-interval", 2*time.Second, "poll interval when idle")
+	workerCmd.Flags().DurationVar(&workerHeartbeatInterval, "heartbeat-interval", 10*time.Second, "heartbeat interval (0 disables)")
+	workerCmd.Flags().BoolVar(&workerRunOnce, "once", false, "run a single task and exit")
+}
+
 type workerTaskPayload struct {
 	Script string `json:"script"`
 	Number int    `json:"number"`
@@ -22,106 +51,93 @@ type workerTaskPayload struct {
 	Output string `json:"output"`
 }
 
-var workerCmd = &cobra.Command{
-	Use:   "worker",
-	Short: "Run an rv worker using rtasks",
-	Long:  "Poll rtasks for render jobs and execute them using rv render.",
-	Run: func(cmd *cobra.Command, args []string) {
-		url, _ := cmd.Flags().GetString("url")
-		token, _ := cmd.Flags().GetString("token")
-		workerName, _ := cmd.Flags().GetString("worker-name")
-		taskName, _ := cmd.Flags().GetString("task-name")
-		pollInterval, _ := cmd.Flags().GetDuration("poll-interval")
-		heartbeatInterval, _ := cmd.Flags().GetDuration("heartbeat-interval")
-		runOnce, _ := cmd.Flags().GetBool("once")
+func runWorker(_ *cobra.Command, args []string) {
+	if workerURL == "" {
+		logs.Err.Fatalln("--url is required")
+	}
+	if workerName == "" {
+		logs.Err.Fatalln("--worker-name is required")
+	}
+	if workerTaskName == "" {
+		logs.Err.Fatalln("--task-name is required")
+	}
+	if workerPollInterval <= 0 {
+		logs.Err.Fatalln("--poll-interval must be > 0")
+	}
 
-		if url == "" {
-			logs.Err.Fatalln("--url is required")
-		}
-		if workerName == "" {
-			logs.Err.Fatalln("--worker-name is required")
-		}
-		if taskName == "" {
-			logs.Err.Fatalln("--task-name is required")
-		}
-		if pollInterval <= 0 {
-			logs.Err.Fatalln("--poll-interval must be > 0")
-		}
+	client := rpcclient.NewRPCClient(workerURL)
+	if workerToken != "" {
+		client = client.WithBearerToken(workerToken)
+	}
 
-		client := rpcclient.NewRPCClient(url)
-		if token != "" {
-			client = client.WithBearerToken(token)
-		}
+	ctx := context.Background()
+	worker, err := client.DeclareWorker(ctx, rpcclient.DeclareWorkerParams{
+		Name:     workerName,
+		TaskName: workerTaskName,
+	})
+	if err != nil {
+		logs.Err.Fatalln("Failed to declare worker:", err)
+	}
+	logs.Info.Printf("Worker declared (id=%d, name=%s, task=%s)\n", worker.Id, worker.Name, worker.TaskName)
 
-		ctx := context.Background()
-		worker, err := client.DeclareWorker(ctx, rpcclient.DeclareWorkerParams{
-			Name:     workerName,
-			TaskName: taskName,
-		})
-		if err != nil {
-			logs.Err.Fatalln("Failed to declare worker:", err)
-		}
-		logs.Info.Printf("Worker declared (id=%d, name=%s, task=%s)\n", worker.Id, worker.Name, worker.TaskName)
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
 
-		stopCh := make(chan os.Signal, 1)
-		signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
-
-		done := make(chan struct{})
-		if heartbeatInterval > 0 {
-			go func() {
-				ticker := time.NewTicker(heartbeatInterval)
-				defer ticker.Stop()
-				for {
-					select {
-					case <-ticker.C:
-						_, _ = client.UpdateWorkerStatus(ctx, rpcclient.UpdateWorkerStatusParams{WorkerId: worker.Id})
-					case <-done:
-						return
-					}
+	done := make(chan struct{})
+	if workerHeartbeatInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(workerHeartbeatInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					_, _ = client.UpdateWorkerStatus(ctx, rpcclient.UpdateWorkerStatusParams{WorkerId: worker.Id})
+				case <-done:
+					return
 				}
-			}()
+			}
+		}()
+	}
+
+	for {
+		select {
+		case <-stopCh:
+			close(done)
+			_ = client.StopWorker(ctx, rpcclient.StopWorkerParams{WorkerId: worker.Id})
+			logs.Info.Println("Worker stopped.")
+			return
+		default:
 		}
 
-		for {
-			select {
-			case <-stopCh:
-				close(done)
-				_ = client.StopWorker(ctx, rpcclient.StopWorkerParams{WorkerId: worker.Id})
-				logs.Info.Println("Worker stopped.")
-				return
-			default:
-			}
-
-			dispatch, err := client.RequestTask(ctx, rpcclient.RequestTaskParams{WorkerId: worker.Id})
-			if err != nil {
-				logs.Warn.Println("Request task failed:", err)
-				time.Sleep(pollInterval)
-				continue
-			}
-			if dispatch.Task == nil {
-				time.Sleep(pollInterval)
-				continue
-			}
-			if dispatch.DispatchToken == nil {
-				logs.Warn.Println("Dispatch token missing; skipping task")
-				time.Sleep(pollInterval)
-				continue
-			}
-
-			task := dispatch.Task
-			err = handleWorkerTask(ctx, client, worker.Id, *dispatch.DispatchToken, task)
-			if err != nil {
-				logs.Warn.Println("Task failed:", err)
-			}
-
-			if runOnce {
-				close(done)
-				_ = client.StopWorker(ctx, rpcclient.StopWorkerParams{WorkerId: worker.Id})
-				logs.Info.Println("Worker stopped (once mode).")
-				return
-			}
+		dispatch, err := client.RequestTask(ctx, rpcclient.RequestTaskParams{WorkerId: worker.Id})
+		if err != nil {
+			logs.Warn.Println("Request task failed:", err)
+			time.Sleep(workerPollInterval)
+			continue
 		}
-	},
+		if dispatch.Task == nil {
+			time.Sleep(workerPollInterval)
+			continue
+		}
+		if dispatch.DispatchToken == nil {
+			logs.Warn.Println("Dispatch token missing; skipping task")
+			time.Sleep(workerPollInterval)
+			continue
+		}
+
+		task := dispatch.Task
+		err = handleWorkerTask(ctx, client, worker.Id, *dispatch.DispatchToken, task)
+		if err != nil {
+			logs.Warn.Println("Task failed:", err)
+		}
+
+		if workerRunOnce {
+			close(done)
+			_ = client.StopWorker(ctx, rpcclient.StopWorkerParams{WorkerId: worker.Id})
+			logs.Info.Println("Worker stopped (once mode).")
+			return
+		}
+	}
 }
 
 func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId int, dispatchToken string, task *rpcclient.TaskModel) error {
@@ -183,16 +199,4 @@ func submitTaskResult(ctx context.Context, client *rpcclient.RPCClient, workerId
 	if err != nil {
 		logs.Warn.Println("Failed to submit result:", err)
 	}
-}
-
-func init() {
-	rootCmd.AddCommand(workerCmd)
-
-	workerCmd.Flags().String("url", "", "rtasks server URL")
-	workerCmd.Flags().String("token", os.Getenv("RTASKS_API_TOKEN"), "rtasks API token")
-	workerCmd.Flags().String("worker-name", "", "worker name")
-	workerCmd.Flags().String("task-name", "", "task name")
-	workerCmd.Flags().Duration("poll-interval", 2*time.Second, "poll interval when idle")
-	workerCmd.Flags().Duration("heartbeat-interval", 10*time.Second, "heartbeat interval (0 disables)")
-	workerCmd.Flags().Bool("once", false, "run a single task and exit")
 }
