@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/Rapid-Vision/rv/cmd/internal/preview"
+	"github.com/Rapid-Vision/rv/internal/preview"
 	"github.com/spf13/cobra"
 )
 

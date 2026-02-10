@@ -3,8 +3,8 @@ package cmd
 import (
 	"path/filepath"
 
-	"github.com/Rapid-Vision/rv/cmd/internal/logs"
-	"github.com/Rapid-Vision/rv/cmd/internal/render"
+	"github.com/Rapid-Vision/rv/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/render"
 	"github.com/spf13/cobra"
 )
 

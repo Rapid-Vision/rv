@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Rapid-Vision/rv/cmd/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/logs"
 )
 
 type previewClient struct {

@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/Rapid-Vision/rv/cmd/internal/logs"
-	"github.com/Rapid-Vision/rv/cmd/internal/utils"
-	"github.com/Rapid-Vision/rv/cmd/internal/watcher"
+	"github.com/Rapid-Vision/rv/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/utils"
+	"github.com/Rapid-Vision/rv/internal/watcher"
 )
 
 func Preview(scriptPathRel string) {

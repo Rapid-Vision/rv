@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Rapid-Vision/rv/cmd/internal/logs"
-	"github.com/Rapid-Vision/rv/cmd/internal/render"
-	"github.com/Rapid-Vision/rv/cmd/internal/rpcclient"
+	"github.com/Rapid-Vision/rv/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/render"
+	"github.com/Rapid-Vision/rv/internal/rpcclient"
 	"github.com/spf13/cobra"
 )
 
