@@ -133,18 +133,168 @@ PASS_MAP = {
 }  # Map pass names to corresponding internal blender attribute names
 
 _RV_OWNED_KEY = "_rv_owned"
+_RV_RUN_ID_KEY = "_rv_run_id"
+_ACTIVE_RUN_ID = None
 
 
 def _mark_owned(obj: bpy.types.ID) -> None:
     if obj is None:
         return
+    _ensure_active_run()
     obj[_RV_OWNED_KEY] = True
+    obj[_RV_RUN_ID_KEY] = _ACTIVE_RUN_ID
 
 
 def _is_owned(obj: bpy.types.ID) -> bool:
     if obj is None:
         return False
-    return bool(obj.get(_RV_OWNED_KEY, False))
+    if obj.get(_RV_OWNED_KEY, False):
+        return True
+    return bool(obj.get(_RV_RUN_ID_KEY))
+
+
+def _ensure_active_run() -> None:
+    global _ACTIVE_RUN_ID
+    if _ACTIVE_RUN_ID is None:
+        _ACTIVE_RUN_ID = uuid.uuid4().hex
+
+
+def _mark_material_tree(material, visited: set[int] | None = None) -> None:
+    if material is None:
+        return
+    _mark_owned(material)
+    node_tree = getattr(material, "node_tree", None)
+    if node_tree is not None:
+        _mark_node_tree(node_tree, visited)
+
+
+def _mark_node_tree(node_tree, visited: set[int] | None = None) -> None:
+    if node_tree is None:
+        return
+    if visited is None:
+        visited = set()
+    ptr = node_tree.as_pointer()
+    if ptr in visited:
+        return
+    visited.add(ptr)
+
+    _mark_owned(node_tree)
+
+    for node in getattr(node_tree, "nodes", []):
+        image = getattr(node, "image", None)
+        if image is not None:
+            _mark_owned(image)
+
+
+def _mark_object_tree(obj: bpy.types.Object) -> None:
+    if obj is None:
+        return
+    _mark_owned(obj)
+
+    obj_data = getattr(obj, "data", None)
+    if obj_data is not None:
+        _mark_owned(obj_data)
+        for material in getattr(obj_data, "materials", []):
+            _mark_material_tree(material)
+        node_tree = getattr(obj_data, "node_tree", None)
+        if node_tree is not None:
+            _mark_node_tree(node_tree)
+
+    for slot in getattr(obj, "material_slots", []):
+        _mark_material_tree(getattr(slot, "material", None))
+
+    for modifier in getattr(obj, "modifiers", []):
+        node_group = getattr(modifier, "node_group", None)
+        if node_group is not None:
+            _mark_node_tree(node_group)
+
+
+def _mark_world_tree(world) -> None:
+    if world is None:
+        return
+    _mark_owned(world)
+    node_tree = getattr(world, "node_tree", None)
+    if node_tree is not None:
+        _mark_node_tree(node_tree)
+
+
+def _remove_owned_unused(id_collection) -> None:
+    for datablock in list(id_collection):
+        if not _is_owned(datablock):
+            continue
+        if getattr(datablock, "users", 0) > 0:
+            continue
+        try:
+            id_collection.remove(datablock, do_unlink=True)
+        except TypeError:
+            id_collection.remove(datablock)
+
+
+def _remove_rv_data() -> None:
+    _get_generated_collection()
+    scene = bpy.context.scene
+
+    if (
+        scene.compositing_node_group is not None
+        and _is_owned(scene.compositing_node_group)
+    ):
+        scene.compositing_node_group = None
+
+    for obj in list(bpy.data.objects):
+        if not _is_owned(obj):
+            continue
+        bpy.data.objects.remove(obj, do_unlink=True)
+
+    for world in list(bpy.data.worlds):
+        if not _is_owned(world):
+            continue
+        if scene.world == world:
+            scene.world = None
+        bpy.data.worlds.remove(world, do_unlink=True)
+
+    _remove_owned_unused(bpy.data.images)
+    _remove_owned_unused(bpy.data.materials)
+    _remove_owned_unused(bpy.data.meshes)
+    _remove_owned_unused(bpy.data.node_groups)
+    _remove_owned_unused(bpy.data.cameras)
+    _remove_owned_unused(bpy.data.lights)
+    _remove_owned_unused(bpy.data.curves)
+
+    if scene.world is None:
+        fallback_world = bpy.data.worlds.get("World")
+        if fallback_world is None:
+            fallback_world = bpy.data.worlds.new("World")
+        scene.world = fallback_world
+
+
+def _purge_orphans() -> None:
+    # Blender API differs by version; attempt supported calls and keep cleanup best-effort.
+    if not hasattr(bpy.data, "orphans_purge"):
+        return
+
+    try:
+        bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=False, do_recursive=True)
+    except TypeError:
+        try:
+            bpy.data.orphans_purge()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def begin_run(purge_orphans: bool = True) -> str:
+    global _ACTIVE_RUN_ID
+    _remove_rv_data()
+    if purge_orphans:
+        _purge_orphans()
+    _ACTIVE_RUN_ID = uuid.uuid4().hex
+    return _ACTIVE_RUN_ID
+
+
+def end_run(purge_orphans: bool = False) -> None:
+    if purge_orphans:
+        _purge_orphans()
 
 
 def _get_generated_collection() -> bpy.types.Collection:
@@ -224,7 +374,7 @@ class Scene(ABC, _Serializable):
         _get_generated_collection()
         bpy.ops.object.camera_add()
         _move_object_to_generated_collection(bpy.context.active_object)
-        _mark_owned(bpy.context.active_object)
+        _mark_object_tree(bpy.context.active_object)
         self.camera = Camera(bpy.context.active_object, self)
         bpy.context.scene.camera = self.camera.obj
         self.camera.set_location(mathutils.Vector((0, 0, 10)))
@@ -263,7 +413,7 @@ class Scene(ABC, _Serializable):
         Create an empty object. May be useful to point camera at or for debugging during `preview` stage.
         """
         empty = bpy.data.objects.new(name, None)
-        _mark_owned(empty)
+        _mark_object_tree(empty)
         _get_generated_collection().objects.link(empty)
 
         return Object(empty, self)
@@ -283,7 +433,7 @@ class Scene(ABC, _Serializable):
         )
         sphere = bpy.context.active_object
         _move_object_to_generated_collection(sphere)
-        _mark_owned(sphere)
+        _mark_object_tree(sphere)
         sphere.name = name
         return Object(sphere, self)
 
@@ -294,7 +444,7 @@ class Scene(ABC, _Serializable):
         bpy.ops.mesh.primitive_cube_add(size=size)
         cube = bpy.context.active_object
         _move_object_to_generated_collection(cube)
-        _mark_owned(cube)
+        _mark_object_tree(cube)
         cube.name = name
         return Object(cube, self)
 
@@ -311,7 +461,7 @@ class Scene(ABC, _Serializable):
         )
         plane = bpy.context.active_object
         _move_object_to_generated_collection(plane)
-        _mark_owned(plane)
+        _mark_object_tree(plane)
         plane.name = name
         return Object(plane, self)
 
@@ -366,12 +516,12 @@ class Scene(ABC, _Serializable):
 
         if import_name is None:
             obj = _load_single_object(path)
-            _mark_owned(obj)
+            _mark_object_tree(obj)
             return ObjectLoader(obj, self)
         else:
             objects = _load_all_objects(path)
             for obj in objects:
-                _mark_owned(obj)
+                _mark_object_tree(obj)
                 if obj.name == import_name:
                     return ObjectLoader(obj, self)
             object_names = ", ".join(obj.name for obj in objects)
@@ -399,13 +549,13 @@ class Scene(ABC, _Serializable):
 
         if import_names is None:
             for obj in objects:
-                _mark_owned(obj)
+                _mark_object_tree(obj)
                 res.append(ObjectLoader(obj, self))
         else:
             import_names_set = set(import_names)
             found_import_names = set()
             for obj in objects:
-                _mark_owned(obj)
+                _mark_object_tree(obj)
                 if obj.name in import_names_set:
                     found_import_names.add(obj.name)
                     res.append(ObjectLoader(obj, self))
@@ -484,7 +634,7 @@ class ObjectLoader:
         Create a single object instance from a loader.
         """
         res = self.obj.copy()
-        _mark_owned(res)
+        _mark_object_tree(res)
         _get_generated_collection().objects.link(res)
 
         if name is not None:
@@ -894,9 +1044,8 @@ class WorldHDRI(World):
         links.new(node_background.outputs["Background"], node_output.inputs["Surface"])
 
         if self.hdri_path is not None:
-            node_env_tex.image = bpy.data.images.load(
-                self.hdri_path, check_existing=True
-            )
+            node_env_tex.image = bpy.data.images.load(self.hdri_path, check_existing=False)
+            _mark_owned(node_env_tex.image)
 
         if self.strength is not None:
             node_background.inputs["Strength"].default_value = self.strength
@@ -941,7 +1090,7 @@ class WorldImported(World):
             else:
                 data_to.worlds = [self.world_name]
         imported_world = data_to.worlds[0]
-        _mark_owned(imported_world)
+        _mark_world_tree(imported_world)
         bpy.context.scene.world = imported_world
 
         for k, v in self.params.items():
@@ -1107,7 +1256,10 @@ def _get_compositor_tree(scene: bpy.types.Scene):
             name=f"RVCompositor_{scene.name}",
             type="CompositorNodeTree",
         )
+        _mark_node_tree(tree)
         scene.compositing_node_group = tree
+    else:
+        _mark_node_tree(tree)
     return tree
 
 
@@ -1274,19 +1426,5 @@ def _combine_arglist_set(args):
 
 
 def _clear_scene():
-    _get_generated_collection()
-    for obj in list(bpy.data.objects):
-        if not _is_owned(obj):
-            continue
-        bpy.data.objects.remove(obj, do_unlink=True)
-    for world in list(bpy.data.worlds):
-        if not _is_owned(world):
-            continue
-        if bpy.context.scene.world == world:
-            bpy.context.scene.world = None
-        bpy.data.worlds.remove(world, do_unlink=True)
-    if bpy.context.scene.world is None:
-        fallback_world = bpy.data.worlds.get("World")
-        if fallback_world is None:
-            fallback_world = bpy.data.worlds.new("World")
-        bpy.context.scene.world = fallback_world
+    # Backward-compatible entrypoint used by older scripts.
+    begin_run(purge_orphans=True)

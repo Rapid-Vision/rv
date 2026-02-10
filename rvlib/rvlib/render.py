@@ -47,12 +47,13 @@ def run_script(script_path, output_dir):
         return
 
     def run_script():
-        rv._clear_scene()
+        rv.begin_run(purge_orphans=True)
         instance = scene_classes[0](output_dir)
         instance.generate()
         instance._post_gen()
         instance._render()
         instance._save_metadata("_meta.json")
+        rv.end_run(purge_orphans=False)
 
     run_script()
 

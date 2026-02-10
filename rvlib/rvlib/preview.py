@@ -62,10 +62,11 @@ def run_script(script_path):
         print(CLASS_COUNT_ERROR_MESSAGE)
         return
 
-    rv._clear_scene()
+    rv.begin_run(purge_orphans=True)
     instance = scene_classes[0]()
     instance.generate()
     instance._post_gen()
+    rv.end_run(purge_orphans=False)
 
 
 def request_rerun():
