@@ -132,6 +132,37 @@ PASS_MAP = {
     RenderPass.CRYPTO_ASSET: "use_pass_cryptomatte_asset",
 }  # Map pass names to corresponding internal blender attribute names
 
+_RV_OWNED_KEY = "_rv_owned"
+
+
+def _mark_owned(obj: bpy.types.ID) -> None:
+    if obj is None:
+        return
+    obj[_RV_OWNED_KEY] = True
+
+
+def _is_owned(obj: bpy.types.ID) -> bool:
+    if obj is None:
+        return False
+    return bool(obj.get(_RV_OWNED_KEY, False))
+
+
+def _get_generated_collection() -> bpy.types.Collection:
+    if "Generated" not in bpy.data.collections:
+        bpy.data.collections.new("Generated")
+    collection = bpy.data.collections["Generated"]
+    if bpy.context.scene.collection.children.get(collection.name) is None:
+        bpy.context.scene.collection.children.link(collection)
+    return collection
+
+
+def _move_object_to_generated_collection(obj: bpy.types.Object) -> None:
+    generated = _get_generated_collection()
+    for col in list(obj.users_collection):
+        col.objects.unlink(obj)
+    if generated.objects.get(obj.name) is None:
+        generated.objects.link(obj)
+
 
 class _Serializable:
     """
@@ -190,7 +221,10 @@ class Scene(ABC, _Serializable):
         self.objects = set()
         self.tags = set()
 
+        _get_generated_collection()
         bpy.ops.object.camera_add()
+        _move_object_to_generated_collection(bpy.context.active_object)
+        _mark_owned(bpy.context.active_object)
         self.camera = Camera(bpy.context.active_object, self)
         bpy.context.scene.camera = self.camera.obj
         self.camera.set_location(mathutils.Vector((0, 0, 10)))
@@ -229,7 +263,8 @@ class Scene(ABC, _Serializable):
         Create an empty object. May be useful to point camera at or for debugging during `preview` stage.
         """
         empty = bpy.data.objects.new(name, None)
-        bpy.context.collection.objects.link(empty)
+        _mark_owned(empty)
+        _get_generated_collection().objects.link(empty)
 
         return Object(empty, self)
 
@@ -247,6 +282,8 @@ class Scene(ABC, _Serializable):
             radius=radius, segments=segments, ring_count=ring_count
         )
         sphere = bpy.context.active_object
+        _move_object_to_generated_collection(sphere)
+        _mark_owned(sphere)
         sphere.name = name
         return Object(sphere, self)
 
@@ -256,6 +293,8 @@ class Scene(ABC, _Serializable):
         """
         bpy.ops.mesh.primitive_cube_add(size=size)
         cube = bpy.context.active_object
+        _move_object_to_generated_collection(cube)
+        _mark_owned(cube)
         cube.name = name
         return Object(cube, self)
 
@@ -271,6 +310,8 @@ class Scene(ABC, _Serializable):
             size=size,
         )
         plane = bpy.context.active_object
+        _move_object_to_generated_collection(plane)
+        _mark_owned(plane)
         plane.name = name
         return Object(plane, self)
 
@@ -325,13 +366,19 @@ class Scene(ABC, _Serializable):
 
         if import_name is None:
             obj = _load_single_object(path)
+            _mark_owned(obj)
             return ObjectLoader(obj, self)
         else:
             objects = _load_all_objects(path)
             for obj in objects:
+                _mark_owned(obj)
                 if obj.name == import_name:
                     return ObjectLoader(obj, self)
-        return None
+            object_names = ", ".join(obj.name for obj in objects)
+            raise ValueError(
+                f"Object '{import_name}' was not found in '{path}'. "
+                f"Available objects: [{object_names}]"
+            )
 
     def load_objects(
         self, blendfile: str, import_names: list[str] = None
@@ -352,12 +399,25 @@ class Scene(ABC, _Serializable):
 
         if import_names is None:
             for obj in objects:
+                _mark_owned(obj)
                 res.append(ObjectLoader(obj, self))
         else:
             import_names_set = set(import_names)
+            found_import_names = set()
             for obj in objects:
+                _mark_owned(obj)
                 if obj.name in import_names_set:
+                    found_import_names.add(obj.name)
                     res.append(ObjectLoader(obj, self))
+
+            missing = import_names_set - found_import_names
+            if missing:
+                missing_sorted = ", ".join(sorted(missing))
+                available = ", ".join(obj.name for obj in objects)
+                raise ValueError(
+                    f"Objects [{missing_sorted}] were not found in '{path}'. "
+                    f"Available objects: [{available}]"
+                )
 
         return res
 
@@ -424,7 +484,8 @@ class ObjectLoader:
         Create a single object instance from a loader.
         """
         res = self.obj.copy()
-        bpy.context.collection.objects.link(res)
+        _mark_owned(res)
+        _get_generated_collection().objects.link(res)
 
         if name is not None:
             res.name = name
@@ -879,7 +940,9 @@ class WorldImported(World):
                 data_to.worlds = [data_from.worlds[0]]
             else:
                 data_to.worlds = [self.world_name]
-        bpy.context.scene.world = data_to.worlds[0]
+        imported_world = data_to.worlds[0]
+        _mark_owned(imported_world)
+        bpy.context.scene.world = imported_world
 
         for k, v in self.params.items():
             bpy.context.scene.world[k] = v
@@ -1187,6 +1250,9 @@ def _load_single_object(path: str):
     with bpy.data.libraries.load(path, link=False) as (data_from, data_to):
         data_to.objects = [name for name in data_from.objects][:1]
 
+    if len(data_to.objects) == 0:
+        raise ValueError(f"No objects found in '{path}'.")
+
     return data_to.objects[0]
 
 
@@ -1208,9 +1274,19 @@ def _combine_arglist_set(args):
 
 
 def _clear_scene():
-    if "Generated" not in bpy.data.collections:
-        bpy.data.collections.new("Generated")
-        bpy.context.scene.collection.children.link(bpy.data.collections["Generated"])
-    collection = bpy.data.collections["Generated"]
-    for obj in collection.objects:
+    _get_generated_collection()
+    for obj in list(bpy.data.objects):
+        if not _is_owned(obj):
+            continue
         bpy.data.objects.remove(obj, do_unlink=True)
+    for world in list(bpy.data.worlds):
+        if not _is_owned(world):
+            continue
+        if bpy.context.scene.world == world:
+            bpy.context.scene.world = None
+        bpy.data.worlds.remove(world, do_unlink=True)
+    if bpy.context.scene.world is None:
+        fallback_world = bpy.data.worlds.get("World")
+        if fallback_world is None:
+            fallback_world = bpy.data.worlds.new("World")
+        bpy.context.scene.world = fallback_world

@@ -8,6 +8,7 @@ import sys
 import argparse
 import signal
 import importlib.util
+import traceback
 
 CLASS_COUNT_ERROR_MESSAGE = """ERROR: exactly one class derived from rv.Scene must be defined.
 Example usage:
@@ -41,13 +42,8 @@ def register_quit():
     bpy.app.timers.register(quit_blender)
 
 
-def clear():
-    if "Generated" not in bpy.data.collections:
-        bpy.data.collections.new("Generated")
-        bpy.context.scene.collection.children.link(bpy.data.collections["Generated"])
-    collection = bpy.data.collections["Generated"]
-    for obj in collection.objects:
-        bpy.data.objects.remove(obj, do_unlink=True)
+RERUN_PENDING = False
+RERUN_RUNNING = False
 
 
 def run_script(script_path):
@@ -66,18 +62,39 @@ def run_script(script_path):
         print(CLASS_COUNT_ERROR_MESSAGE)
         return
 
-    def generate_preview():
-        rv._clear_scene()
-        instance = scene_classes[0]()
-        instance.generate()
-        instance._post_gen()
+    rv._clear_scene()
+    instance = scene_classes[0]()
+    instance.generate()
+    instance._post_gen()
 
-    bpy.app.timers.register(generate_preview)
+
+def request_rerun():
+    global RERUN_PENDING
+    RERUN_PENDING = True
+
+
+def preview_tick():
+    global RERUN_PENDING, RERUN_RUNNING
+
+    if RERUN_RUNNING or not RERUN_PENDING:
+        return 0.1
+
+    RERUN_RUNNING = True
+    RERUN_PENDING = False
+    try:
+        run_script(ARGS.script)
+    except Exception:
+        print("ERROR: Failed to execute preview run")
+        traceback.print_exc()
+    finally:
+        RERUN_RUNNING = False
+
+    return 0.1
 
 
 def run_command(path, body):
     if path == "/rerun":
-        run_script(ARGS.script)
+        request_rerun()
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -90,7 +107,11 @@ class RequestHandler(BaseHTTPRequestHandler):
             try:
                 json_body = json.loads(body)
             except json.JSONDecodeError:
-                self.send_response_only(404)
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", 0)
+                self.end_headers()
+                return
 
         run_command(path, json_body)
         self.send_response(200)
@@ -120,7 +141,8 @@ signal.signal(signal.SIGINT, sig_handler)
 
 sys.path.append(ARGS.libpath)
 os.chdir(ARGS.cwd)
-run_script(ARGS.script)
+request_rerun()
+bpy.app.timers.register(preview_tick)
 
 server_thread = threading.Thread(target=run_server, daemon=True)
 server_thread.start()
