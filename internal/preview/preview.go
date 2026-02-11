@@ -14,11 +14,13 @@ import (
 	"github.com/Rapid-Vision/rv/internal/watcher"
 )
 
-func Preview(scriptPathRel string) {
-	scriptPath, err := filepath.Abs(scriptPathRel)
+func Preview(scriptPathArg string, cwdArg string) {
+	paths, err := utils.ResolveRuntimePaths(scriptPathArg, cwdArg)
 	if err != nil {
-		logs.Err.Fatalln("Failed to get script absolute path:", err)
+		logs.Err.Fatalln("Failed to resolve paths:", err)
 	}
+	scriptPath := paths.ScriptPath
+	cwdAbs := paths.Cwd
 
 	blenderPath, err := utils.GetBlenderPath()
 	if err != nil {
@@ -43,11 +45,6 @@ func Preview(scriptPathRel string) {
 		}
 	} else if info.IsDir() {
 		logs.Err.Fatalln("Script path is a directory, not a file:", scriptPath)
-	}
-
-	cwdAbs, err := utils.GetAbsCwdPath()
-	if err != nil {
-		logs.Err.Fatalln("Can't get current working directory path:", err)
 	}
 
 	// Start Blender

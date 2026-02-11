@@ -1,10 +1,9 @@
 package cmd
 
 import (
-	"path/filepath"
-
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/render"
+	"github.com/Rapid-Vision/rv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -12,6 +11,7 @@ var (
 	renderImageNum  int
 	renderProcs     int
 	renderOutputDir string
+	renderCwd       string
 )
 
 var renderCmd = &cobra.Command{
@@ -28,16 +28,22 @@ func init() {
 	renderCmd.Flags().IntVarP(&renderImageNum, "number", "n", 1, "Number of total images generated")
 	renderCmd.Flags().IntVarP(&renderProcs, "procs", "p", 1, "Maximum number of spawned Blender processes")
 	renderCmd.Flags().StringVarP(&renderOutputDir, "output", "o", "./out", "Output directory")
+	renderCmd.Flags().StringVar(&renderCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
 }
 
 func runRender(_ *cobra.Command, args []string) {
-	scriptPath := args[0]
-	outputDirAbs, err := filepath.Abs(renderOutputDir)
+	paths, err := utils.ResolveRenderPaths(args[0], renderOutputDir, renderCwd)
 	if err != nil {
-		logs.Err.Fatalln("Failed to parse output path:", err)
+		logs.Err.Fatalln("Failed to resolve paths:", err)
 	}
 
-	if err := render.Render(scriptPath, renderImageNum, renderProcs, outputDirAbs); err != nil {
+	if err := render.Render(render.RenderOptions{
+		ScriptPath: paths.ScriptPath,
+		Cwd:        paths.Cwd,
+		ImageNum:   renderImageNum,
+		Procs:      renderProcs,
+		OutputDir:  paths.OutputDir,
+	}); err != nil {
 		logs.Err.Fatalln("Render failed:", err)
 	}
 }

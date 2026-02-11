@@ -12,10 +12,29 @@ import (
 	"github.com/Rapid-Vision/rv/internal/utils"
 )
 
-func Render(scriptPathRel string, imgNum int, procs int, outputDir string) error {
-	scriptPath, err := filepath.Abs(scriptPathRel)
-	if err != nil {
-		logs.Err.Fatalln("Failed to get script absolute path:", err)
+type RenderOptions struct {
+	ScriptPath string
+	Cwd        string
+	ImageNum   int
+	Procs      int
+	OutputDir  string
+}
+
+func Render(opts RenderOptions) error {
+	scriptPath := opts.ScriptPath
+	imgNum := opts.ImageNum
+	procs := opts.Procs
+	outputDir := opts.OutputDir
+	cwdAbs := opts.Cwd
+
+	if scriptPath == "" {
+		logs.Err.Fatalln("script path is required")
+	}
+	if outputDir == "" {
+		logs.Err.Fatalln("output directory is required")
+	}
+	if cwdAbs == "" {
+		logs.Err.Fatalln("cwd is required")
 	}
 
 	blenderPath, err := utils.GetBlenderPath()
@@ -33,11 +52,6 @@ func Render(scriptPathRel string, imgNum int, procs int, outputDir string) error
 	seqOutDir, err := utils.GetSequentialOutputDir(outputDir)
 	if err != nil {
 		logs.Err.Fatalln("Can't create new output directory:", err)
-	}
-
-	cwdAbs, err := utils.GetAbsCwdPath()
-	if err != nil {
-		logs.Err.Fatalln("Can't get current working directory path:", err)
 	}
 
 	var cmdBuff [](*exec.Cmd)

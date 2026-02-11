@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/Rapid-Vision/rv/rvlib"
 )
@@ -147,6 +148,98 @@ func SplitTaskBetweenProcs(n int, p int, i int) int {
 	}
 
 	return res
+}
+
+type RuntimePaths struct {
+	ScriptPath string
+	Cwd        string
+}
+
+type RenderPaths struct {
+	ScriptPath string
+	Cwd        string
+	OutputDir  string
+}
+
+func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, error) {
+	if scriptPathArg == "" {
+		return RuntimePaths{}, errors.New("script path is required")
+	}
+
+	var cwdAbs string
+	var scriptAbs string
+
+	if cwdArg != "" {
+		var err error
+		cwdAbs, err = filepath.Abs(cwdArg)
+		if err != nil {
+			return RuntimePaths{}, fmt.Errorf("resolve cwd: %w", err)
+		}
+		if filepath.IsAbs(scriptPathArg) {
+			scriptAbs = filepath.Clean(scriptPathArg)
+		} else {
+			scriptAbs = filepath.Join(cwdAbs, scriptPathArg)
+		}
+	} else {
+		var err error
+		scriptAbs, err = filepath.Abs(scriptPathArg)
+		if err != nil {
+			return RuntimePaths{}, fmt.Errorf("resolve script: %w", err)
+		}
+		cwdAbs = filepath.Dir(scriptAbs)
+	}
+
+	return RuntimePaths{
+		ScriptPath: filepath.Clean(scriptAbs),
+		Cwd:        filepath.Clean(cwdAbs),
+	}, nil
+}
+
+func ResolveRenderPaths(scriptPathArg string, outputArg string, cwdArg string) (RenderPaths, error) {
+	runtimePaths, err := ResolveRuntimePaths(scriptPathArg, cwdArg)
+	if err != nil {
+		return RenderPaths{}, err
+	}
+
+	if outputArg == "" {
+		return RenderPaths{}, errors.New("output path is required")
+	}
+
+	outputAbs, err := filepath.Abs(outputArg)
+	if err != nil {
+		return RenderPaths{}, fmt.Errorf("resolve output: %w", err)
+	}
+
+	return RenderPaths{
+		ScriptPath: runtimePaths.ScriptPath,
+		Cwd:        runtimePaths.Cwd,
+		OutputDir:  filepath.Clean(outputAbs),
+	}, nil
+}
+
+func ValidateRelativePath(pathArg string) (string, error) {
+	if pathArg == "" {
+		return "", errors.New("path is required")
+	}
+	if filepath.IsAbs(pathArg) {
+		return "", errors.New("path must be relative")
+	}
+
+	cleanPath := filepath.Clean(pathArg)
+	if cleanPath == "." {
+		return "", errors.New("path must not be current directory")
+	}
+
+	if cleanPath == ".." {
+		return "", errors.New("path must not escape cwd")
+	}
+	if rel, err := filepath.Rel(".", cleanPath); err == nil {
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "", errors.New("path must not escape cwd")
+		}
+	}
+
+	return cleanPath, nil
 }
 
 func GetAbsCwdPath() (string, error) {

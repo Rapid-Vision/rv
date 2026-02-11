@@ -5,6 +5,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var previewCwd string
+
 var previewCmd = &cobra.Command{
 	Use:   "preview <script.py>",
 	Short: "Run live preview",
@@ -15,8 +17,9 @@ var previewCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(previewCmd)
+	previewCmd.Flags().StringVar(&previewCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
 }
 
 func runPreview(cmd *cobra.Command, args []string) {
-	preview.Preview(args[0])
+	preview.Preview(args[0], previewCwd)
 }

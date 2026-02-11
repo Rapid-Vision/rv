@@ -4,14 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/Rapid-Vision/rv/internal/assets"
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/render"
 	"github.com/Rapid-Vision/rv/internal/rpcclient"
+	"github.com/Rapid-Vision/rv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +29,9 @@ var (
 	workerPollInterval      time.Duration
 	workerHeartbeatInterval time.Duration
 	workerRunOnce           bool
+	workerCwd               string
+	workerOutputDir         string
+	workerCleanupPolicy     string
 )
 
 var workerCmd = &cobra.Command{
@@ -42,13 +51,21 @@ func init() {
 	workerCmd.Flags().DurationVar(&workerPollInterval, "poll-interval", 2*time.Second, "poll interval when idle")
 	workerCmd.Flags().DurationVar(&workerHeartbeatInterval, "heartbeat-interval", 10*time.Second, "heartbeat interval (0 disables)")
 	workerCmd.Flags().BoolVar(&workerRunOnce, "once", false, "run a single task and exit")
+	workerCmd.Flags().StringVar(&workerCwd, "cwd", "", "Working directory for resolving relative script paths (defaults to script directory)")
+	workerCmd.Flags().StringVarP(&workerOutputDir, "output", "o", "./out", "Output directory for rendered files (resolved from process working directory)")
+	workerCmd.Flags().StringVar(&workerCleanupPolicy, "cleanup-policy", "keep", "Asset cleanup policy: keep or cleanup")
 }
 
 type workerTaskPayload struct {
-	Script string `json:"script"`
-	Number int    `json:"number"`
-	Procs  int    `json:"procs"`
-	Output string `json:"output"`
+	Script        string               `json:"script"`
+	Number        int                  `json:"number"`
+	Procs         int                  `json:"procs"`
+	AssetMappings []workerAssetMapping `json:"asset_mappings"`
+}
+
+type workerAssetMapping struct {
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
 }
 
 func runWorker(_ *cobra.Command, args []string) {
@@ -63,6 +80,11 @@ func runWorker(_ *cobra.Command, args []string) {
 	}
 	if workerPollInterval <= 0 {
 		logs.Err.Fatalln("--poll-interval must be > 0")
+	}
+	switch workerCleanupPolicy {
+	case "keep", "cleanup":
+	default:
+		logs.Err.Fatalln("--cleanup-policy must be either \"keep\" or \"cleanup\"")
 	}
 
 	client := rpcclient.NewRPCClient(workerURL)
@@ -147,14 +169,188 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 		return err
 	}
 
-	logs.Info.Printf("Running task %d: script=%s number=%d procs=%d output=%s\n", task.Id, payload.Script, payload.Number, payload.Procs, payload.Output)
+	resolveWorkerCwd := func() (string, error) {
+		if workerCwd != "" {
+			return filepath.Abs(workerCwd)
+		}
+		return os.Getwd()
+	}
 
-	if err := render.Render(payload.Script, payload.Number, payload.Procs, payload.Output); err != nil {
-		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{"error": err.Error()})
+	var scriptPath string
+	var runtimeCwd string
+	var staged []assets.StagedFile
+
+	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 5, "resolving paths", nil)
+	outputDirAbs, err := filepath.Abs(workerOutputDir)
+	if err != nil {
+		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+			"error": "failed to resolve output path",
+			"details": map[string]any{
+				"message": err.Error(),
+			},
+		})
 		return err
 	}
 
-	submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "success", map[string]any{"ok": true})
+	if isManagedResourceSource(payload.Script) {
+		runtimeCwd, err = resolveWorkerCwd()
+		if err != nil {
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+				"error": "failed to resolve cwd",
+				"details": map[string]any{
+					"message": err.Error(),
+				},
+			})
+			return err
+		}
+
+		if err := os.MkdirAll(runtimeCwd, 0o755); err != nil {
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+				"error": "failed to create cwd",
+				"details": map[string]any{
+					"cwd":     runtimeCwd,
+					"message": err.Error(),
+				},
+			})
+			return err
+		}
+
+		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 12, "staging script", nil)
+		scriptMappings := []assets.Mapping{{
+			Source:      payload.Script,
+			Destination: workerScriptDestination(payload.Script),
+		}}
+		stagedScript, stageErr := assets.StageMappings(ctx, runtimeCwd, scriptMappings)
+		if stageErr != nil {
+			result := map[string]any{
+				"error": "script staging failed",
+				"details": map[string]any{
+					"message": stageErr.Error(),
+				},
+			}
+			if workerCleanupPolicy == "cleanup" && len(stagedScript) > 0 {
+				if cleanupErr := assets.CleanupStagedFiles(stagedScript); cleanupErr != nil {
+					result["cleanup_warning"] = cleanupErr.Error()
+				}
+			}
+			var mappingErr *assets.MappingError
+			if errors.As(stageErr, &mappingErr) {
+				result["details"] = map[string]any{
+					"source":      mappingErr.Source,
+					"destination": mappingErr.Destination,
+					"message":     mappingErr.Err.Error(),
+				}
+			}
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			return stageErr
+		}
+
+		staged = append(staged, stagedScript...)
+		scriptPath = stagedScript[0].Path
+	} else {
+		runtimePaths, pathErr := utils.ResolveRuntimePaths(payload.Script, workerCwd)
+		if pathErr != nil {
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+				"error": "failed to resolve paths",
+				"details": map[string]any{
+					"message": pathErr.Error(),
+				},
+			})
+			return pathErr
+		}
+		scriptPath = runtimePaths.ScriptPath
+		runtimeCwd = runtimePaths.Cwd
+	}
+
+	if err := os.MkdirAll(runtimeCwd, 0o755); err != nil {
+		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+			"error": "failed to create cwd",
+			"details": map[string]any{
+				"cwd":     runtimeCwd,
+				"message": err.Error(),
+			},
+		})
+		return err
+	}
+
+	logs.Info.Printf("Running task %d: script=%s number=%d procs=%d output=%s cwd=%s\n", task.Id, scriptPath, payload.Number, payload.Procs, outputDirAbs, runtimeCwd)
+
+	if len(payload.AssetMappings) > 0 {
+		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 20, "staging assets", nil)
+		mappings := make([]assets.Mapping, 0, len(payload.AssetMappings))
+		for _, mapping := range payload.AssetMappings {
+			mappings = append(mappings, assets.Mapping{
+				Source:      mapping.Source,
+				Destination: mapping.Destination,
+			})
+		}
+
+		stagedAssets, stageErr := assets.StageMappings(ctx, runtimeCwd, mappings)
+		if stageErr != nil {
+			result := map[string]any{
+				"error": "asset staging failed",
+				"details": map[string]any{
+					"message": stageErr.Error(),
+				},
+			}
+			if workerCleanupPolicy == "cleanup" && len(stagedAssets) > 0 {
+				toCleanup := append(append([]assets.StagedFile{}, staged...), stagedAssets...)
+				cleanupErr := assets.CleanupStagedFiles(toCleanup)
+				if cleanupErr != nil {
+					logs.Warn.Printf("Task %d cleanup failed after staging error: %v\n", task.Id, cleanupErr)
+					result["cleanup_warning"] = cleanupErr.Error()
+				}
+			}
+			var mappingErr *assets.MappingError
+			if errors.As(stageErr, &mappingErr) {
+				result["details"] = map[string]any{
+					"source":      mappingErr.Source,
+					"destination": mappingErr.Destination,
+					"message":     mappingErr.Err.Error(),
+				}
+			}
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			return stageErr
+		}
+		staged = append(staged, stagedAssets...)
+	}
+
+	runCleanup := func() error {
+		if workerCleanupPolicy != "cleanup" || len(staged) == 0 {
+			return nil
+		}
+		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 95, "cleanup", nil)
+		cleanupErr := assets.CleanupStagedFiles(staged)
+		if cleanupErr != nil {
+			logs.Warn.Printf("Task %d cleanup failed: %v\n", task.Id, cleanupErr)
+		}
+		return cleanupErr
+	}
+
+	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 40, "rendering", nil)
+	if err := render.Render(render.RenderOptions{
+		ScriptPath: scriptPath,
+		Cwd:        runtimeCwd,
+		ImageNum:   payload.Number,
+		Procs:      payload.Procs,
+		OutputDir:  outputDirAbs,
+	}); err != nil {
+		cleanupErr := runCleanup()
+		result := map[string]any{"error": err.Error()}
+		if cleanupErr != nil {
+			result["cleanup_warning"] = cleanupErr.Error()
+		}
+		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+		return err
+	}
+
+	cleanupErr := runCleanup()
+	result := map[string]any{"ok": true}
+	if cleanupErr != nil {
+		result["cleanup_warning"] = cleanupErr.Error()
+	}
+	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 100, "completed", nil)
+	submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "success", result)
 	return nil
 }
 
@@ -177,9 +373,15 @@ func parseWorkerPayload(raw *json.RawMessage) (*workerTaskPayload, error) {
 	if payload.Procs <= 0 {
 		payload.Procs = 1
 	}
-	if payload.Output == "" {
-		payload.Output = "./out"
+	for i, mapping := range payload.AssetMappings {
+		if mapping.Source == "" {
+			return nil, fmt.Errorf("payload.asset_mappings[%d].source is required", i)
+		}
+		if mapping.Destination == "" {
+			return nil, fmt.Errorf("payload.asset_mappings[%d].destination is required", i)
+		}
 	}
+
 	return &payload, nil
 }
 
@@ -199,4 +401,62 @@ func submitTaskResult(ctx context.Context, client *rpcclient.RPCClient, workerId
 	if err != nil {
 		logs.Warn.Println("Failed to submit result:", err)
 	}
+}
+
+func submitTaskProgress(ctx context.Context, client *rpcclient.RPCClient, workerId int, taskId int, dispatchToken string, progress int, message string, payload map[string]any) {
+	var rawPayload *json.RawMessage
+	if payload != nil {
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			logs.Warn.Println("Failed to encode progress payload:", err)
+			return
+		}
+		msg := json.RawMessage(raw)
+		rawPayload = &msg
+	}
+	var progressMessage *string
+	if message != "" {
+		progressMessage = &message
+	}
+	_, err := client.UpdateTaskProgress(ctx, rpcclient.UpdateTaskProgressParams{
+		WorkerId:        workerId,
+		TaskId:          taskId,
+		DispatchToken:   dispatchToken,
+		Progress:        progress,
+		ProgressMessage: progressMessage,
+		ProgressPayload: rawPayload,
+	})
+	if err != nil {
+		logs.Warn.Printf("Failed to submit task progress (task=%d): %v\n", taskId, err)
+	}
+}
+
+func isManagedResourceSource(source string) bool {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return false
+	}
+	parsed, err := url.Parse(source)
+	if err != nil {
+		return false
+	}
+	switch parsed.Scheme {
+	case "http", "https", "s3", "file":
+		return true
+	default:
+		return false
+	}
+}
+
+func workerScriptDestination(source string) string {
+	base := "script.py"
+	if parsed, err := url.Parse(source); err == nil {
+		if parsed.Path != "" {
+			candidate := filepath.Base(parsed.Path)
+			if candidate != "" && candidate != "." && candidate != "/" {
+				base = candidate
+			}
+		}
+	}
+	return filepath.Join(".rv-staged", "scripts", base)
 }
