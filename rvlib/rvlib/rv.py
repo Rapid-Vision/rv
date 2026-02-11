@@ -234,9 +234,8 @@ def _remove_rv_data() -> None:
     _get_generated_collection()
     scene = bpy.context.scene
 
-    if (
-        scene.compositing_node_group is not None
-        and _is_owned(scene.compositing_node_group)
+    if scene.compositing_node_group is not None and _is_owned(
+        scene.compositing_node_group
     ):
         scene.compositing_node_group = None
 
@@ -273,7 +272,9 @@ def _purge_orphans() -> None:
         return
 
     try:
-        bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=False, do_recursive=True)
+        bpy.data.orphans_purge(
+            do_local_ids=True, do_linked_ids=False, do_recursive=True
+        )
     except TypeError:
         try:
             bpy.data.orphans_purge()
@@ -354,8 +355,10 @@ class Scene(ABC, _Serializable):
     tags: set[str]
 
     objects: set["Object"]
+    materials: set["Material"]
 
     object_index_counter: int = 0
+    material_index_counter: int = 0
 
     @abstractmethod
     def generate(self) -> None:
@@ -369,6 +372,7 @@ class Scene(ABC, _Serializable):
         self.passes = set()
         self.output_dir = output_dir
         self.objects = set()
+        self.materials = set()
         self.tags = set()
 
         _get_generated_collection()
@@ -380,7 +384,7 @@ class Scene(ABC, _Serializable):
         self.camera.set_location(mathutils.Vector((0, 0, 10)))
         self._set_user_view()
 
-        self.world = WorldSky()
+        self.world = SkyWorld()
 
     def set_resolution(self, width: float, height: float = None):
         """
@@ -571,6 +575,21 @@ class Scene(ABC, _Serializable):
 
         return res
 
+    def create_material(self, name: str = "Material") -> "BasicMaterial":
+        """
+        Create a new basic (Principled BSDF) material.
+        """
+        return BasicMaterial(name=name)
+
+    def import_material(
+        self, blendfile: str, material_name: str = None
+    ) -> "ImportedMaterial":
+        """
+        Create an imported material descriptor from a .blend file.
+        """
+        path = str(pathlib.Path(blendfile).expanduser())
+        return ImportedMaterial(filepath=path, material_name=material_name)
+
     def _set_user_view(self) -> None:
         for area in bpy.context.screen.areas:
             if area.type == "VIEW_3D":
@@ -603,6 +622,11 @@ class Scene(ABC, _Serializable):
         self.objects.add(obj)
         return self.object_index_counter
 
+    def _register_material(self, material: "Material") -> int:
+        self.material_index_counter += 1
+        self.materials.add(material)
+        return self.material_index_counter
+
     def _get_meta(self) -> dict:
         res = super()._get_meta()
         res.update(
@@ -612,6 +636,7 @@ class Scene(ABC, _Serializable):
                 "passes": [p.value for p in self.passes],
                 "tags": list(self.tags),
                 "objects": list(obj._get_meta() for obj in self.objects),
+                "materials": list(material._get_meta() for material in self.materials),
             }
         )
         return res
@@ -641,6 +666,250 @@ class ObjectLoader:
             res.name = name
 
         return Object(res, self.scene)
+
+
+class Material(ABC, _Serializable):
+    """
+    Base class for material descriptors.
+
+    A material descriptor is converted to a real Blender material when assigned to an object.
+    """
+
+    name: str | None
+    index: int | None
+    _resolved_material: bpy.types.Material | None
+
+    def __init__(self, name: str | None = None) -> None:
+        super().__init__()
+        self.name = name
+        self.index = None
+        self._resolved_material = None
+
+    @abstractmethod
+    def set_params(self, **kwargs):
+        pass
+
+    @abstractmethod
+    def _build_material(self) -> bpy.types.Material:
+        pass
+
+    def _resolve(self, scene: "Scene") -> bpy.types.Material:
+        if self._resolved_material is not None:
+            try:
+                resolved_name = self._resolved_material.name
+                if bpy.data.materials.get(resolved_name) == self._resolved_material:
+                    return self._resolved_material
+            except Exception:
+                pass
+            self._resolved_material = None
+
+        material = self._build_material()
+        _mark_material_tree(material)
+        self.index = scene._register_material(self)
+        material.pass_index = self.index
+        self._resolved_material = material
+        return material
+
+    def _get_meta(self) -> dict:
+        res = super()._get_meta()
+        res.update(
+            {
+                "type": self.__class__.__name__,
+                "index": self.index,
+                "name": (
+                    self._resolved_material.name
+                    if self._resolved_material is not None
+                    else self.name
+                ),
+            }
+        )
+        return res
+
+
+def _get_principled_bsdf_node(material: bpy.types.Material):
+    node_tree = getattr(material, "node_tree", None)
+    if node_tree is None:
+        return None
+    for node in node_tree.nodes:
+        if node.type == "BSDF_PRINCIPLED":
+            return node
+    return None
+
+
+class BasicMaterial(Material):
+    base_color: tuple[float, float, float, float] | None
+    roughness: float | None
+    metallic: float | None
+    specular: float | None
+    emission_color: tuple[float, float, float, float] | None
+    emission_strength: float | None
+    alpha: float | None
+    transmission: float | None
+    ior: float | None
+    properties: dict
+
+    def __init__(self, name: str = "Material"):
+        super().__init__(name=name)
+        self.base_color = None
+        self.roughness = None
+        self.metallic = None
+        self.specular = None
+        self.emission_color = None
+        self.emission_strength = None
+        self.alpha = None
+        self.transmission = None
+        self.ior = None
+        self.properties = dict()
+
+    def set_params(
+        self,
+        base_color: (
+            tuple[float, float, float, float] | tuple[float, float, float] | None
+        ) = None,
+        roughness: float = None,
+        metallic: float = None,
+        specular: float = None,
+        emission_color: (
+            tuple[float, float, float, float] | tuple[float, float, float] | None
+        ) = None,
+        emission_strength: float = None,
+        alpha: float = None,
+        transmission: float = None,
+        ior: float = None,
+    ):
+        def _as_rgba(
+            color: tuple[float, float, float, float] | tuple[float, float, float],
+        ) -> tuple[float, float, float, float]:
+            rgba = tuple(color)
+            if len(rgba) == 3:
+                return (rgba[0], rgba[1], rgba[2], 1.0)
+            if len(rgba) != 4:
+                raise TypeError("Color must have 3 (RGB) or 4 (RGBA) components.")
+            return rgba
+
+        if base_color is not None:
+            self.base_color = _as_rgba(base_color)
+        if roughness is not None:
+            self.roughness = roughness
+        if metallic is not None:
+            self.metallic = metallic
+        if specular is not None:
+            self.specular = specular
+        if emission_color is not None:
+            self.emission_color = _as_rgba(emission_color)
+        if emission_strength is not None:
+            self.emission_strength = emission_strength
+        if alpha is not None:
+            self.alpha = alpha
+        if transmission is not None:
+            self.transmission = transmission
+        if ior is not None:
+            self.ior = ior
+        return self
+
+    def set_property(self, key: str, value: any):
+        self.properties[key] = value
+        return self
+
+    def _build_material(self) -> bpy.types.Material:
+        material = bpy.data.materials.new(name=self.name or "Material")
+        material.use_nodes = True
+
+        node = _get_principled_bsdf_node(material)
+        if node is None:
+            raise RuntimeError("Failed to create a Principled BSDF node.")
+
+        if self.base_color is not None:
+            node.inputs["Base Color"].default_value = self.base_color
+        if self.roughness is not None:
+            node.inputs["Roughness"].default_value = self.roughness
+        if self.metallic is not None:
+            node.inputs["Metallic"].default_value = self.metallic
+        if self.specular is not None:
+            node.inputs["Specular IOR Level"].default_value = self.specular
+        if self.emission_color is not None:
+            node.inputs["Emission Color"].default_value = self.emission_color
+        if self.emission_strength is not None:
+            node.inputs["Emission Strength"].default_value = self.emission_strength
+        if self.alpha is not None:
+            node.inputs["Alpha"].default_value = self.alpha
+            material.blend_method = "BLEND" if self.alpha < 1.0 else "OPAQUE"
+        if self.transmission is not None:
+            node.inputs["Transmission Weight"].default_value = self.transmission
+        if self.ior is not None:
+            node.inputs["IOR"].default_value = self.ior
+
+        for key, value in self.properties.items():
+            material[key] = value
+
+        return material
+
+    def _get_meta(self) -> dict:
+        res = super()._get_meta()
+        res.update(
+            {
+                "params": {
+                    "base_color": self.base_color,
+                    "roughness": self.roughness,
+                    "metallic": self.metallic,
+                    "specular": self.specular,
+                    "emission_color": self.emission_color,
+                    "emission_strength": self.emission_strength,
+                    "alpha": self.alpha,
+                    "transmission": self.transmission,
+                    "ior": self.ior,
+                },
+                "properties": self.properties,
+            }
+        )
+        return res
+
+
+class ImportedMaterial(Material):
+    filepath: str
+    material_name: str | None
+    params: dict
+
+    def __init__(self, filepath: str, material_name: str = None):
+        super().__init__(name=material_name)
+        self.filepath = filepath
+        self.material_name = material_name
+        self.params = dict()
+
+    def set_params(self, **kwargs):
+        self.params.update(kwargs)
+        return self
+
+    def _build_material(self) -> bpy.types.Material:
+        with bpy.data.libraries.load(self.filepath, link=False) as (data_from, data_to):
+            if self.material_name is None:
+                if len(data_from.materials) == 0:
+                    raise ValueError(f"No materials found in '{self.filepath}'.")
+                data_to.materials = [data_from.materials[0]]
+            else:
+                if self.material_name not in data_from.materials:
+                    available = ", ".join(data_from.materials)
+                    raise ValueError(
+                        f"Material '{self.material_name}' was not found in '{self.filepath}'. "
+                        f"Available materials: [{available}]"
+                    )
+                data_to.materials = [self.material_name]
+
+        material = data_to.materials[0]
+        for key, value in self.params.items():
+            material[key] = value
+        return material
+
+    def _get_meta(self) -> dict:
+        res = super()._get_meta()
+        res.update(
+            {
+                "filepath": self.filepath,
+                "material_name": self.material_name,
+                "params": self.params,
+            }
+        )
+        return res
 
 
 class Object(_Serializable):
@@ -713,6 +982,43 @@ class Object(_Serializable):
         """
         self.obj[key] = value
         self.properties[key] = value
+        return self
+
+    def set_material(self, material: "Material", slot: int = 0):
+        """
+        Set object material in the given slot.
+        """
+        if self.obj.data is None or not hasattr(self.obj.data, "materials"):
+            raise TypeError("Object does not support materials.")
+        if slot < 0:
+            raise ValueError("Material slot index must be non-negative.")
+
+        bpy_material = material._resolve(self.scene)
+        materials = self.obj.data.materials
+        while len(materials) <= slot:
+            materials.append(None)
+        materials[slot] = bpy_material
+        _mark_material_tree(bpy_material)
+        return self
+
+    def add_material(self, material: "Material"):
+        """
+        Append material to object's material slots.
+        """
+        if self.obj.data is None or not hasattr(self.obj.data, "materials"):
+            raise TypeError("Object does not support materials.")
+        bpy_material = material._resolve(self.scene)
+        self.obj.data.materials.append(bpy_material)
+        _mark_material_tree(bpy_material)
+        return self
+
+    def clear_materials(self):
+        """
+        Remove all materials from object.
+        """
+        if self.obj.data is None or not hasattr(self.obj.data, "materials"):
+            raise TypeError("Object does not support materials.")
+        self.obj.data.materials.clear()
         return self
 
     def set_tags(self, *tags: str | list[str]):
@@ -800,6 +1106,11 @@ class Object(_Serializable):
                 "name": self.obj.name,
                 "tags": list(self.tags),
                 "properties": self.properties,
+                "materials": [
+                    slot.material.name
+                    for slot in self.obj.material_slots
+                    if slot.material is not None
+                ],
                 "location": tuple(self.obj.location),
                 "rotation": tuple(self.obj.rotation_euler),
                 "scale": tuple(self.obj.scale),
@@ -848,7 +1159,7 @@ class World(ABC):
         pass
 
 
-class WorldColor(World):
+class BasicWorld(World):
     """
     `World` class representing a single color environmental lighting.
     """
@@ -899,7 +1210,7 @@ class WorldColor(World):
             self.strength = strength
 
 
-class WorldSky(World):
+class SkyWorld(World):
     """
     `World` class representing a procedural sky environement.
 
@@ -999,7 +1310,7 @@ class WorldSky(World):
             self.ozone = ozone
 
 
-class WorldHDRI(World):
+class HDRIWorld(World):
     """
     `World` class for importing lighting from an hdri `.exr` file.
 
@@ -1044,7 +1355,9 @@ class WorldHDRI(World):
         links.new(node_background.outputs["Background"], node_output.inputs["Surface"])
 
         if self.hdri_path is not None:
-            node_env_tex.image = bpy.data.images.load(self.hdri_path, check_existing=False)
+            node_env_tex.image = bpy.data.images.load(
+                self.hdri_path, check_existing=False
+            )
             _mark_owned(node_env_tex.image)
 
         if self.strength is not None:
@@ -1067,7 +1380,7 @@ class WorldHDRI(World):
             self.rotation_z = rotation_z
 
 
-class WorldImported(World):
+class ImportedWorld(World):
     """
     `World` class for importing environment lighting from a `.blend` file.
 
