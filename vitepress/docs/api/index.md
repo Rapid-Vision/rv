@@ -52,7 +52,9 @@ Base class for describing rv scene. To set up a scene, implement `generate` func
 | `world` | `'World'` |  |
 | `tags` | `set[str]` |  |
 | `objects` | `set['Object']` |  |
+| `materials` | `set['Material']` |  |
 | `object_index_counter` | `int` |  |
+| `material_index_counter` | `int` |  |
 
 :::
 
@@ -318,11 +320,46 @@ def load_objects(self, blendfile: str, import_names: list[str]=None) -> list['Ob
 
 **Returns**: `Self`
 
+##### `create_material`
+
+Create a new basic (Principled BSDF) material.
+
+**Signature**
+
+```python
+def create_material(self, name: str='Material') -> 'BasicMaterial'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+
+**Returns**: `'BasicMaterial'`
+
+##### `import_material`
+
+Create an imported material descriptor from a .blend file.
+
+**Signature**
+
+```python
+def import_material(self, blendfile: str, material_name: str=None) -> 'ImportedMaterial'
+```
+
+**Arguments**
+
+- **`blendfile`** : `str`
+- **`material_name`** : `str`
+
+**Returns**: `'ImportedMaterial'`
+
 :::
 
 ---
 
 ### `class ObjectLoader` {#class-objectloader}
+Helper for creating object instances from a loaded Blender object source.
+
 ::: details Methods
 
 ##### `create_instance`
@@ -345,8 +382,151 @@ def create_instance(self, name: str=None) -> 'Object'
 
 ---
 
+### `class Material` {#class-material}
+Inherits from: `ABC`, `_Serializable`
+
+Base class for material descriptors.
+
+A material descriptor is converted to a real Blender material when assigned to an object.
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `name` | `str | None` |  |
+| `index` | `int | None` |  |
+
+:::
+
+::: details Methods
+
+##### `set_params`
+
+Update descriptor-specific material parameters and return `self`.
+
+**Signature**
+
+```python
+@abstractmethod
+def set_params(self, **kwargs)
+```
+
+**Arguments**
+
+- **`**kwargs`**
+
+:::
+
+---
+
+### `class BasicMaterial` {#class-basicmaterial}
+Inherits from: `Material`
+
+Material descriptor backed by Blender's Principled BSDF shader.
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `base_color` | `tuple[float, float, float, float] | None` |  |
+| `roughness` | `float | None` |  |
+| `metallic` | `float | None` |  |
+| `specular` | `float | None` |  |
+| `emission_color` | `tuple[float, float, float, float] | None` |  |
+| `emission_strength` | `float | None` |  |
+| `alpha` | `float | None` |  |
+| `transmission` | `float | None` |  |
+| `ior` | `float | None` |  |
+| `properties` | `dict` |  |
+
+:::
+
+::: details Methods
+
+##### `set_params`
+
+Set Principled BSDF parameters used when building the material.
+
+**Signature**
+
+```python
+def set_params(self, base_color: tuple[float, float, float, float] | tuple[float, float, float] | None=None, roughness: float=None, metallic: float=None, specular: float=None, emission_color: tuple[float, float, float, float] | tuple[float, float, float] | None=None, emission_strength: float=None, alpha: float=None, transmission: float=None, ior: float=None)
+```
+
+**Arguments**
+
+- **`base_color`** : `tuple[float, float, float, float] | tuple[float, float, float] | None`
+- **`roughness`** : `float`
+- **`metallic`** : `float`
+- **`specular`** : `float`
+- **`emission_color`** : `tuple[float, float, float, float] | tuple[float, float, float] | None`
+- **`emission_strength`** : `float`
+- **`alpha`** : `float`
+- **`transmission`** : `float`
+- **`ior`** : `float`
+
+##### `set_property`
+
+Set a custom Blender property on the generated material.
+
+**Signature**
+
+```python
+def set_property(self, key: str, value: any)
+```
+
+**Arguments**
+
+- **`key`** : `str`
+- **`value`** : `any`
+
+**Returns**: `Self`
+
+:::
+
+---
+
+### `class ImportedMaterial` {#class-importedmaterial}
+Inherits from: `Material`
+
+Material descriptor that imports a material from another `.blend` file.
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `filepath` | `str` |  |
+| `material_name` | `str | None` |  |
+| `params` | `dict` |  |
+
+:::
+
+::: details Methods
+
+##### `set_params`
+
+Set custom properties applied to the imported material.
+
+**Signature**
+
+```python
+def set_params(self, **kwargs)
+```
+
+**Arguments**
+
+- **`**kwargs`**
+
+**Returns**: `Self`
+
+:::
+
+---
+
 ### `class Object` {#class-object}
 Inherits from: `_Serializable`
+
+Wrapper around a Blender object with chainable transformation and metadata helpers.
 
 ::: details Attributes
 
@@ -427,6 +607,54 @@ def set_property(self, key: str, value: any)
 
 - **`key`** : `str`
 - **`value`** : `any`
+
+**Returns**: `Self`
+
+##### `set_material`
+
+Set object material in the given slot.
+
+**Signature**
+
+```python
+def set_material(self, material: 'Material', slot: int=0)
+```
+
+**Arguments**
+
+- **`material`** : `'Material'`
+- **`slot`** : `int`
+
+**Returns**: `Self`
+
+##### `add_material`
+
+Append material to object's material slots.
+
+**Signature**
+
+```python
+def add_material(self, material: 'Material')
+```
+
+**Arguments**
+
+- **`material`** : `'Material'`
+
+**Returns**: `Self`
+
+##### `clear_materials`
+
+Remove all materials from object.
+
+**Signature**
+
+```python
+def clear_materials(self)
+```
+
+**Arguments**
+
 
 **Returns**: `Self`
 
@@ -555,6 +783,8 @@ def show_debug_name(self, show)
 ### `class Camera` {#class-camera}
 Inherits from: `Object`
 
+`Object` specialization with camera-specific controls.
+
 ::: details Methods
 
 ##### `set_fov`
@@ -586,6 +816,8 @@ Base class representing world (environment ligthing).
 
 ##### `set_params`
 
+Update world-specific lighting parameters.
+
 **Signature**
 
 ```python
@@ -600,7 +832,7 @@ def set_params(self)
 
 ---
 
-### `class WorldColor` {#class-worldcolor}
+### `class BasicWorld` {#class-basicworld}
 Inherits from: `World`
 
 `World` class representing a single color environmental lighting.
@@ -635,7 +867,7 @@ def set_params(self, color: tuple[float, float, float, float]=None, strength: fl
 
 ---
 
-### `class WorldSky` {#class-worldsky}
+### `class SkyWorld` {#class-skyworld}
 Inherits from: `World`
 
 `World` class representing a procedural sky environement.
@@ -653,7 +885,7 @@ For more information, view [official blender docs](https://docs.blender.org/manu
 | `rotation_z` | `float` |  |
 | `altitude` | `float` |  |
 | `air` | `float` |  |
-| `dust` | `float` |  |
+| `aerosol_density` | `float` |  |
 | `ozone` | `float` |  |
 
 :::
@@ -662,10 +894,12 @@ For more information, view [official blender docs](https://docs.blender.org/manu
 
 ##### `set_params`
 
+Set procedural sky parameters for the current world.
+
 **Signature**
 
 ```python
-def set_params(self, strength: float=None, sun_size: float=None, sun_intensity: float=None, sun_elevation: float=None, rotation_z: float=None, air: float=None, dust: float=None, ozone: float=None)
+def set_params(self, strength: float=None, sun_size: float=None, sun_intensity: float=None, sun_elevation: float=None, rotation_z: float=None, air: float=None, aerosol_density: float=None, ozone: float=None)
 ```
 
 **Arguments**
@@ -676,14 +910,14 @@ def set_params(self, strength: float=None, sun_size: float=None, sun_intensity: 
 - **`sun_elevation`** : `float` — Sun elevation
 - **`rotation_z`** : `float` — Angle representing the sun direction
 - **`air`** : `float` — Air density
-- **`dust`** : `float` — Dust density
+- **`aerosol_density`** : `float` — Aerosol density
 - **`ozone`** : `float` — Ozone density
 
 :::
 
 ---
 
-### `class WorldHDRI` {#class-worldhdri}
+### `class HDRIWorld` {#class-hdriworld}
 Inherits from: `World`
 
 `World` class for importing lighting from an hdri `.exr` file.
@@ -704,6 +938,8 @@ HDRI files can be captured by a 360 camera or a smartphone app or downloaded fro
 
 ##### `set_params`
 
+Set HDRI source and environment lighting parameters.
+
 **Signature**
 
 ```python
@@ -720,7 +956,7 @@ def set_params(self, hdri_path: str=None, strength: float=None, rotation_z: floa
 
 ---
 
-### `class WorldImported` {#class-worldimported}
+### `class ImportedWorld` {#class-importedworld}
 Inherits from: `World`
 
 `World` class for importing environment lighting from a `.blend` file.
@@ -740,6 +976,8 @@ Use it to bring in custom procedural lighting setups and adjust their parameters
 ::: details Methods
 
 ##### `set_params`
+
+Set custom properties applied to the imported world.
 
 **Signature**
 
@@ -795,3 +1033,45 @@ For full documentation view [blender docs](https://docs.blender.org/manual/en/la
 :::
 
 ---
+
+## Functions
+
+### `begin_run` {#function-begin-run}
+
+Start a new rv run by clearing previously generated data and returning a new run ID.
+
+::: details Details
+
+**Signature**
+
+```python
+def begin_run(purge_orphans: bool=True) -> str
+```
+
+**Arguments**
+
+- **`purge_orphans`** : `bool`
+
+**Returns**: `Self`
+
+:::
+
+### `end_run` {#function-end-run}
+
+Finish the current rv run and optionally purge orphaned Blender datablocks.
+
+::: details Details
+
+**Signature**
+
+```python
+def end_run(purge_orphans: bool=False) -> None
+```
+
+**Arguments**
+
+- **`purge_orphans`** : `bool`
+
+**Returns**: `None`
+
+:::

@@ -285,6 +285,9 @@ def _purge_orphans() -> None:
 
 
 def begin_run(purge_orphans: bool = True) -> str:
+    """
+    Start a new rv run by clearing previously generated data and returning a new run ID.
+    """
     global _ACTIVE_RUN_ID
     _remove_rv_data()
     if purge_orphans:
@@ -294,6 +297,9 @@ def begin_run(purge_orphans: bool = True) -> str:
 
 
 def end_run(purge_orphans: bool = False) -> None:
+    """
+    Finish the current rv run and optionally purge orphaned Blender datablocks.
+    """
     if purge_orphans:
         _purge_orphans()
 
@@ -647,6 +653,10 @@ class Scene(ABC, _Serializable):
 
 
 class ObjectLoader:
+    """
+    Helper for creating object instances from a loaded Blender object source.
+    """
+
     def __init__(self, obj, scene: "Scene") -> None:
         self.obj = obj
         self.scene = scene
@@ -687,6 +697,9 @@ class Material(ABC, _Serializable):
 
     @abstractmethod
     def set_params(self, **kwargs):
+        """
+        Update descriptor-specific material parameters and return `self`.
+        """
         pass
 
     @abstractmethod
@@ -737,6 +750,10 @@ def _get_principled_bsdf_node(material: bpy.types.Material):
 
 
 class BasicMaterial(Material):
+    """
+    Material descriptor backed by Blender's Principled BSDF shader.
+    """
+
     base_color: tuple[float, float, float, float] | None
     roughness: float | None
     metallic: float | None
@@ -777,6 +794,10 @@ class BasicMaterial(Material):
         transmission: float = None,
         ior: float = None,
     ):
+        """
+        Set Principled BSDF parameters used when building the material.
+        """
+
         def _as_rgba(
             color: tuple[float, float, float, float] | tuple[float, float, float],
         ) -> tuple[float, float, float, float]:
@@ -808,6 +829,9 @@ class BasicMaterial(Material):
         return self
 
     def set_property(self, key: str, value: any):
+        """
+        Set a custom Blender property on the generated material.
+        """
         self.properties[key] = value
         return self
 
@@ -866,6 +890,10 @@ class BasicMaterial(Material):
 
 
 class ImportedMaterial(Material):
+    """
+    Material descriptor that imports a material from another `.blend` file.
+    """
+
     filepath: str
     material_name: str | None
     params: dict
@@ -877,6 +905,9 @@ class ImportedMaterial(Material):
         self.params = dict()
 
     def set_params(self, **kwargs):
+        """
+        Set custom properties applied to the imported material.
+        """
         self.params.update(kwargs)
         return self
 
@@ -913,6 +944,10 @@ class ImportedMaterial(Material):
 
 
 class Object(_Serializable):
+    """
+    Wrapper around a Blender object with chainable transformation and metadata helpers.
+    """
+
     obj: bpy.types.Object
     scene: Scene
     tags: set[str]
@@ -1120,6 +1155,10 @@ class Object(_Serializable):
 
 
 class Camera(Object):
+    """
+    `Object` specialization with camera-specific controls.
+    """
+
     def set_fov(
         self,
         angle: float,  # Camera FOV in degrees
@@ -1156,6 +1195,9 @@ class World(ABC):
 
     @abstractmethod
     def set_params(self):
+        """
+        Update world-specific lighting parameters.
+        """
         pass
 
 
@@ -1292,6 +1334,9 @@ class SkyWorld(World):
         aerosol_density: float = None,  # Aerosol density
         ozone: float = None,  # Ozone density
     ):
+        """
+        Set procedural sky parameters for the current world.
+        """
         if strength is not None:
             self.strength = strength
         if sun_size is not None:
@@ -1372,6 +1417,9 @@ class HDRIWorld(World):
         strength: float = None,  #
         rotation_z: float = None,
     ):
+        """
+        Set HDRI source and environment lighting parameters.
+        """
         if hdri_path is not None:
             self.hdri_path = hdri_path
         if strength is not None:
@@ -1410,6 +1458,9 @@ class ImportedWorld(World):
             bpy.context.scene.world[k] = v
 
     def set_params(self, **kwargs):
+        """
+        Set custom properties applied to the imported world.
+        """
         self.params.update(kwargs)
 
 
