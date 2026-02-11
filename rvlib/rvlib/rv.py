@@ -22,6 +22,9 @@ class BasicScene(rv.Scene):
         )
         plane = self.create_plane(size=1000)
         empty = self.create_empty().set_location((0, 0, 1))
+        key_light = self.create_area_light(power=250).set_location((4, -4, 6)).point_at(
+            empty
+        )
 
         cam = self.get_camera().set_location((7, 7, 3)).point_at(empty)
 ```
@@ -362,9 +365,11 @@ class Scene(ABC, _Serializable):
 
     objects: set["Object"]
     materials: set["Material"]
+    lights: set["Light"]
 
     object_index_counter: int = 0
     material_index_counter: int = 0
+    light_index_counter: int = 0
 
     @abstractmethod
     def generate(self) -> None:
@@ -379,7 +384,11 @@ class Scene(ABC, _Serializable):
         self.output_dir = output_dir
         self.objects = set()
         self.materials = set()
+        self.lights = set()
         self.tags = set()
+        self.object_index_counter = 0
+        self.material_index_counter = 0
+        self.light_index_counter = 0
 
         _get_generated_collection()
         bpy.ops.object.camera_add()
@@ -474,6 +483,52 @@ class Scene(ABC, _Serializable):
         _mark_object_tree(plane)
         plane.name = name
         return Object(plane, self)
+
+    def create_point_light(
+        self, name: str = "Point", power: float = 1000.0
+    ) -> "PointLight":
+        """
+        Create a point light.
+        """
+        light_data = bpy.data.lights.new(name=name, type="POINT")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        return PointLight(light_obj, self).set_power(power)
+
+    def create_sun_light(self, name: str = "Sun", power: float = 1.0) -> "SunLight":
+        """
+        Create a sun light.
+        """
+        light_data = bpy.data.lights.new(name=name, type="SUN")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        return SunLight(light_obj, self).set_power(power)
+
+    def create_area_light(
+        self, name: str = "Area", power: float = 100.0
+    ) -> "AreaLight":
+        """
+        Create an area light.
+        """
+        light_data = bpy.data.lights.new(name=name, type="AREA")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        return AreaLight(light_obj, self).set_power(power)
+
+    def create_spot_light(
+        self, name: str = "Spot", power: float = 1000.0
+    ) -> "SpotLight":
+        """
+        Create a spot light.
+        """
+        light_data = bpy.data.lights.new(name=name, type="SPOT")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        return SpotLight(light_obj, self).set_power(power)
 
     def get_camera(self) -> "Camera":
         """
@@ -633,6 +688,11 @@ class Scene(ABC, _Serializable):
         self.materials.add(material)
         return self.material_index_counter
 
+    def _register_light(self, light: "Light") -> int:
+        self.light_index_counter += 1
+        self.lights.add(light)
+        return self.light_index_counter
+
     def _get_meta(self) -> dict:
         res = super()._get_meta()
         res.update(
@@ -643,6 +703,7 @@ class Scene(ABC, _Serializable):
                 "tags": list(self.tags),
                 "objects": list(obj._get_meta() for obj in self.objects),
                 "materials": list(material._get_meta() for material in self.materials),
+                "lights": list(light._get_meta() for light in self.lights),
             }
         )
         return res
@@ -953,9 +1014,11 @@ class Object(_Serializable):
     tags: set[str]
     properties: dict
 
-    index: int
+    index: int | None
 
-    def __init__(self, obj: bpy.types.Object, scene: "Scene") -> None:
+    def __init__(
+        self, obj: bpy.types.Object, scene: "Scene", register_object: bool = True
+    ) -> None:
         super().__init__()
 
         self.obj = obj
@@ -964,8 +1027,10 @@ class Object(_Serializable):
         self.tags = set()
         self.properties = dict()
 
-        self.index = self.scene._register_object(self)
-        self.obj.pass_index = self.index
+        self.index = None
+        if register_object:
+            self.index = self.scene._register_object(self)
+            self.obj.pass_index = self.index
         self.obj.rotation_mode = "QUATERNION"
 
     def set_location(self, location: Union[mathutils.Vector, typing.Sequence[float]]):
@@ -1178,6 +1243,226 @@ class Camera(Object):
             }
         )
         return res
+
+
+class Light(Object):
+    """
+    Base object wrapper for Blender lights with chainable parameter setters.
+    """
+
+    _allowed_area_shapes = {"SQUARE", "RECTANGLE", "DISK", "ELLIPSE"}
+
+    def __init__(self, obj: bpy.types.Object, scene: "Scene") -> None:
+        if obj.type != "LIGHT":
+            raise TypeError("Light wrapper requires an object of type 'LIGHT'.")
+        super().__init__(obj, scene, register_object=False)
+        self.index = self.scene._register_light(self)
+        self.obj.pass_index = self.index
+
+    @property
+    def light_data(self) -> bpy.types.Light:
+        """
+        Return the underlying Blender light datablock.
+        """
+        return self.obj.data
+
+    def set_color(
+        self,
+        color: tuple[float, float, float] | tuple[float, float, float, float],
+    ) -> "Light":
+        """
+        Set light RGB color. Alpha (if provided) is ignored.
+        """
+        rgb = tuple(color)
+        if len(rgb) not in (3, 4):
+            raise ValueError("Light color must contain 3 (RGB) or 4 (RGBA) values.")
+        self.light_data.color = rgb[:3]
+        return self
+
+    def set_power(self, power: float) -> "Light":
+        """
+        Set light power in Blender `energy` units.
+        """
+        if power < 0:
+            raise ValueError("Light power must be non-negative.")
+        self.light_data.energy = power
+        return self
+
+    def set_cast_shadow(self, enabled: bool = True) -> "Light":
+        """
+        Enable or disable shadow casting.
+        """
+        self.light_data.use_shadow = enabled
+        return self
+
+    def set_specular_factor(self, factor: float) -> "Light":
+        """
+        Set the light contribution to specular highlights.
+        """
+        self.light_data.specular_factor = factor
+        return self
+
+    def set_softness(self, value: float) -> "Light":
+        """
+        Set softness parameter mapped to the current light type.
+        """
+        if value < 0:
+            raise ValueError("Light softness must be non-negative.")
+        if self.light_data.type == "SUN":
+            self.light_data.angle = value
+        else:
+            self.light_data.shadow_soft_size = value
+        return self
+
+    def set_params(self, **kwargs) -> "Light":
+        """
+        Set known light-data attributes or custom properties.
+        """
+        for key, value in kwargs.items():
+            if hasattr(self.light_data, key):
+                setattr(self.light_data, key, value)
+            else:
+                self.light_data[key] = value
+        return self
+
+    def _type_specific_meta(self) -> dict:
+        return {}
+
+    def _get_meta(self) -> dict:
+        res = super()._get_meta()
+        res.update(
+            {
+                "light_type": self.light_data.type,
+                "power": self.light_data.energy,
+                "color": tuple(self.light_data.color),
+                "cast_shadow": self.light_data.use_shadow,
+                "specular_factor": self.light_data.specular_factor,
+            }
+        )
+        res.update(self._type_specific_meta())
+        return res
+
+
+class PointLight(Light):
+    """
+    Point light with radius control.
+    """
+
+    def set_radius(self, radius: float) -> "PointLight":
+        """
+        Set point light radius.
+        """
+        if radius < 0:
+            raise ValueError("Point light radius must be non-negative.")
+        self.light_data.shadow_soft_size = radius
+        return self
+
+    def _type_specific_meta(self) -> dict:
+        return {"radius": self.light_data.shadow_soft_size}
+
+
+class SunLight(Light):
+    """
+    Directional sun light with angular size control.
+    """
+
+    def set_angle(self, angle_radians: float) -> "SunLight":
+        """
+        Set sun angular size in radians.
+        """
+        if angle_radians < 0:
+            raise ValueError("Sun light angle must be non-negative.")
+        self.light_data.angle = angle_radians
+        return self
+
+    def _type_specific_meta(self) -> dict:
+        return {"angle": self.light_data.angle}
+
+
+class AreaLight(Light):
+    """
+    Area light with shape and size controls.
+    """
+
+    def set_shape(
+        self, shape: Literal["SQUARE", "RECTANGLE", "DISK", "ELLIPSE"]
+    ) -> "AreaLight":
+        """
+        Set area light shape.
+        """
+        if shape not in self._allowed_area_shapes:
+            allowed = ", ".join(sorted(self._allowed_area_shapes))
+            raise ValueError(
+                f"Unknown area light shape '{shape}'. Allowed: [{allowed}]"
+            )
+        self.light_data.shape = shape
+        return self
+
+    def set_size(self, size: float) -> "AreaLight":
+        """
+        Set primary area light size.
+        """
+        if size < 0:
+            raise ValueError("Area light size must be non-negative.")
+        self.light_data.size = size
+        return self
+
+    def set_size_xy(self, size_x: float, size_y: float) -> "AreaLight":
+        """
+        Set area light X and Y sizes.
+        """
+        if size_x < 0 or size_y < 0:
+            raise ValueError("Area light sizes must be non-negative.")
+        self.light_data.size = size_x
+        self.light_data.size_y = size_y
+        return self
+
+    def _type_specific_meta(self) -> dict:
+        res = {
+            "shape": self.light_data.shape,
+            "size": self.light_data.size,
+        }
+        if hasattr(self.light_data, "size_y"):
+            res["size_y"] = self.light_data.size_y
+        return res
+
+
+class SpotLight(Light):
+    """
+    Spot light with cone and blend controls.
+    """
+
+    def set_spot_size(self, angle_radians: float) -> "SpotLight":
+        """
+        Set spotlight cone angle in radians.
+        """
+        if angle_radians < 0:
+            raise ValueError("Spot light angle must be non-negative.")
+        self.light_data.spot_size = angle_radians
+        return self
+
+    def set_blend(self, blend: float) -> "SpotLight":
+        """
+        Set spotlight edge softness in the [0, 1] range.
+        """
+        if blend < 0 or blend > 1:
+            raise ValueError("Spot light blend must be in the [0, 1] range.")
+        self.light_data.spot_blend = blend
+        return self
+
+    def set_show_cone(self, show: bool = True) -> "SpotLight":
+        """
+        Show or hide the spotlight cone in viewport.
+        """
+        self.light_data.show_cone = show
+        return self
+
+    def _type_specific_meta(self) -> dict:
+        return {
+            "spot_size": self.light_data.spot_size,
+            "spot_blend": self.light_data.spot_blend,
+            "show_cone": self.light_data.show_cone,
+        }
 
 
 class World(ABC):

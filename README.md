@@ -42,6 +42,9 @@ class BasicScene(rv.Scene):
         )
         plane = self.create_plane(size=1000)
         empty = self.create_empty().set_location((0, 0, 1))
+        key_light = self.create_area_light(power=250).set_location((4, -4, 6)).point_at(
+            empty
+        )
 
         cam = self.get_camera().set_location((7, 7, 3)).point_at(empty)
 ```
@@ -86,4 +89,3 @@ rv render scene.py
 
 ## Use `rv` for generating your next synthetic dataset
 For more information view the [API reference](/docs/api).
-
