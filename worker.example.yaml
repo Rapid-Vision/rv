@@ -1,0 +1,22 @@
+worker:
+  worker_name: render-1
+  task_name: render
+
+  rtasks:
+    url: http://localhost:5701
+    token: secret_token
+    poll_interval: 2s
+
+  directories:
+    working: ./tmp/
+    output: ./out/
+    cleanup_policy: keep
+
+  s3:
+    endpoint: localhost:9000
+    path: /rv-results/
+    region: us-east-1
+    secure: false
+    cleanup: false
+    access_key: minioadmin
+    secret_key: minioadmin

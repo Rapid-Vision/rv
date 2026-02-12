@@ -37,7 +37,7 @@ func runRender(_ *cobra.Command, args []string) {
 		logs.Err.Fatalln("Failed to resolve paths:", err)
 	}
 
-	if err := render.Render(render.RenderOptions{
+	if _, err := render.Render(render.RenderOptions{
 		ScriptPath: paths.ScriptPath,
 		Cwd:        paths.Cwd,
 		ImageNum:   renderImageNum,

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Rapid-Vision/rv/internal/assets"
+	"github.com/Rapid-Vision/rv/internal/config"
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/render"
 	"github.com/Rapid-Vision/rv/internal/rpcclient"
@@ -22,6 +23,7 @@ import (
 )
 
 var (
+	workerConfigPath        string
 	workerURL               string
 	workerToken             string
 	workerName              string
@@ -32,6 +34,15 @@ var (
 	workerCwd               string
 	workerOutputDir         string
 	workerCleanupPolicy     string
+	workerS3OutputURL       string
+	workerS3Path            string
+	workerS3Endpoint        string
+	workerS3Region          string
+	workerS3Secure          bool
+	workerCleanupOutputS3   bool
+	workerS3AccessKey       string
+	workerS3SecretKey       string
+	workerS3SessionToken    string
 )
 
 var workerCmd = &cobra.Command{
@@ -44,24 +55,19 @@ var workerCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(workerCmd)
 
-	workerCmd.Flags().StringVar(&workerURL, "url", "", "rtasks server URL")
-	workerCmd.Flags().StringVar(&workerToken, "token", os.Getenv("RTASKS_API_TOKEN"), "rtasks API token")
-	workerCmd.Flags().StringVar(&workerName, "worker-name", "", "worker name")
-	workerCmd.Flags().StringVar(&workerTaskName, "task-name", "", "task name")
-	workerCmd.Flags().DurationVar(&workerPollInterval, "poll-interval", 2*time.Second, "poll interval when idle")
-	workerCmd.Flags().DurationVar(&workerHeartbeatInterval, "heartbeat-interval", 10*time.Second, "heartbeat interval (0 disables)")
 	workerCmd.Flags().BoolVar(&workerRunOnce, "once", false, "run a single task and exit")
-	workerCmd.Flags().StringVar(&workerCwd, "cwd", "", "Working directory for resolving relative script paths (defaults to script directory)")
-	workerCmd.Flags().StringVarP(&workerOutputDir, "output", "o", "./out", "Output directory for rendered files (resolved from process working directory)")
-	workerCmd.Flags().StringVar(&workerCleanupPolicy, "cleanup-policy", "keep", "Asset cleanup policy: keep or cleanup")
+	workerCmd.Flags().StringVar(&workerConfigPath, "config", "worker-conf.yaml", "Path to worker config file")
 }
 
 type workerTaskPayload struct {
 	Script        string               `json:"script"`
 	Number        int                  `json:"number"`
 	Procs         int                  `json:"procs"`
+	OutputS3URL   string               `json:"output_s3_url"`
 	AssetMappings []workerAssetMapping `json:"asset_mappings"`
 }
+
+var uploadDirectoryToS3 = assets.UploadDirectoryToS3
 
 type workerAssetMapping struct {
 	Source      string `json:"source"`
@@ -69,22 +75,57 @@ type workerAssetMapping struct {
 }
 
 func runWorker(_ *cobra.Command, args []string) {
+	cfg, err := config.LoadWorkerConfig(workerConfigPath)
+	if err != nil {
+		logs.Err.Fatalln("Failed to load worker config:", err)
+	}
+
+	workerURL = cfg.RTasks.URL
+	workerToken = cfg.RTasks.Token
+	workerName = cfg.WorkerName
+	workerTaskName = cfg.TaskName
+	workerPollInterval = cfg.RTasks.PollInterval
+	workerHeartbeatInterval = cfg.RTasks.HeartbeatInterval
+	workerCwd = cfg.Directories.Working
+	workerOutputDir = cfg.Directories.Output
+	workerCleanupPolicy = cfg.Directories.CleanupPolicy
+	workerS3OutputURL = cfg.S3.OutputURL
+	workerS3Path = cfg.S3.Path
+	workerS3Endpoint = cfg.S3.Endpoint
+	workerS3Region = cfg.S3.Region
+	workerS3Secure = cfg.S3.Secure
+	workerCleanupOutputS3 = cfg.S3.Cleanup
+	workerS3AccessKey = cfg.S3.AccessKeyID
+	workerS3SecretKey = cfg.S3.SecretKey
+	workerS3SessionToken = cfg.S3.SessionToken
+
 	if workerURL == "" {
-		logs.Err.Fatalln("--url is required")
+		logs.Err.Fatalln("worker.rtasks.url is required")
 	}
 	if workerName == "" {
-		logs.Err.Fatalln("--worker-name is required")
+		logs.Err.Fatalln("worker.worker_name is required")
 	}
 	if workerTaskName == "" {
-		logs.Err.Fatalln("--task-name is required")
+		logs.Err.Fatalln("worker.task_name is required")
 	}
 	if workerPollInterval <= 0 {
-		logs.Err.Fatalln("--poll-interval must be > 0")
+		logs.Err.Fatalln("worker.rtasks.poll_interval must be > 0")
 	}
 	switch workerCleanupPolicy {
 	case "keep", "cleanup":
 	default:
-		logs.Err.Fatalln("--cleanup-policy must be either \"keep\" or \"cleanup\"")
+		logs.Err.Fatalln("worker.directories.cleanup_policy must be either \"keep\" or \"cleanup\"")
+	}
+	var errS3URL error
+	workerS3OutputURL, errS3URL = config.ResolveWorkerS3BaseURL(workerS3OutputURL, workerS3Path)
+	if errS3URL != nil {
+		logs.Err.Fatalln("Invalid worker.s3 destination:", errS3URL)
+	}
+	if workerS3OutputURL != "" && strings.TrimSpace(workerS3Endpoint) == "" {
+		logs.Err.Fatalln("worker.s3.endpoint is required when worker.s3.output_url is set")
+	}
+	if (strings.TrimSpace(workerS3AccessKey) == "") != (strings.TrimSpace(workerS3SecretKey) == "") {
+		logs.Err.Fatalln("worker.s3.access_key and worker.s3.secret_key must be set together")
 	}
 
 	client := rpcclient.NewRPCClient(workerURL)
@@ -328,13 +369,14 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 	}
 
 	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 40, "rendering", nil)
-	if err := render.Render(render.RenderOptions{
+	renderResult, err := render.Render(render.RenderOptions{
 		ScriptPath: scriptPath,
 		Cwd:        runtimeCwd,
 		ImageNum:   payload.Number,
 		Procs:      payload.Procs,
 		OutputDir:  outputDirAbs,
-	}); err != nil {
+	})
+	if err != nil {
 		cleanupErr := runCleanup()
 		result := map[string]any{"error": err.Error()}
 		if cleanupErr != nil {
@@ -344,11 +386,53 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 		return err
 	}
 
+	resultOutput := map[string]any{
+		"local_dir": renderResult.OutputDir,
+	}
+
+	targetS3URL := strings.TrimSpace(workerS3OutputURL)
+	if strings.TrimSpace(payload.OutputS3URL) != "" {
+		targetS3URL = strings.TrimSpace(payload.OutputS3URL)
+	}
+	if targetS3URL != "" {
+		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 70, "uploading dataset", nil)
+		uploadedS3URL, taskS3URL, uploadErr := uploadRenderedOutput(ctx, task.Id, targetS3URL, renderResult.OutputDir)
+		if uploadErr != nil {
+			cleanupErr := runCleanup()
+			result := map[string]any{
+				"error": "dataset upload failed",
+				"output": map[string]any{
+					"local_dir": renderResult.OutputDir,
+					"s3_target": taskS3URL,
+				},
+				"details": map[string]any{
+					"message": uploadErr.Error(),
+				},
+			}
+			if cleanupErr != nil {
+				result["cleanup_warning"] = cleanupErr.Error()
+			}
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			return uploadErr
+		}
+		resultOutput["s3_uri"] = uploadedS3URL
+
+		if workerCleanupOutputS3 {
+			if err := os.RemoveAll(renderResult.OutputDir); err != nil {
+				resultOutput["cleanup_output_warning"] = err.Error()
+			}
+		}
+	}
+
 	cleanupErr := runCleanup()
-	result := map[string]any{"ok": true}
+	result := map[string]any{
+		"ok":     true,
+		"output": resultOutput,
+	}
 	if cleanupErr != nil {
 		result["cleanup_warning"] = cleanupErr.Error()
 	}
+	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 90, "finalizing result", nil)
 	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 100, "completed", nil)
 	submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "success", result)
 	return nil
@@ -372,6 +456,11 @@ func parseWorkerPayload(raw *json.RawMessage) (*workerTaskPayload, error) {
 	}
 	if payload.Procs <= 0 {
 		payload.Procs = 1
+	}
+	if strings.TrimSpace(payload.OutputS3URL) != "" {
+		if _, err := assets.ParseS3URL(payload.OutputS3URL); err != nil {
+			return nil, fmt.Errorf("payload.output_s3_url is invalid: %w", err)
+		}
 	}
 	for i, mapping := range payload.AssetMappings {
 		if mapping.Source == "" {
@@ -429,6 +518,29 @@ func submitTaskProgress(ctx context.Context, client *rpcclient.RPCClient, worker
 	if err != nil {
 		logs.Warn.Printf("Failed to submit task progress (task=%d): %v\n", taskId, err)
 	}
+}
+
+func uploadRenderedOutput(ctx context.Context, taskID int, targetS3URL string, localOutputDir string) (string, string, error) {
+	taskS3URL, err := assets.BuildWorkerTaskS3URL(targetS3URL, taskID, localOutputDir)
+	if err != nil {
+		return "", targetS3URL, err
+	}
+
+	uploadedS3URL, err := uploadDirectoryToS3(ctx, assets.S3UploadOptions{
+		LocalDir:        localOutputDir,
+		DestinationURL:  taskS3URL,
+		Endpoint:        workerS3Endpoint,
+		Region:          workerS3Region,
+		Secure:          workerS3Secure,
+		AccessKeyID:     workerS3AccessKey,
+		SecretAccessKey: workerS3SecretKey,
+		SessionToken:    workerS3SessionToken,
+	})
+	if err != nil {
+		return "", taskS3URL, err
+	}
+
+	return uploadedS3URL, taskS3URL, nil
 }
 
 func isManagedResourceSource(source string) bool {

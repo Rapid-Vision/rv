@@ -1,6 +1,7 @@
 package render
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,7 +21,11 @@ type RenderOptions struct {
 	OutputDir  string
 }
 
-func Render(opts RenderOptions) error {
+type RenderResult struct {
+	OutputDir string
+}
+
+func Render(opts RenderOptions) (RenderResult, error) {
 	scriptPath := opts.ScriptPath
 	imgNum := opts.ImageNum
 	procs := opts.Procs
@@ -28,40 +33,40 @@ func Render(opts RenderOptions) error {
 	cwdAbs := opts.Cwd
 
 	if scriptPath == "" {
-		logs.Err.Fatalln("script path is required")
+		return RenderResult{}, errors.New("script path is required")
 	}
 	if outputDir == "" {
-		logs.Err.Fatalln("output directory is required")
+		return RenderResult{}, errors.New("output directory is required")
 	}
 	if cwdAbs == "" {
-		logs.Err.Fatalln("cwd is required")
+		return RenderResult{}, errors.New("cwd is required")
 	}
 
 	blenderPath, err := utils.GetBlenderPath()
 	if err != nil {
-		logs.Err.Fatalln("Can't find blender path:", err)
+		return RenderResult{}, fmt.Errorf("can't find blender path: %w", err)
 	}
 
 	libPath, err := utils.GetLibPath()
 	if err != nil {
-		logs.Err.Fatalln("Can't find rvlib:", err)
+		return RenderResult{}, fmt.Errorf("can't find rvlib: %w", err)
 	}
 
 	logs.Info.Println("librv path: ", libPath)
 
 	seqOutDir, err := utils.GetSequentialOutputDir(outputDir)
 	if err != nil {
-		logs.Err.Fatalln("Can't create new output directory:", err)
+		return RenderResult{}, fmt.Errorf("can't create new output directory: %w", err)
 	}
 
 	var cmdBuff [](*exec.Cmd)
 
 	if imgNum < 1 {
-		logs.Err.Fatalln("--number is less then one")
+		return RenderResult{}, errors.New("--number is less then one")
 	}
 
 	if procs < 1 {
-		logs.Err.Fatalln("--procs must be at least 1")
+		return RenderResult{}, errors.New("--procs must be at least 1")
 	}
 
 	if imgNum < procs {
@@ -89,7 +94,7 @@ func Render(opts RenderOptions) error {
 		cmd.Stderr = os.Stderr
 
 		if err = cmd.Start(); err != nil {
-			logs.Err.Fatalln("failed to start blender:", err)
+			return RenderResult{}, fmt.Errorf("failed to start blender: %w", err)
 		}
 		logs.Info.Printf("Blender started (PID %d)\n", cmd.Process.Pid)
 
@@ -124,5 +129,11 @@ func Render(opts RenderOptions) error {
 		}
 	}
 
-	return renderErr
+	if renderErr != nil {
+		return RenderResult{}, renderErr
+	}
+
+	return RenderResult{
+		OutputDir: seqOutDir,
+	}, nil
 }
