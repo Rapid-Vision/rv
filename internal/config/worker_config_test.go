@@ -15,6 +15,8 @@ func TestLoadWorkerConfig(t *testing.T) {
 	content := []byte(`worker:
   worker_name: render-1
   task_name: render
+  renderer:
+    max_procs: 5
   rtasks:
     url: http://localhost:5701
     token: secret_token
@@ -49,6 +51,9 @@ func TestLoadWorkerConfig(t *testing.T) {
 	}
 	if cfg.RTasks.HeartbeatInterval != 7*time.Second {
 		t.Fatalf("heartbeat interval = %v", cfg.RTasks.HeartbeatInterval)
+	}
+	if cfg.Renderer.MaxProcs != 5 {
+		t.Fatalf("max_procs = %d", cfg.Renderer.MaxProcs)
 	}
 	if cfg.S3.Path != "/rv-results/datasets" || cfg.S3.Secure {
 		t.Fatalf("unexpected s3 config: %#v", cfg.S3)
@@ -86,6 +91,9 @@ func TestLoadWorkerConfig_Defaults(t *testing.T) {
 	}
 	if cfg.RTasks.HeartbeatInterval != 10*time.Second {
 		t.Fatalf("heartbeat interval = %v", cfg.RTasks.HeartbeatInterval)
+	}
+	if cfg.Renderer.MaxProcs != 1 {
+		t.Fatalf("max_procs = %d", cfg.Renderer.MaxProcs)
 	}
 	if cfg.Directories.Output != "./out" {
 		t.Fatalf("output = %q", cfg.Directories.Output)

@@ -29,6 +29,7 @@ var (
 	workerToken             string
 	workerName              string
 	workerTaskName          string
+	workerMaxProcs          int
 	workerPollInterval      time.Duration
 	workerHeartbeatInterval time.Duration
 	workerRunOnce           bool
@@ -63,8 +64,7 @@ func init() {
 type workerTaskPayload struct {
 	Script        string               `json:"script"`
 	Number        int                  `json:"number"`
-	Procs         int                  `json:"procs"`
-	OutputS3URL   string               `json:"output_s3_url"`
+	Resolution    []int                `json:"resolution"`
 	AssetMappings []workerAssetMapping `json:"asset_mappings"`
 }
 
@@ -86,6 +86,7 @@ func runWorker(_ *cobra.Command, args []string) {
 	workerToken = cfg.RTasks.Token
 	workerName = cfg.WorkerName
 	workerTaskName = cfg.TaskName
+	workerMaxProcs = cfg.Renderer.MaxProcs
 	workerPollInterval = cfg.RTasks.PollInterval
 	workerHeartbeatInterval = cfg.RTasks.HeartbeatInterval
 	workerCwd = cfg.Directories.Working
@@ -112,6 +113,9 @@ func runWorker(_ *cobra.Command, args []string) {
 	}
 	if workerPollInterval <= 0 {
 		logs.Err.Fatalln("worker.rtasks.poll_interval must be > 0")
+	}
+	if workerMaxProcs <= 0 {
+		logs.Err.Fatalln("worker.renderer.max_procs must be > 0")
 	}
 	switch workerCleanupPolicy {
 	case "keep", "cleanup":
@@ -381,7 +385,7 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 		return err
 	}
 
-	logs.Info.Printf("Running task %d: script=%s number=%d procs=%d output=%s cwd=%s\n", task.Id, scriptPath, payload.Number, payload.Procs, outputDirAbs, runtimeCwd)
+	logs.Info.Printf("Running task %d: script=%s number=%d resolution=%v output=%s cwd=%s\n", task.Id, scriptPath, payload.Number, payload.Resolution, outputDirAbs, runtimeCwd)
 
 	if len(payload.AssetMappings) > 0 {
 		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 20, "staging assets", nil)
@@ -429,7 +433,8 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 		ScriptPath: scriptPath,
 		Cwd:        runtimeCwd,
 		ImageNum:   payload.Number,
-		Procs:      payload.Procs,
+		Procs:      workerMaxProcs,
+		Resolution: [2]int{payload.Resolution[0], payload.Resolution[1]},
 		OutputDir:  outputDirAbs,
 	})
 	if err != nil {
@@ -454,9 +459,6 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 	}
 
 	targetS3URL := strings.TrimSpace(workerS3OutputURL)
-	if strings.TrimSpace(payload.OutputS3URL) != "" {
-		targetS3URL = strings.TrimSpace(payload.OutputS3URL)
-	}
 	if targetS3URL != "" {
 		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 70, "uploading dataset", nil)
 		uploadedS3URL, taskS3URL, uploadErr := uploadRenderedOutput(ctx, task.Id, targetS3URL, renderResult.OutputDir)
@@ -519,13 +521,11 @@ func parseWorkerPayload(raw *json.RawMessage) (*workerTaskPayload, error) {
 	if payload.Number <= 0 {
 		payload.Number = 1
 	}
-	if payload.Procs <= 0 {
-		payload.Procs = 1
+	if len(payload.Resolution) != 2 {
+		return nil, errors.New("payload.resolution must be [width, height]")
 	}
-	if strings.TrimSpace(payload.OutputS3URL) != "" {
-		if _, err := assets.ParseS3URL(payload.OutputS3URL); err != nil {
-			return nil, fmt.Errorf("payload.output_s3_url is invalid: %w", err)
-		}
+	if payload.Resolution[0] <= 0 || payload.Resolution[1] <= 0 {
+		return nil, errors.New("payload.resolution width and height must be > 0")
 	}
 	for i, mapping := range payload.AssetMappings {
 		if mapping.Source == "" {

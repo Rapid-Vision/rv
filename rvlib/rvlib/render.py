@@ -25,12 +25,24 @@ def parse_args():
     parser.add_argument("--libpath", type=str)
     parser.add_argument("--output", type=str)
     parser.add_argument("--number", type=int)
+    parser.add_argument("--resolution", type=str, default="640,640")
     parser.add_argument("--cwd", type=str)
 
     return parser.parse_args(args)
 
 
-def run_script(script_path, output_dir):
+def parse_resolution(raw):
+    parts = [part.strip() for part in raw.split(",")]
+    if len(parts) != 2:
+        raise ValueError("--resolution must be WIDTH,HEIGHT")
+    width = int(parts[0])
+    height = int(parts[1])
+    if width <= 0 or height <= 0:
+        raise ValueError("--resolution width and height must be > 0")
+    return (width, height)
+
+
+def run_script(script_path, output_dir, resolution):
     spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -49,6 +61,7 @@ def run_script(script_path, output_dir):
     def run_script():
         rv.begin_run(purge_orphans=True)
         instance = scene_classes[0](output_dir)
+        instance.resolution = resolution
         instance.generate()
         instance._post_gen()
         instance._render()
@@ -59,9 +72,10 @@ def run_script(script_path, output_dir):
 
 
 ARGS = parse_args()
+RESOLUTION = parse_resolution(ARGS.resolution)
 
 sys.path.append(ARGS.libpath)
 os.chdir(ARGS.cwd)
 
 for i in range(ARGS.number):
-    run_script(ARGS.script, ARGS.output)
+    run_script(ARGS.script, ARGS.output, RESOLUTION)

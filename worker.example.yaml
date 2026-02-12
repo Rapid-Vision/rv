@@ -2,6 +2,9 @@ worker:
   worker_name: render-1
   task_name: render
 
+  renderer:
+    max_procs: 5
+
   rtasks:
     url: http://localhost:5701
     token: secret_token

@@ -32,6 +32,7 @@ func TestRender_ReturnsSequentialOutputDir(t *testing.T) {
 		Cwd:        tmp,
 		ImageNum:   1,
 		Procs:      1,
+		Resolution: [2]int{640, 640},
 		OutputDir:  outputRoot,
 	})
 	if err != nil {

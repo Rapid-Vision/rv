@@ -18,6 +18,7 @@ type RenderOptions struct {
 	Cwd        string
 	ImageNum   int
 	Procs      int
+	Resolution [2]int
 	OutputDir  string
 }
 
@@ -29,6 +30,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	scriptPath := opts.ScriptPath
 	imgNum := opts.ImageNum
 	procs := opts.Procs
+	resolution := opts.Resolution
 	outputDir := opts.OutputDir
 	cwdAbs := opts.Cwd
 
@@ -68,6 +70,9 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if procs < 1 {
 		return RenderResult{}, errors.New("--procs must be at least 1")
 	}
+	if resolution[0] <= 0 || resolution[1] <= 0 {
+		return RenderResult{}, errors.New("--resolution must be WIDTH,HEIGHT with positive integers")
+	}
 
 	if imgNum < procs {
 		procs = imgNum
@@ -87,6 +92,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 			"--script", scriptPath,
 			"--libpath", libPath,
 			"--number", fmt.Sprintf("%d", part),
+			"--resolution", fmt.Sprintf("%d,%d", resolution[0], resolution[1]),
 			"--output", seqOutDir,
 			"--cwd", cwdAbs,
 		)

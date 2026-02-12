@@ -14,7 +14,10 @@ import (
 type WorkerConfig struct {
 	WorkerName string `mapstructure:"worker_name"`
 	TaskName   string `mapstructure:"task_name"`
-	RTasks     struct {
+	Renderer   struct {
+		MaxProcs int `mapstructure:"max_procs"`
+	} `mapstructure:"renderer"`
+	RTasks struct {
 		URL               string        `mapstructure:"url"`
 		Token             string        `mapstructure:"token"`
 		PollInterval      time.Duration `mapstructure:"poll_interval"`
@@ -50,6 +53,7 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	v.SetDefault("worker.rtasks.token", os.Getenv("RTASKS_API_TOKEN"))
 	v.SetDefault("worker.rtasks.poll_interval", "2s")
 	v.SetDefault("worker.rtasks.heartbeat_interval", "10s")
+	v.SetDefault("worker.renderer.max_procs", 1)
 	v.SetDefault("worker.directories.output", "./out")
 	v.SetDefault("worker.directories.cleanup_policy", "keep")
 	v.SetDefault("worker.s3.endpoint", "s3.amazonaws.com")
@@ -72,6 +76,7 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	cfg.RTasks.Token = strings.TrimSpace(v.GetString("worker.rtasks.token"))
 	cfg.RTasks.PollInterval = v.GetDuration("worker.rtasks.poll_interval")
 	cfg.RTasks.HeartbeatInterval = v.GetDuration("worker.rtasks.heartbeat_interval")
+	cfg.Renderer.MaxProcs = v.GetInt("worker.renderer.max_procs")
 
 	cfg.Directories.Working = strings.TrimSpace(v.GetString("worker.directories.working"))
 	cfg.Directories.Output = strings.TrimSpace(v.GetString("worker.directories.output"))

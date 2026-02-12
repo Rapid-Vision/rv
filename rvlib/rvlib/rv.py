@@ -401,15 +401,6 @@ class Scene(ABC, _Serializable):
 
         self.world = SkyWorld()
 
-    def set_resolution(self, width: float, height: float = None):
-        """
-        Set resulting image resolution. If only width is passed, resulting image will be a square.
-        """
-        if height is None:
-            height = width
-        self.resolution = (width, height)
-        return self
-
     def set_rendering_time_limit(
         self,
         time_limit: float = 3.0,  # Rendering time limit in seconds
