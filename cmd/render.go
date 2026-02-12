@@ -12,11 +12,16 @@ import (
 )
 
 var (
-	renderImageNum   int
-	renderProcs      int
-	renderResolution string
-	renderOutputDir  string
-	renderCwd        string
+	renderImageNum              int
+	renderProcs                 int
+	renderResolution            string
+	renderOutputDir             string
+	renderCwd                   string
+	renderTimeLimit             float64
+	renderMaxSamples            int
+	renderMinSamples            int
+	renderNoiseThresholdEnabled bool
+	renderNoiseThreshold        float64
 )
 
 var renderCmd = &cobra.Command{
@@ -33,11 +38,16 @@ func init() {
 	renderCmd.Flags().IntVarP(&renderImageNum, "number", "n", 1, "Number of total images generated")
 	renderCmd.Flags().IntVarP(&renderProcs, "procs", "p", 1, "Maximum number of spawned Blender processes")
 	renderCmd.Flags().StringVar(&renderResolution, "resolution", "640,640", "Output image resolution in WIDTH,HEIGHT format")
+	renderCmd.Flags().Float64Var(&renderTimeLimit, "time-limit", 0, "Cycles rendering time limit in seconds")
+	renderCmd.Flags().IntVar(&renderMaxSamples, "max-samples", 0, "Cycles maximum render samples")
+	renderCmd.Flags().IntVar(&renderMinSamples, "min-samples", 0, "Cycles minimum adaptive render samples")
+	renderCmd.Flags().BoolVar(&renderNoiseThresholdEnabled, "noise-threshold-enabled", false, "Enable Cycles adaptive noise threshold")
+	renderCmd.Flags().Float64Var(&renderNoiseThreshold, "noise-threshold", 0, "Cycles adaptive noise threshold value")
 	renderCmd.Flags().StringVarP(&renderOutputDir, "output", "o", "./out", "Output directory")
 	renderCmd.Flags().StringVar(&renderCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
 }
 
-func runRender(_ *cobra.Command, args []string) {
+func runRender(cmd *cobra.Command, args []string) {
 	paths, err := utils.ResolveRenderPaths(args[0], renderOutputDir, renderCwd)
 	if err != nil {
 		logs.Err.Fatalln("Failed to resolve paths:", err)
@@ -48,15 +58,36 @@ func runRender(_ *cobra.Command, args []string) {
 		logs.Err.Fatalln("Invalid --resolution:", err)
 	}
 
-	if _, err := render.Render(render.RenderOptions{
+	opts := render.RenderOptions{
 		ScriptPath: paths.ScriptPath,
 		Cwd:        paths.Cwd,
 		ImageNum:   renderImageNum,
 		Procs:      renderProcs,
 		Resolution: resolution,
 		OutputDir:  paths.OutputDir,
-	}); err != nil {
+	}
+	applyOptionalRenderFlags(cmd, &opts)
+
+	if _, err := render.Render(opts); err != nil {
 		logs.Err.Fatalln("Render failed:", err)
+	}
+}
+
+func applyOptionalRenderFlags(cmd *cobra.Command, opts *render.RenderOptions) {
+	if cmd.Flags().Changed("time-limit") {
+		opts.TimeLimit = &renderTimeLimit
+	}
+	if cmd.Flags().Changed("max-samples") {
+		opts.MaxSamples = &renderMaxSamples
+	}
+	if cmd.Flags().Changed("min-samples") {
+		opts.MinSamples = &renderMinSamples
+	}
+	if cmd.Flags().Changed("noise-threshold-enabled") {
+		opts.NoiseThresholdEnabled = &renderNoiseThresholdEnabled
+	}
+	if cmd.Flags().Changed("noise-threshold") {
+		opts.NoiseThreshold = &renderNoiseThreshold
 	}
 }
 

@@ -35,10 +35,15 @@ type Runner struct {
 }
 
 type workerTaskPayload struct {
-	Script        string               `json:"script"`
-	Number        int                  `json:"number"`
-	Resolution    []int                `json:"resolution"`
-	AssetMappings []workerAssetMapping `json:"asset_mappings"`
+	Script                string               `json:"script"`
+	Number                int                  `json:"number"`
+	Resolution            []int                `json:"resolution"`
+	TimeLimit             *float64             `json:"time_limit"`
+	MaxSamples            *int                 `json:"max_samples"`
+	MinSamples            *int                 `json:"min_samples"`
+	NoiseThresholdEnabled *bool                `json:"noise_threshold_enabled"`
+	NoiseThreshold        *float64             `json:"noise_threshold"`
+	AssetMappings         []workerAssetMapping `json:"asset_mappings"`
 }
 
 type workerAssetMapping struct {
@@ -339,7 +344,20 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 		return err
 	}
 
-	logs.Info.Printf("Running task %d: script=%s number=%d resolution=%v output=%s cwd=%s\n", task.Id, scriptPath, payload.Number, payload.Resolution, outputDirAbs, runtimeCwd)
+	logs.Info.Printf(
+		"Running task %d: script=%s number=%d resolution=%v time_limit=%v max_samples=%v min_samples=%v noise_threshold_enabled=%v noise_threshold=%v output=%s cwd=%s\n",
+		task.Id,
+		scriptPath,
+		payload.Number,
+		payload.Resolution,
+		payload.TimeLimit,
+		payload.MaxSamples,
+		payload.MinSamples,
+		payload.NoiseThresholdEnabled,
+		payload.NoiseThreshold,
+		outputDirAbs,
+		runtimeCwd,
+	)
 
 	if len(payload.AssetMappings) > 0 {
 		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 20, "staging assets", nil)
@@ -384,12 +402,17 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 
 	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 40, "rendering", nil)
 	renderResult, err := render.Render(render.RenderOptions{
-		ScriptPath: scriptPath,
-		Cwd:        runtimeCwd,
-		ImageNum:   payload.Number,
-		Procs:      cfg.Renderer.MaxProcs,
-		Resolution: [2]int{payload.Resolution[0], payload.Resolution[1]},
-		OutputDir:  outputDirAbs,
+		ScriptPath:            scriptPath,
+		Cwd:                   runtimeCwd,
+		ImageNum:              payload.Number,
+		Procs:                 cfg.Renderer.MaxProcs,
+		Resolution:            [2]int{payload.Resolution[0], payload.Resolution[1]},
+		OutputDir:             outputDirAbs,
+		TimeLimit:             payload.TimeLimit,
+		MaxSamples:            payload.MaxSamples,
+		MinSamples:            payload.MinSamples,
+		NoiseThresholdEnabled: payload.NoiseThresholdEnabled,
+		NoiseThreshold:        payload.NoiseThreshold,
 	})
 	if err != nil {
 		cleanupErr := runCleanup()
@@ -480,6 +503,31 @@ func parseWorkerPayload(raw *json.RawMessage) (*workerTaskPayload, error) {
 	}
 	if payload.Resolution[0] <= 0 || payload.Resolution[1] <= 0 {
 		return nil, errors.New("payload.resolution width and height must be > 0")
+	}
+	if payload.TimeLimit != nil && *payload.TimeLimit <= 0 {
+		return nil, errors.New("payload.time_limit must be > 0")
+	}
+	if payload.MaxSamples != nil && *payload.MaxSamples <= 0 {
+		return nil, errors.New("payload.max_samples must be > 0")
+	}
+	if payload.MinSamples != nil && *payload.MinSamples < 0 {
+		return nil, errors.New("payload.min_samples must be >= 0")
+	}
+	if payload.MinSamples != nil && payload.MaxSamples != nil && *payload.MinSamples > *payload.MaxSamples {
+		return nil, errors.New("payload.min_samples must be <= payload.max_samples")
+	}
+	if payload.NoiseThresholdEnabled != nil && *payload.NoiseThresholdEnabled {
+		if payload.NoiseThreshold == nil {
+			return nil, errors.New("payload.noise_threshold is required when payload.noise_threshold_enabled=true")
+		}
+		if *payload.NoiseThreshold <= 0 {
+			return nil, errors.New("payload.noise_threshold must be > 0 when payload.noise_threshold_enabled=true")
+		}
+	}
+	if payload.NoiseThreshold != nil {
+		if payload.NoiseThresholdEnabled == nil || !*payload.NoiseThresholdEnabled {
+			return nil, errors.New("payload.noise_threshold requires payload.noise_threshold_enabled=true")
+		}
 	}
 	for i, mapping := range payload.AssetMappings {
 		if mapping.Source == "" {

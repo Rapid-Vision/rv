@@ -14,12 +14,17 @@ import (
 )
 
 type RenderOptions struct {
-	ScriptPath string
-	Cwd        string
-	ImageNum   int
-	Procs      int
-	Resolution [2]int
-	OutputDir  string
+	ScriptPath            string
+	Cwd                   string
+	ImageNum              int
+	Procs                 int
+	Resolution            [2]int
+	OutputDir             string
+	TimeLimit             *float64
+	MaxSamples            *int
+	MinSamples            *int
+	NoiseThresholdEnabled *bool
+	NoiseThreshold        *float64
 }
 
 type RenderResult struct {
@@ -73,6 +78,9 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if resolution[0] <= 0 || resolution[1] <= 0 {
 		return RenderResult{}, errors.New("--resolution must be WIDTH,HEIGHT with positive integers")
 	}
+	if err := validateOptionalRenderOptions(opts); err != nil {
+		return RenderResult{}, err
+	}
 
 	if imgNum < procs {
 		procs = imgNum
@@ -84,17 +92,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 		// Start Blender
 		cmd := exec.Command(
 			blenderPath,
-			filepath.Join(libPath, "template.blend"),
-			"--factory-startup",
-			"--background",
-			"--python", filepath.Join(libPath, "render.py"),
-			"--",
-			"--script", scriptPath,
-			"--libpath", libPath,
-			"--number", fmt.Sprintf("%d", part),
-			"--resolution", fmt.Sprintf("%d,%d", resolution[0], resolution[1]),
-			"--output", seqOutDir,
-			"--cwd", cwdAbs,
+			buildBlenderRenderArgs(opts, libPath, seqOutDir, part)...,
 		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -142,4 +140,67 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	return RenderResult{
 		OutputDir: seqOutDir,
 	}, nil
+}
+
+func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string, part int) []string {
+	args := []string{
+		filepath.Join(libPath, "template.blend"),
+		"--factory-startup",
+		"--background",
+		"--python", filepath.Join(libPath, "render.py"),
+		"--",
+		"--script", opts.ScriptPath,
+		"--libpath", libPath,
+		"--number", fmt.Sprintf("%d", part),
+		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
+		"--output", seqOutDir,
+		"--cwd", opts.Cwd,
+	}
+
+	if opts.TimeLimit != nil {
+		args = append(args, "--time-limit", fmt.Sprintf("%g", *opts.TimeLimit))
+	}
+	if opts.MaxSamples != nil {
+		args = append(args, "--max-samples", fmt.Sprintf("%d", *opts.MaxSamples))
+	}
+	if opts.MinSamples != nil {
+		args = append(args, "--min-samples", fmt.Sprintf("%d", *opts.MinSamples))
+	}
+	if opts.NoiseThresholdEnabled != nil {
+		args = append(args, "--noise-threshold-enabled", fmt.Sprintf("%t", *opts.NoiseThresholdEnabled))
+	}
+	if opts.NoiseThreshold != nil {
+		args = append(args, "--noise-threshold", fmt.Sprintf("%g", *opts.NoiseThreshold))
+	}
+
+	return args
+}
+
+func validateOptionalRenderOptions(opts RenderOptions) error {
+	if opts.TimeLimit != nil && *opts.TimeLimit <= 0 {
+		return errors.New("--time-limit must be > 0")
+	}
+	if opts.MaxSamples != nil && *opts.MaxSamples <= 0 {
+		return errors.New("--max-samples must be > 0")
+	}
+	if opts.MinSamples != nil && *opts.MinSamples < 0 {
+		return errors.New("--min-samples must be >= 0")
+	}
+	if opts.MinSamples != nil && opts.MaxSamples != nil && *opts.MinSamples > *opts.MaxSamples {
+		return errors.New("--min-samples must be <= --max-samples")
+	}
+	if opts.NoiseThresholdEnabled != nil && *opts.NoiseThresholdEnabled {
+		if opts.NoiseThreshold == nil {
+			return errors.New("--noise-threshold is required when --noise-threshold-enabled=true")
+		}
+		if *opts.NoiseThreshold <= 0 {
+			return errors.New("--noise-threshold must be > 0 when --noise-threshold-enabled=true")
+		}
+	}
+	if opts.NoiseThreshold != nil {
+		if opts.NoiseThresholdEnabled == nil || !*opts.NoiseThresholdEnabled {
+			return errors.New("--noise-threshold requires --noise-threshold-enabled=true")
+		}
+	}
+	return nil
 }
