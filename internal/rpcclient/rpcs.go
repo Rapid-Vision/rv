@@ -62,7 +62,8 @@ func (c *RPCClient) ListTasks(ctx context.Context, params ListTasksParams) ([]Ta
 }
 
 type ShowTaskParams struct {
-	TaskId int `json:"task_id"`
+	TaskId   *int    `json:"task_id"`
+	TaskUuid *string `json:"task_uuid"`
 }
 type ShowTaskResult struct {
 	Task TaskModel `json:"task"`
@@ -80,9 +81,10 @@ func (c *RPCClient) ShowTask(ctx context.Context, params ShowTaskParams) (TaskMo
 }
 
 type ShowTaskHistoryParams struct {
-	TaskId int  `json:"task_id"`
-	Limit  *int `json:"limit"`
-	Offset *int `json:"offset"`
+	TaskId   *int    `json:"task_id"`
+	TaskUuid *string `json:"task_uuid"`
+	Limit    *int    `json:"limit"`
+	Offset   *int    `json:"offset"`
 }
 type ShowTaskHistoryResult struct {
 	Result []HistoryModel `json:"result"`
@@ -121,7 +123,8 @@ func (c *RPCClient) SubmitTask(ctx context.Context, params SubmitTaskParams) (Ta
 }
 
 type DeleteTaskParams struct {
-	TaskId int `json:"task_id"`
+	TaskId   *int    `json:"task_id"`
+	TaskUuid *string `json:"task_uuid"`
 }
 
 func (c *RPCClient) DeleteTask(ctx context.Context, params DeleteTaskParams) error {
@@ -134,7 +137,8 @@ func (c *RPCClient) DeleteTask(ctx context.Context, params DeleteTaskParams) err
 }
 
 type UnclaimTaskParams struct {
-	TaskId int `json:"task_id"`
+	TaskId   *int    `json:"task_id"`
+	TaskUuid *string `json:"task_uuid"`
 }
 
 func (c *RPCClient) UnclaimTask(ctx context.Context, params UnclaimTaskParams) error {
@@ -185,7 +189,8 @@ func (c *RPCClient) ListWorkers(ctx context.Context, params ListWorkersParams) (
 }
 
 type RequestTaskParams struct {
-	WorkerId int `json:"worker_id"`
+	WorkerId   *int    `json:"worker_id"`
+	WorkerUuid *string `json:"worker_uuid"`
 }
 type RequestTaskResult struct {
 	TaskDispatch TaskDispatchModel `json:"task_dispatch"`
@@ -203,11 +208,13 @@ func (c *RPCClient) RequestTask(ctx context.Context, params RequestTaskParams) (
 }
 
 type SubmitResultParams struct {
-	WorkerId      int             `json:"worker_id"`
-	TaskId        int             `json:"task_id"`
 	DispatchToken string          `json:"dispatch_token"`
 	Status        string          `json:"status"`
 	Result        json.RawMessage `json:"result"`
+	WorkerId      *int            `json:"worker_id"`
+	WorkerUuid    *string         `json:"worker_uuid"`
+	TaskId        *int            `json:"task_id"`
+	TaskUuid      *string         `json:"task_uuid"`
 }
 type SubmitResultResult struct {
 	Task TaskModel `json:"task"`
@@ -225,10 +232,12 @@ func (c *RPCClient) SubmitResult(ctx context.Context, params SubmitResultParams)
 }
 
 type UpdateTaskTimeoutParams struct {
-	WorkerId      int    `json:"worker_id"`
-	TaskId        int    `json:"task_id"`
-	DispatchToken string `json:"dispatch_token"`
-	MaxTimeout    int    `json:"max_timeout"`
+	DispatchToken string  `json:"dispatch_token"`
+	MaxTimeout    int     `json:"max_timeout"`
+	WorkerId      *int    `json:"worker_id"`
+	WorkerUuid    *string `json:"worker_uuid"`
+	TaskId        *int    `json:"task_id"`
+	TaskUuid      *string `json:"task_uuid"`
 }
 type UpdateTaskTimeoutResult struct {
 	Task TaskModel `json:"task"`
@@ -246,12 +255,14 @@ func (c *RPCClient) UpdateTaskTimeout(ctx context.Context, params UpdateTaskTime
 }
 
 type UpdateTaskProgressParams struct {
-	WorkerId        int              `json:"worker_id"`
-	TaskId          int              `json:"task_id"`
 	DispatchToken   string           `json:"dispatch_token"`
 	Progress        int              `json:"progress"`
 	ProgressMessage *string          `json:"progress_message"`
 	ProgressPayload *json.RawMessage `json:"progress_payload"`
+	WorkerId        *int             `json:"worker_id"`
+	WorkerUuid      *string          `json:"worker_uuid"`
+	TaskId          *int             `json:"task_id"`
+	TaskUuid        *string          `json:"task_uuid"`
 }
 type UpdateTaskProgressResult struct {
 	Task TaskModel `json:"task"`
@@ -269,8 +280,9 @@ func (c *RPCClient) UpdateTaskProgress(ctx context.Context, params UpdateTaskPro
 }
 
 type UpdateWorkerStatusParams struct {
-	WorkerId int     `json:"worker_id"`
-	Status   *string `json:"status"`
+	WorkerId   *int    `json:"worker_id"`
+	WorkerUuid *string `json:"worker_uuid"`
+	Status     *string `json:"status"`
 }
 type UpdateWorkerStatusResult struct {
 	Worker WorkerModel `json:"worker"`
@@ -288,7 +300,8 @@ func (c *RPCClient) UpdateWorkerStatus(ctx context.Context, params UpdateWorkerS
 }
 
 type StopWorkerParams struct {
-	WorkerId int `json:"worker_id"`
+	WorkerId   *int    `json:"worker_id"`
+	WorkerUuid *string `json:"worker_uuid"`
 }
 
 func (c *RPCClient) StopWorker(ctx context.Context, params StopWorkerParams) error {

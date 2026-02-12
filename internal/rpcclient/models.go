@@ -6,10 +6,12 @@ import "encoding/json"
 
 type TaskModel struct {
 	Id                 int              `json:"id"`
+	Uuid               string           `json:"uuid"`
 	TaskName           string           `json:"task_name"`
 	Payload            *json.RawMessage `json:"payload"`
 	Status             string           `json:"status"`
 	WorkerId           *int             `json:"worker_id"`
+	WorkerUuid         *string          `json:"worker_uuid"`
 	Result             *json.RawMessage `json:"result"`
 	RetryCount         int              `json:"retry_count"`
 	MaxAttempts        *int             `json:"max_attempts"`
@@ -41,6 +43,7 @@ type StatusModel struct {
 }
 type WorkerModel struct {
 	Id        int    `json:"id"`
+	Uuid      string `json:"uuid"`
 	Name      string `json:"name"`
 	TaskName  string `json:"task_name"`
 	Status    string `json:"status"`
@@ -51,6 +54,7 @@ type HistoryModel struct {
 	Id         int    `json:"id"`
 	EntityType string `json:"entity_type"`
 	EntityId   int    `json:"entity_id"`
+	EntityUuid string `json:"entity_uuid"`
 	EventType  string `json:"event_type"`
 	Data       string `json:"data"`
 	CreatedAt  string `json:"created_at"`

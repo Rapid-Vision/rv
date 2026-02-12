@@ -89,6 +89,7 @@ func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool
 		return fmt.Errorf("declare worker: %w", err)
 	}
 	logs.Info.Printf("Worker declared (id=%d, name=%s, task=%s)\n", declaredWorker.Id, declaredWorker.Name, declaredWorker.TaskName)
+	workerUUID := declaredWorker.Uuid
 
 	stopCh := make(chan os.Signal, 1)
 	signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
@@ -111,7 +112,7 @@ func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool
 			for {
 				select {
 				case <-ticker.C:
-					_, _ = client.UpdateWorkerStatus(ctx, rpcclient.UpdateWorkerStatusParams{WorkerId: declaredWorker.Id})
+					_, _ = client.UpdateWorkerStatus(ctx, rpcclient.UpdateWorkerStatusParams{WorkerUuid: &workerUUID})
 				case <-done:
 					return
 				}
@@ -121,7 +122,7 @@ func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool
 
 	stopAndReturn := func(message string) error {
 		closeDone()
-		if err := client.StopWorker(ctx, rpcclient.StopWorkerParams{WorkerId: declaredWorker.Id}); err != nil {
+		if err := client.StopWorker(ctx, rpcclient.StopWorkerParams{WorkerUuid: &workerUUID}); err != nil {
 			return fmt.Errorf("stop worker: %w", err)
 		}
 		logs.Info.Println(message)
@@ -135,7 +136,7 @@ func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool
 		default:
 		}
 
-		dispatch, err := client.RequestTask(ctx, rpcclient.RequestTaskParams{WorkerId: declaredWorker.Id})
+		dispatch, err := client.RequestTask(ctx, rpcclient.RequestTaskParams{WorkerUuid: &workerUUID})
 		if err != nil {
 			logs.Warn.Println("Request task failed:", err)
 			time.Sleep(cfg.RTasks.PollInterval)
@@ -152,7 +153,7 @@ func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool
 		}
 
 		task := dispatch.Task
-		err = r.HandleWorkerTask(ctx, client, declaredWorker.Id, *dispatch.DispatchToken, task, cfg)
+		err = r.HandleWorkerTask(ctx, client, workerUUID, *dispatch.DispatchToken, task, cfg)
 		if err != nil {
 			logs.Warn.Println("Task failed:", err)
 		}
@@ -163,10 +164,11 @@ func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool
 	}
 }
 
-func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId int, dispatchToken string, task *rpcclient.TaskModel, cfg *config.WorkerConfig) error {
+func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerUUID string, dispatchToken string, task *rpcclient.TaskModel, cfg *config.WorkerConfig) error {
+	taskUUID := task.Uuid
 	payload, err := parseWorkerPayload(task.Payload)
 	if err != nil {
-		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{"error": err.Error()})
+		submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", map[string]any{"error": err.Error()})
 		return err
 	}
 
@@ -180,7 +182,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 	var scriptPath string
 	var runtimeCwd string
 	var taskWorkDir string
-	var taskUUID string
+	var taskWorkUUID string
 	var staged []assets.StagedFile
 	managedSource := isManagedResourceSource(payload.Script)
 
@@ -189,8 +191,8 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			return
 		}
 		result["task_work_dir"] = taskWorkDir
-		if strings.TrimSpace(taskUUID) != "" {
-			result["task_uuid"] = taskUUID
+		if strings.TrimSpace(taskWorkUUID) != "" {
+			result["task_uuid"] = taskWorkUUID
 		}
 	}
 
@@ -201,7 +203,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 		if len(staged) == 0 && strings.TrimSpace(taskWorkDir) == "" {
 			return nil
 		}
-		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 95, "cleanup", nil)
+		submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 95, "cleanup", nil)
 		cleanupErr := cleanupWorkerTaskResources(cfg.Directories.CleanupPolicy, staged, taskWorkDir)
 		if cleanupErr != nil {
 			logs.Warn.Printf("Task %d cleanup failed: %v\n", task.Id, cleanupErr)
@@ -209,7 +211,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 		return cleanupErr
 	}
 
-	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 5, "resolving paths", nil)
+	submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 5, "resolving paths", nil)
 	outputDirAbs, err := filepath.Abs(cfg.Directories.Output)
 	if err != nil {
 		result := map[string]any{
@@ -219,7 +221,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			},
 		}
 		addTaskWorkspaceMeta(result)
-		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+		submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 		return err
 	}
 
@@ -233,11 +235,11 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 				},
 			}
 			addTaskWorkspaceMeta(result)
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return resolveErr
 		}
 
-		runtimeCwd, taskUUID, err = r.resolveManagedTaskRuntimeCwd(baseCwd)
+		runtimeCwd, taskWorkUUID, err = r.resolveManagedTaskRuntimeCwd(baseCwd)
 		if err != nil {
 			result := map[string]any{
 				"error": "failed to build task workspace",
@@ -246,7 +248,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 				},
 			}
 			addTaskWorkspaceMeta(result)
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return err
 		}
 		taskWorkDir = runtimeCwd
@@ -260,12 +262,12 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 				},
 			}
 			addTaskWorkspaceMeta(result)
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return err
 		}
-		logs.Info.Printf("Task %d workspace: task_uuid=%s task_work_dir=%s\n", task.Id, taskUUID, taskWorkDir)
+		logs.Info.Printf("Task %d workspace: task_uuid=%s task_work_dir=%s\n", task.Id, taskWorkUUID, taskWorkDir)
 
-		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 12, "staging script", nil)
+		submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 12, "staging script", nil)
 		scriptMappings := []assets.Mapping{{
 			Source:      payload.Script,
 			Destination: workerScriptDestination(payload.Script),
@@ -293,7 +295,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			if cleanupErr != nil {
 				result["cleanup_warning"] = cleanupErr.Error()
 			}
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return stageErr
 		}
 		if len(stagedScript) == 0 {
@@ -306,7 +308,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			if cleanupErr != nil {
 				result["cleanup_warning"] = cleanupErr.Error()
 			}
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return err
 		}
 		scriptPath = stagedScript[0].Path
@@ -320,7 +322,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 				},
 			}
 			addTaskWorkspaceMeta(result)
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return pathErr
 		}
 		scriptPath = runtimePaths.ScriptPath
@@ -336,7 +338,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			},
 		}
 		addTaskWorkspaceMeta(result)
-		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+		submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 		return err
 	}
 
@@ -356,7 +358,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 	)
 
 	if len(payload.AssetMappings) > 0 {
-		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 20, "staging assets", nil)
+		submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 20, "staging assets", nil)
 		mappings := make([]assets.Mapping, 0, len(payload.AssetMappings))
 		for _, mapping := range payload.AssetMappings {
 			destination := mapping.Destination
@@ -392,12 +394,12 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			if cleanupErr != nil {
 				result["cleanup_warning"] = cleanupErr.Error()
 			}
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return stageErr
 		}
 	}
 
-	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 40, "rendering", nil)
+	submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 40, "rendering", nil)
 	renderResult, err := render.Render(render.RenderOptions{
 		ScriptPath:            scriptPath,
 		Cwd:                   runtimeCwd,
@@ -418,7 +420,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 		if cleanupErr != nil {
 			result["cleanup_warning"] = cleanupErr.Error()
 		}
-		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+		submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 		return err
 	}
 
@@ -428,13 +430,13 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 	if strings.TrimSpace(taskWorkDir) != "" {
 		resultOutput["task_work_dir"] = taskWorkDir
 	}
-	if strings.TrimSpace(taskUUID) != "" {
-		resultOutput["task_uuid"] = taskUUID
+	if strings.TrimSpace(taskWorkUUID) != "" {
+		resultOutput["task_uuid"] = taskWorkUUID
 	}
 
 	targetS3URL := strings.TrimSpace(cfg.S3.OutputURL)
 	if targetS3URL != "" {
-		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 70, "uploading dataset", nil)
+		submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 70, "uploading dataset", nil)
 		uploadedS3URL, taskS3URL, uploadErr := r.uploadRenderedOutput(ctx, cfg, task.Id, targetS3URL, renderResult.OutputDir)
 		if uploadErr != nil {
 			cleanupErr := runCleanup()
@@ -452,7 +454,7 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			if cleanupErr != nil {
 				result["cleanup_warning"] = cleanupErr.Error()
 			}
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
 			return uploadErr
 		}
 		resultOutput["s3_uri"] = uploadedS3URL
@@ -473,9 +475,9 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 	if cleanupErr != nil {
 		result["cleanup_warning"] = cleanupErr.Error()
 	}
-	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 90, "finalizing result", nil)
-	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 100, "completed", nil)
-	submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "success", result)
+	submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 90, "finalizing result", nil)
+	submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 100, "completed", nil)
+	submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "success", result)
 	return nil
 }
 
@@ -538,15 +540,15 @@ func parseWorkerPayload(raw *json.RawMessage) (*WorkerTaskPayload, error) {
 	return &payload, nil
 }
 
-func submitTaskResult(ctx context.Context, client *rpcclient.RPCClient, workerId int, taskId int, dispatchToken string, status string, result map[string]any) {
+func submitTaskResult(ctx context.Context, client *rpcclient.RPCClient, workerUUID string, taskUUID string, dispatchToken string, status string, result map[string]any) {
 	raw, err := json.Marshal(result)
 	if err != nil {
 		logs.Warn.Println("Failed to encode result:", err)
 		return
 	}
 	_, err = client.SubmitResult(ctx, rpcclient.SubmitResultParams{
-		WorkerId:      workerId,
-		TaskId:        taskId,
+		WorkerUuid:    &workerUUID,
+		TaskUuid:      &taskUUID,
 		DispatchToken: dispatchToken,
 		Status:        status,
 		Result:        raw,
@@ -556,7 +558,7 @@ func submitTaskResult(ctx context.Context, client *rpcclient.RPCClient, workerId
 	}
 }
 
-func submitTaskProgress(ctx context.Context, client *rpcclient.RPCClient, workerId int, taskId int, dispatchToken string, progress int, message string, payload map[string]any) {
+func submitTaskProgress(ctx context.Context, client *rpcclient.RPCClient, workerUUID string, taskUUID string, dispatchToken string, progress int, message string, payload map[string]any) {
 	var rawPayload *json.RawMessage
 	if payload != nil {
 		raw, err := json.Marshal(payload)
@@ -572,15 +574,15 @@ func submitTaskProgress(ctx context.Context, client *rpcclient.RPCClient, worker
 		progressMessage = &message
 	}
 	_, err := client.UpdateTaskProgress(ctx, rpcclient.UpdateTaskProgressParams{
-		WorkerId:        workerId,
-		TaskId:          taskId,
+		WorkerUuid:      &workerUUID,
+		TaskUuid:        &taskUUID,
 		DispatchToken:   dispatchToken,
 		Progress:        progress,
 		ProgressMessage: progressMessage,
 		ProgressPayload: rawPayload,
 	})
 	if err != nil {
-		logs.Warn.Printf("Failed to submit task progress (task=%d): %v\n", taskId, err)
+		logs.Warn.Printf("Failed to submit task progress (task_uuid=%s): %v\n", taskUUID, err)
 	}
 }
 
