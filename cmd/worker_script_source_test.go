@@ -36,17 +36,17 @@ func TestWorkerScriptDestination(t *testing.T) {
 		{
 			name:   "s3 filename",
 			source: "s3://bucket/path/scene.py",
-			want:   ".rv-staged/scripts/scene.py",
+			want:   "scripts/scene.py",
 		},
 		{
 			name:   "http filename",
 			source: "https://example.com/files/scene_main.py",
-			want:   ".rv-staged/scripts/scene_main.py",
+			want:   "scripts/scene_main.py",
 		},
 		{
 			name:   "fallback filename",
 			source: "file://",
-			want:   ".rv-staged/scripts/script.py",
+			want:   "scripts/script.py",
 		},
 	}
 
@@ -55,6 +55,34 @@ func TestWorkerScriptDestination(t *testing.T) {
 			got := workerScriptDestination(tc.source)
 			if got != tc.want {
 				t.Fatalf("workerScriptDestination(%q) = %q, want %q", tc.source, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestWorkerAssetDestination(t *testing.T) {
+	tests := []struct {
+		name        string
+		destination string
+		want        string
+	}{
+		{
+			name:        "simple file",
+			destination: "a.png",
+			want:        "assets/a.png",
+		},
+		{
+			name:        "nested path",
+			destination: "textures/a.png",
+			want:        "assets/textures/a.png",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := workerAssetDestination(tc.destination)
+			if got != tc.want {
+				t.Fatalf("workerAssetDestination(%q) = %q, want %q", tc.destination, got, tc.want)
 			}
 		})
 	}

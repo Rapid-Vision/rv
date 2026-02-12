@@ -19,6 +19,7 @@ import (
 	"github.com/Rapid-Vision/rv/internal/render"
 	"github.com/Rapid-Vision/rv/internal/rpcclient"
 	"github.com/Rapid-Vision/rv/internal/utils"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -68,6 +69,7 @@ type workerTaskPayload struct {
 }
 
 var uploadDirectoryToS3 = assets.UploadDirectoryToS3
+var newWorkerTaskUUID = func() string { return uuid.NewString() }
 
 type workerAssetMapping struct {
 	Source      string `json:"source"`
@@ -219,42 +221,91 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 
 	var scriptPath string
 	var runtimeCwd string
+	var taskWorkDir string
+	var taskUUID string
 	var staged []assets.StagedFile
+	managedSource := isManagedResourceSource(payload.Script)
+
+	addTaskWorkspaceMeta := func(result map[string]any) {
+		if strings.TrimSpace(taskWorkDir) == "" {
+			return
+		}
+		result["task_work_dir"] = taskWorkDir
+		if strings.TrimSpace(taskUUID) != "" {
+			result["task_uuid"] = taskUUID
+		}
+	}
+
+	runCleanup := func() error {
+		if workerCleanupPolicy != "cleanup" {
+			return nil
+		}
+		if len(staged) == 0 && strings.TrimSpace(taskWorkDir) == "" {
+			return nil
+		}
+		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 95, "cleanup", nil)
+		cleanupErr := cleanupWorkerTaskResources(workerCleanupPolicy, staged, taskWorkDir)
+		if cleanupErr != nil {
+			logs.Warn.Printf("Task %d cleanup failed: %v\n", task.Id, cleanupErr)
+		}
+		return cleanupErr
+	}
 
 	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 5, "resolving paths", nil)
 	outputDirAbs, err := filepath.Abs(workerOutputDir)
 	if err != nil {
-		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+		result := map[string]any{
 			"error": "failed to resolve output path",
 			"details": map[string]any{
 				"message": err.Error(),
 			},
-		})
+		}
+		addTaskWorkspaceMeta(result)
+		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
 		return err
 	}
 
-	if isManagedResourceSource(payload.Script) {
-		runtimeCwd, err = resolveWorkerCwd()
-		if err != nil {
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+	if managedSource {
+		baseCwd, resolveErr := resolveWorkerCwd()
+		if resolveErr != nil {
+			result := map[string]any{
 				"error": "failed to resolve cwd",
+				"details": map[string]any{
+					"message": resolveErr.Error(),
+				},
+			}
+			addTaskWorkspaceMeta(result)
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			return resolveErr
+		}
+
+		runtimeCwd, taskUUID, err = resolveManagedTaskRuntimeCwd(baseCwd)
+		if err != nil {
+			result := map[string]any{
+				"error": "failed to build task workspace",
 				"details": map[string]any{
 					"message": err.Error(),
 				},
-			})
+			}
+			addTaskWorkspaceMeta(result)
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
 			return err
 		}
+		taskWorkDir = runtimeCwd
 
 		if err := os.MkdirAll(runtimeCwd, 0o755); err != nil {
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+			result := map[string]any{
 				"error": "failed to create cwd",
 				"details": map[string]any{
 					"cwd":     runtimeCwd,
 					"message": err.Error(),
 				},
-			})
+			}
+			addTaskWorkspaceMeta(result)
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
 			return err
 		}
+		logs.Info.Printf("Task %d workspace: task_uuid=%s task_work_dir=%s\n", task.Id, taskUUID, taskWorkDir)
 
 		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 12, "staging script", nil)
 		scriptMappings := []assets.Mapping{{
@@ -262,6 +313,7 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 			Destination: workerScriptDestination(payload.Script),
 		}}
 		stagedScript, stageErr := assets.StageMappings(ctx, runtimeCwd, scriptMappings)
+		staged = append(staged, stagedScript...)
 		if stageErr != nil {
 			result := map[string]any{
 				"error": "script staging failed",
@@ -269,11 +321,8 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 					"message": stageErr.Error(),
 				},
 			}
-			if workerCleanupPolicy == "cleanup" && len(stagedScript) > 0 {
-				if cleanupErr := assets.CleanupStagedFiles(stagedScript); cleanupErr != nil {
-					result["cleanup_warning"] = cleanupErr.Error()
-				}
-			}
+			cleanupErr := runCleanup()
+			addTaskWorkspaceMeta(result)
 			var mappingErr *assets.MappingError
 			if errors.As(stageErr, &mappingErr) {
 				result["details"] = map[string]any{
@@ -282,21 +331,37 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 					"message":     mappingErr.Err.Error(),
 				}
 			}
+			if cleanupErr != nil {
+				result["cleanup_warning"] = cleanupErr.Error()
+			}
 			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
 			return stageErr
 		}
-
-		staged = append(staged, stagedScript...)
+		if len(stagedScript) == 0 {
+			err := errors.New("script staging produced no files")
+			result := map[string]any{
+				"error": err.Error(),
+			}
+			cleanupErr := runCleanup()
+			addTaskWorkspaceMeta(result)
+			if cleanupErr != nil {
+				result["cleanup_warning"] = cleanupErr.Error()
+			}
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
+			return err
+		}
 		scriptPath = stagedScript[0].Path
 	} else {
 		runtimePaths, pathErr := utils.ResolveRuntimePaths(payload.Script, workerCwd)
 		if pathErr != nil {
-			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+			result := map[string]any{
 				"error": "failed to resolve paths",
 				"details": map[string]any{
 					"message": pathErr.Error(),
 				},
-			})
+			}
+			addTaskWorkspaceMeta(result)
+			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
 			return pathErr
 		}
 		scriptPath = runtimePaths.ScriptPath
@@ -304,13 +369,15 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 	}
 
 	if err := os.MkdirAll(runtimeCwd, 0o755); err != nil {
-		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{
+		result := map[string]any{
 			"error": "failed to create cwd",
 			"details": map[string]any{
 				"cwd":     runtimeCwd,
 				"message": err.Error(),
 			},
-		})
+		}
+		addTaskWorkspaceMeta(result)
+		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
 		return err
 	}
 
@@ -320,13 +387,18 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 20, "staging assets", nil)
 		mappings := make([]assets.Mapping, 0, len(payload.AssetMappings))
 		for _, mapping := range payload.AssetMappings {
+			destination := mapping.Destination
+			if managedSource {
+				destination = workerAssetDestination(mapping.Destination)
+			}
 			mappings = append(mappings, assets.Mapping{
 				Source:      mapping.Source,
-				Destination: mapping.Destination,
+				Destination: destination,
 			})
 		}
 
 		stagedAssets, stageErr := assets.StageMappings(ctx, runtimeCwd, mappings)
+		staged = append(staged, stagedAssets...)
 		if stageErr != nil {
 			result := map[string]any{
 				"error": "asset staging failed",
@@ -334,14 +406,8 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 					"message": stageErr.Error(),
 				},
 			}
-			if workerCleanupPolicy == "cleanup" && len(stagedAssets) > 0 {
-				toCleanup := append(append([]assets.StagedFile{}, staged...), stagedAssets...)
-				cleanupErr := assets.CleanupStagedFiles(toCleanup)
-				if cleanupErr != nil {
-					logs.Warn.Printf("Task %d cleanup failed after staging error: %v\n", task.Id, cleanupErr)
-					result["cleanup_warning"] = cleanupErr.Error()
-				}
-			}
+			cleanupErr := runCleanup()
+			addTaskWorkspaceMeta(result)
 			var mappingErr *assets.MappingError
 			if errors.As(stageErr, &mappingErr) {
 				result["details"] = map[string]any{
@@ -350,22 +416,12 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 					"message":     mappingErr.Err.Error(),
 				}
 			}
+			if cleanupErr != nil {
+				result["cleanup_warning"] = cleanupErr.Error()
+			}
 			submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", result)
 			return stageErr
 		}
-		staged = append(staged, stagedAssets...)
-	}
-
-	runCleanup := func() error {
-		if workerCleanupPolicy != "cleanup" || len(staged) == 0 {
-			return nil
-		}
-		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 95, "cleanup", nil)
-		cleanupErr := assets.CleanupStagedFiles(staged)
-		if cleanupErr != nil {
-			logs.Warn.Printf("Task %d cleanup failed: %v\n", task.Id, cleanupErr)
-		}
-		return cleanupErr
 	}
 
 	submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 40, "rendering", nil)
@@ -379,6 +435,7 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 	if err != nil {
 		cleanupErr := runCleanup()
 		result := map[string]any{"error": err.Error()}
+		addTaskWorkspaceMeta(result)
 		if cleanupErr != nil {
 			result["cleanup_warning"] = cleanupErr.Error()
 		}
@@ -388,6 +445,12 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 
 	resultOutput := map[string]any{
 		"local_dir": renderResult.OutputDir,
+	}
+	if strings.TrimSpace(taskWorkDir) != "" {
+		resultOutput["task_work_dir"] = taskWorkDir
+	}
+	if strings.TrimSpace(taskUUID) != "" {
+		resultOutput["task_uuid"] = taskUUID
 	}
 
 	targetS3URL := strings.TrimSpace(workerS3OutputURL)
@@ -409,6 +472,7 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 					"message": uploadErr.Error(),
 				},
 			}
+			addTaskWorkspaceMeta(result)
 			if cleanupErr != nil {
 				result["cleanup_warning"] = cleanupErr.Error()
 			}
@@ -429,6 +493,7 @@ func handleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 		"ok":     true,
 		"output": resultOutput,
 	}
+	addTaskWorkspaceMeta(result)
 	if cleanupErr != nil {
 		result["cleanup_warning"] = cleanupErr.Error()
 	}
@@ -570,5 +635,50 @@ func workerScriptDestination(source string) string {
 			}
 		}
 	}
-	return filepath.Join(".rv-staged", "scripts", base)
+	return filepath.Join("scripts", base)
+}
+
+func buildTaskWorkDir(baseCwd string, taskUUID string) string {
+	return filepath.Join(baseCwd, taskUUID)
+}
+
+func workerAssetDestination(destination string) string {
+	return filepath.Join("assets", destination)
+}
+
+func resolveManagedTaskRuntimeCwd(baseCwd string) (string, string, error) {
+	baseCwd = strings.TrimSpace(baseCwd)
+	if baseCwd == "" {
+		return "", "", errors.New("base cwd is required")
+	}
+
+	taskUUID := strings.TrimSpace(newWorkerTaskUUID())
+	if taskUUID == "" {
+		return "", "", errors.New("task UUID is empty")
+	}
+
+	return buildTaskWorkDir(baseCwd, taskUUID), taskUUID, nil
+}
+
+func cleanupWorkerTaskResources(cleanupPolicy string, staged []assets.StagedFile, taskWorkDir string) error {
+	if cleanupPolicy != "cleanup" {
+		return nil
+	}
+
+	var errs []string
+	if len(staged) > 0 {
+		if err := assets.CleanupStagedFiles(staged); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if strings.TrimSpace(taskWorkDir) != "" {
+		if err := os.RemoveAll(taskWorkDir); err != nil {
+			errs = append(errs, fmt.Sprintf("remove task work dir %q: %v", taskWorkDir, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
 }
