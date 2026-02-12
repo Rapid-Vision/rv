@@ -10,23 +10,20 @@ import (
 )
 
 func TestUploadRenderedOutput_Success(t *testing.T) {
-	origUploader := uploadDirectoryToS3
-	t.Cleanup(func() {
-		uploadDirectoryToS3 = origUploader
-	})
-
 	cfg := &config.WorkerConfig{}
 	cfg.S3.Endpoint = "s3.amazonaws.com"
 	cfg.S3.Region = "us-east-1"
 	cfg.S3.Secure = true
 
 	var got assets.S3UploadOptions
-	uploadDirectoryToS3 = func(_ context.Context, opts assets.S3UploadOptions) (string, error) {
-		got = opts
-		return opts.DestinationURL, nil
-	}
+	runner := NewRunner(Deps{
+		UploadDirFn: func(_ context.Context, opts assets.S3UploadOptions) (string, error) {
+			got = opts
+			return opts.DestinationURL, nil
+		},
+	})
 
-	uploaded, target, err := uploadRenderedOutput(context.Background(), cfg, 19, "s3://bucket/base", "/tmp/out/5")
+	uploaded, target, err := runner.uploadRenderedOutput(context.Background(), cfg, 19, "s3://bucket/base", "/tmp/out/5")
 	if err != nil {
 		t.Fatalf("uploadRenderedOutput() error = %v", err)
 	}
@@ -44,17 +41,13 @@ func TestUploadRenderedOutput_Success(t *testing.T) {
 }
 
 func TestUploadRenderedOutput_UploadError(t *testing.T) {
-	origUploader := uploadDirectoryToS3
-	t.Cleanup(func() {
-		uploadDirectoryToS3 = origUploader
-	})
-
-	uploadDirectoryToS3 = func(_ context.Context, _ assets.S3UploadOptions) (string, error) {
-		return "", errors.New("boom")
-	}
-
 	cfg := &config.WorkerConfig{}
-	uploaded, target, err := uploadRenderedOutput(context.Background(), cfg, 3, "s3://bucket/base", "/tmp/out/8")
+	runner := NewRunner(Deps{
+		UploadDirFn: func(_ context.Context, _ assets.S3UploadOptions) (string, error) {
+			return "", errors.New("boom")
+		},
+	})
+	uploaded, target, err := runner.uploadRenderedOutput(context.Background(), cfg, 3, "s3://bucket/base", "/tmp/out/8")
 	if err == nil {
 		t.Fatal("expected uploadRenderedOutput to return an error")
 	}

@@ -17,13 +17,11 @@ func TestBuildTaskWorkDir(t *testing.T) {
 }
 
 func TestResolveManagedTaskRuntimeCwd(t *testing.T) {
-	orig := newWorkerTaskUUID
-	t.Cleanup(func() {
-		newWorkerTaskUUID = orig
+	runner := NewRunner(Deps{
+		UUIDFn: func() string { return "task-uuid-1" },
 	})
-	newWorkerTaskUUID = func() string { return "task-uuid-1" }
 
-	cwd, taskUUID, err := resolveManagedTaskRuntimeCwd("/tmp/worker")
+	cwd, taskUUID, err := runner.resolveManagedTaskRuntimeCwd("/tmp/worker")
 	if err != nil {
 		t.Fatalf("resolveManagedTaskRuntimeCwd() error = %v", err)
 	}
@@ -33,6 +31,16 @@ func TestResolveManagedTaskRuntimeCwd(t *testing.T) {
 	want := filepath.Join("/tmp/worker", "task-uuid-1")
 	if cwd != want {
 		t.Fatalf("cwd = %q, want %q", cwd, want)
+	}
+}
+
+func TestNewRunner_DefaultDeps(t *testing.T) {
+	runner := NewRunner(Deps{})
+	if runner.deps.UUIDFn == nil {
+		t.Fatal("UUIDFn should be initialized")
+	}
+	if runner.deps.UploadDirFn == nil {
+		t.Fatal("UploadDirFn should be initialized")
 	}
 }
 

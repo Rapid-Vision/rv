@@ -22,10 +22,17 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	newWorkerTaskUUID   = func() string { return uuid.NewString() }
-	uploadDirectoryToS3 = assets.UploadDirectoryToS3
-)
+type UUIDFn func() string
+type UploadDirFn func(context.Context, assets.S3UploadOptions) (string, error)
+
+type Deps struct {
+	UUIDFn      UUIDFn
+	UploadDirFn UploadDirFn
+}
+
+type Runner struct {
+	deps Deps
+}
 
 type workerTaskPayload struct {
 	Script        string               `json:"script"`
@@ -39,7 +46,29 @@ type workerAssetMapping struct {
 	Destination string `json:"destination"`
 }
 
+func defaultUUIDFn() UUIDFn {
+	return uuid.NewString
+}
+
+func defaultUploadDirFn() UploadDirFn {
+	return assets.UploadDirectoryToS3
+}
+
+func NewRunner(deps Deps) *Runner {
+	if deps.UUIDFn == nil {
+		deps.UUIDFn = defaultUUIDFn()
+	}
+	if deps.UploadDirFn == nil {
+		deps.UploadDirFn = defaultUploadDirFn()
+	}
+	return &Runner{deps: deps}
+}
+
 func Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool) error {
+	return NewRunner(Deps{}).Run(ctx, cfg, runOnce)
+}
+
+func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool) error {
 	if cfg == nil {
 		return errors.New("worker config is required")
 	}
@@ -123,7 +152,7 @@ func Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool) error {
 		}
 
 		task := dispatch.Task
-		err = HandleWorkerTask(ctx, client, declaredWorker.Id, *dispatch.DispatchToken, task, cfg)
+		err = r.HandleWorkerTask(ctx, client, declaredWorker.Id, *dispatch.DispatchToken, task, cfg)
 		if err != nil {
 			logs.Warn.Println("Task failed:", err)
 		}
@@ -134,7 +163,7 @@ func Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool) error {
 	}
 }
 
-func HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId int, dispatchToken string, task *rpcclient.TaskModel, cfg *config.WorkerConfig) error {
+func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId int, dispatchToken string, task *rpcclient.TaskModel, cfg *config.WorkerConfig) error {
 	payload, err := parseWorkerPayload(task.Payload)
 	if err != nil {
 		submitTaskResult(ctx, client, workerId, task.Id, dispatchToken, "failed", map[string]any{"error": err.Error()})
@@ -208,7 +237,7 @@ func HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 			return resolveErr
 		}
 
-		runtimeCwd, taskUUID, err = resolveManagedTaskRuntimeCwd(baseCwd)
+		runtimeCwd, taskUUID, err = r.resolveManagedTaskRuntimeCwd(baseCwd)
 		if err != nil {
 			result := map[string]any{
 				"error": "failed to build task workspace",
@@ -386,7 +415,7 @@ func HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClient, workerId
 	targetS3URL := strings.TrimSpace(cfg.S3.OutputURL)
 	if targetS3URL != "" {
 		submitTaskProgress(ctx, client, workerId, task.Id, dispatchToken, 70, "uploading dataset", nil)
-		uploadedS3URL, taskS3URL, uploadErr := uploadRenderedOutput(ctx, cfg, task.Id, targetS3URL, renderResult.OutputDir)
+		uploadedS3URL, taskS3URL, uploadErr := r.uploadRenderedOutput(ctx, cfg, task.Id, targetS3URL, renderResult.OutputDir)
 		if uploadErr != nil {
 			cleanupErr := runCleanup()
 			result := map[string]any{
@@ -510,13 +539,13 @@ func submitTaskProgress(ctx context.Context, client *rpcclient.RPCClient, worker
 	}
 }
 
-func uploadRenderedOutput(ctx context.Context, cfg *config.WorkerConfig, taskID int, targetS3URL string, localOutputDir string) (string, string, error) {
+func (r *Runner) uploadRenderedOutput(ctx context.Context, cfg *config.WorkerConfig, taskID int, targetS3URL string, localOutputDir string) (string, string, error) {
 	taskS3URL, err := assets.BuildWorkerTaskS3URL(targetS3URL, taskID, localOutputDir)
 	if err != nil {
 		return "", targetS3URL, err
 	}
 
-	uploadedS3URL, err := uploadDirectoryToS3(ctx, assets.S3UploadOptions{
+	uploadedS3URL, err := r.deps.UploadDirFn(ctx, assets.S3UploadOptions{
 		LocalDir:        localOutputDir,
 		DestinationURL:  taskS3URL,
 		Endpoint:        cfg.S3.Endpoint,
@@ -571,13 +600,13 @@ func workerAssetDestination(destination string) string {
 	return filepath.Join("assets", destination)
 }
 
-func resolveManagedTaskRuntimeCwd(baseCwd string) (string, string, error) {
+func (r *Runner) resolveManagedTaskRuntimeCwd(baseCwd string) (string, string, error) {
 	baseCwd = strings.TrimSpace(baseCwd)
 	if baseCwd == "" {
 		return "", "", errors.New("base cwd is required")
 	}
 
-	taskUUID := strings.TrimSpace(newWorkerTaskUUID())
+	taskUUID := strings.TrimSpace(r.deps.UUIDFn())
 	if taskUUID == "" {
 		return "", "", errors.New("task UUID is empty")
 	}
