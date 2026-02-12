@@ -34,23 +34,6 @@ type Runner struct {
 	deps Deps
 }
 
-type workerTaskPayload struct {
-	Script                string               `json:"script"`
-	Number                int                  `json:"number"`
-	Resolution            []int                `json:"resolution"`
-	TimeLimit             *float64             `json:"time_limit"`
-	MaxSamples            *int                 `json:"max_samples"`
-	MinSamples            *int                 `json:"min_samples"`
-	NoiseThresholdEnabled *bool                `json:"noise_threshold_enabled"`
-	NoiseThreshold        *float64             `json:"noise_threshold"`
-	AssetMappings         []workerAssetMapping `json:"asset_mappings"`
-}
-
-type workerAssetMapping struct {
-	Source      string `json:"source"`
-	Destination string `json:"destination"`
-}
-
 func defaultUUIDFn() UUIDFn {
 	return uuid.NewString
 }
@@ -482,12 +465,12 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 	return nil
 }
 
-func parseWorkerPayload(raw *json.RawMessage) (*workerTaskPayload, error) {
+func parseWorkerPayload(raw *json.RawMessage) (*WorkerTaskPayload, error) {
 	if raw == nil || len(*raw) == 0 {
 		return nil, errors.New("task payload is empty")
 	}
 
-	var payload workerTaskPayload
+	var payload WorkerTaskPayload
 	if err := json.Unmarshal(*raw, &payload); err != nil {
 		return nil, err
 	}

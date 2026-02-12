@@ -1,6 +1,6 @@
 worker:
   worker_name: render-1
-  task_name: render
+  task_name: dataset_render
 
   renderer:
     max_procs: 5
