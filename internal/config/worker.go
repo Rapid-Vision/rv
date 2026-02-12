@@ -107,13 +107,23 @@ func ResolveWorkerS3BaseURL(outputURL string, s3Path string) (string, error) {
 		return "", nil
 	}
 
-	normalized := strings.TrimPrefix(s3Path, "/")
+	normalized := strings.Trim(strings.TrimSpace(s3Path), "/")
+	if normalized == "" {
+		return "", errors.New("worker.s3.path must include bucket name")
+	}
 	parts := strings.SplitN(normalized, "/", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return "", errors.New("worker.s3.path must be in format /bucket/prefix")
+	bucket := strings.TrimSpace(parts[0])
+	if bucket == "" {
+		return "", errors.New("worker.s3.path must include bucket name")
 	}
 
-	url := fmt.Sprintf("s3://%s/%s", strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+	url := fmt.Sprintf("s3://%s", bucket)
+	if len(parts) == 2 {
+		prefix := strings.TrimSpace(parts[1])
+		if prefix != "" {
+			url = fmt.Sprintf("s3://%s/%s", bucket, prefix)
+		}
+	}
 	if _, err := assets.ParseS3URL(url); err != nil {
 		return "", fmt.Errorf("worker.s3.path is invalid: %w", err)
 	}

@@ -31,6 +31,9 @@ type S3URL struct {
 }
 
 func (s S3URL) String() string {
+	if s.Prefix == "" {
+		return fmt.Sprintf("s3://%s", s.Bucket)
+	}
 	return fmt.Sprintf("s3://%s/%s", s.Bucket, s.Prefix)
 }
 
@@ -141,12 +144,12 @@ func UploadDirectoryToS3(ctx context.Context, opts S3UploadOptions) (string, err
 func normalizeS3Prefix(rawPath string) (string, error) {
 	trimmed := strings.TrimSpace(strings.TrimPrefix(rawPath, "/"))
 	if trimmed == "" {
-		return "", errors.New("s3 prefix is required")
+		return "", nil
 	}
 
 	cleaned := path.Clean(trimmed)
 	if cleaned == "." || cleaned == "" {
-		return "", errors.New("s3 prefix is required")
+		return "", nil
 	}
 	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return "", errors.New("s3 prefix must not escape root")

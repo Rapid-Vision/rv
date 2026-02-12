@@ -22,9 +22,16 @@ func TestParseS3URL(t *testing.T) {
 		}
 	})
 
-	t.Run("missing prefix", func(t *testing.T) {
-		if _, err := ParseS3URL("s3://my-bucket"); err == nil {
-			t.Fatal("expected missing prefix error")
+	t.Run("bucket root", func(t *testing.T) {
+		got, err := ParseS3URL("s3://my-bucket")
+		if err != nil {
+			t.Fatalf("ParseS3URL() error = %v", err)
+		}
+		if got.Bucket != "my-bucket" {
+			t.Fatalf("bucket = %q, want %q", got.Bucket, "my-bucket")
+		}
+		if got.Prefix != "" {
+			t.Fatalf("prefix = %q, want empty", got.Prefix)
 		}
 	})
 
@@ -42,6 +49,18 @@ func TestBuildWorkerTaskS3URL(t *testing.T) {
 	}
 
 	want := "s3://bucket/datasets/base/task-17/12"
+	if got != want {
+		t.Fatalf("BuildWorkerTaskS3URL() = %q, want %q", got, want)
+	}
+}
+
+func TestBuildWorkerTaskS3URL_BucketRoot(t *testing.T) {
+	got, err := BuildWorkerTaskS3URL("s3://bucket", 7, "/tmp/out/1")
+	if err != nil {
+		t.Fatalf("BuildWorkerTaskS3URL() error = %v", err)
+	}
+
+	want := "s3://bucket/task-7/1"
 	if got != want {
 		t.Fatalf("BuildWorkerTaskS3URL() = %q, want %q", got, want)
 	}

@@ -37,8 +37,13 @@ func TestResolveWorkerS3BaseURL(t *testing.T) {
 		},
 		{
 			name:    "invalid path",
-			path:    "/bucket",
+			path:    "/",
 			wantErr: true,
+		},
+		{
+			name: "bucket root path",
+			path: "/bucket/",
+			want: "s3://bucket",
 		},
 	}
 
