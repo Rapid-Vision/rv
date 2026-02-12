@@ -22,6 +22,19 @@ type Mapping struct {
 	Destination string
 }
 
+type StageS3Options struct {
+	Endpoint        string
+	Region          string
+	Secure          bool
+	AccessKeyID     string
+	SecretAccessKey string
+	SessionToken    string
+}
+
+type StageOptions struct {
+	S3 StageS3Options
+}
+
 type StagedFile struct {
 	Source      string
 	Destination string
@@ -43,6 +56,10 @@ func (e *MappingError) Unwrap() error {
 }
 
 func StageMappings(ctx context.Context, cwd string, mappings []Mapping) ([]StagedFile, error) {
+	return StageMappingsWithOptions(ctx, cwd, mappings, StageOptions{})
+}
+
+func StageMappingsWithOptions(ctx context.Context, cwd string, mappings []Mapping, opts StageOptions) ([]StagedFile, error) {
 	if cwd == "" {
 		return nil, errors.New("cwd is required")
 	}
@@ -104,7 +121,7 @@ func StageMappings(ctx context.Context, cwd string, mappings []Mapping) ([]Stage
 			Path:        dstPath,
 		})
 
-		if err := copySourceToPath(ctx, cwdAbs, mapping.Source, dstPath); err != nil {
+		if err := copySourceToPath(ctx, cwdAbs, mapping.Source, dstPath, opts); err != nil {
 			return res, &MappingError{
 				Source:      mapping.Source,
 				Destination: mapping.Destination,
@@ -129,7 +146,7 @@ func CleanupStagedFiles(staged []StagedFile) error {
 	return nil
 }
 
-func copySourceToPath(ctx context.Context, cwd string, source string, dstPath string) error {
+func copySourceToPath(ctx context.Context, cwd string, source string, dstPath string, opts StageOptions) error {
 	source = strings.TrimSpace(source)
 	if source == "" {
 		return errors.New("source is required")
@@ -147,7 +164,7 @@ func copySourceToPath(ctx context.Context, cwd string, source string, dstPath st
 	case "http", "https":
 		return downloadHTTP(ctx, source, dstPath)
 	case "s3":
-		return downloadS3(ctx, parsed, dstPath)
+		return downloadS3(ctx, parsed, dstPath, opts.S3)
 	case "file":
 		return copyLocalFile(parsed.Path, dstPath)
 	case "":
@@ -202,17 +219,26 @@ func downloadHTTP(ctx context.Context, source string, dstPath string) error {
 	return err
 }
 
-func downloadS3(ctx context.Context, parsed *url.URL, dstPath string) error {
+func downloadS3(ctx context.Context, parsed *url.URL, dstPath string, opts StageS3Options) error {
 	bucket := parsed.Host
 	key := strings.TrimPrefix(parsed.Path, "/")
 	if bucket == "" || key == "" {
 		return fmt.Errorf("invalid s3 source: %q", parsed.String())
 	}
 
-	client, err := minio.New("s3.amazonaws.com", &minio.Options{
-		Creds:  credentials.NewEnvAWS(),
-		Secure: true,
-		Region: os.Getenv("AWS_REGION"),
+	endpoint := strings.TrimSpace(opts.Endpoint)
+	if endpoint == "" {
+		endpoint = "s3.amazonaws.com"
+	}
+	region := strings.TrimSpace(opts.Region)
+	if region == "" {
+		region = strings.TrimSpace(os.Getenv("AWS_REGION"))
+	}
+
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentialsForStageS3(opts),
+		Secure: opts.Secure || endpoint == "s3.amazonaws.com",
+		Region: region,
 	})
 	if err != nil {
 		return fmt.Errorf("init s3 client: %w", err)
@@ -232,6 +258,16 @@ func downloadS3(ctx context.Context, parsed *url.URL, dstPath string) error {
 
 	_, err = io.Copy(dstFile, obj)
 	return err
+}
+
+func credentialsForStageS3(opts StageS3Options) *credentials.Credentials {
+	if strings.TrimSpace(opts.AccessKeyID) != "" && strings.TrimSpace(opts.SecretAccessKey) != "" {
+		return credentials.NewStaticV4(strings.TrimSpace(opts.AccessKeyID), strings.TrimSpace(opts.SecretAccessKey), strings.TrimSpace(opts.SessionToken))
+	}
+	if strings.TrimSpace(os.Getenv("AWS_ACCESS_KEY_ID")) != "" && strings.TrimSpace(os.Getenv("AWS_SECRET_ACCESS_KEY")) != "" {
+		return credentials.NewEnvAWS()
+	}
+	return credentials.NewIAM("")
 }
 
 func copyLocalFile(source string, dstPath string) error {

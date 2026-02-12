@@ -24,10 +24,12 @@ import (
 
 type UUIDFn func() string
 type UploadDirFn func(context.Context, assets.S3UploadOptions) (string, error)
+type EnsureS3BucketFn func(context.Context, assets.S3BucketOptions) error
 
 type Deps struct {
-	UUIDFn      UUIDFn
-	UploadDirFn UploadDirFn
+	UUIDFn         UUIDFn
+	UploadDirFn    UploadDirFn
+	EnsureBucketFn EnsureS3BucketFn
 }
 
 type Runner struct {
@@ -42,12 +44,19 @@ func defaultUploadDirFn() UploadDirFn {
 	return assets.UploadDirectoryToS3
 }
 
+func defaultEnsureBucketFn() EnsureS3BucketFn {
+	return assets.EnsureS3Bucket
+}
+
 func NewRunner(deps Deps) *Runner {
 	if deps.UUIDFn == nil {
 		deps.UUIDFn = defaultUUIDFn()
 	}
 	if deps.UploadDirFn == nil {
 		deps.UploadDirFn = defaultUploadDirFn()
+	}
+	if deps.EnsureBucketFn == nil {
+		deps.EnsureBucketFn = defaultEnsureBucketFn()
 	}
 	return &Runner{deps: deps}
 }
@@ -62,6 +71,9 @@ func (r *Runner) Run(ctx context.Context, cfg *config.WorkerConfig, runOnce bool
 	}
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if err := r.ensureConfiguredS3Bucket(ctx, cfg); err != nil {
+		return err
 	}
 
 	client := rpcclient.NewRPCClient(cfg.RTasks.URL)
@@ -258,7 +270,8 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			Source:      payload.Script,
 			Destination: workerScriptDestination(payload.Script),
 		}}
-		stagedScript, stageErr := assets.StageMappings(ctx, runtimeCwd, scriptMappings)
+		stageOpts := stageOptionsFromConfig(cfg)
+		stagedScript, stageErr := assets.StageMappingsWithOptions(ctx, runtimeCwd, scriptMappings, stageOpts)
 		staged = append(staged, stagedScript...)
 		if stageErr != nil {
 			result := map[string]any{
@@ -356,7 +369,8 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 			})
 		}
 
-		stagedAssets, stageErr := assets.StageMappings(ctx, runtimeCwd, mappings)
+		stageOpts := stageOptionsFromConfig(cfg)
+		stagedAssets, stageErr := assets.StageMappingsWithOptions(ctx, runtimeCwd, mappings, stageOpts)
 		staged = append(staged, stagedAssets...)
 		if stageErr != nil {
 			result := map[string]any{
@@ -591,6 +605,38 @@ func (r *Runner) uploadRenderedOutput(ctx context.Context, cfg *config.WorkerCon
 	}
 
 	return uploadedS3URL, taskS3URL, nil
+}
+
+func (r *Runner) ensureConfiguredS3Bucket(ctx context.Context, cfg *config.WorkerConfig) error {
+	targetS3URL := strings.TrimSpace(cfg.S3.OutputURL)
+	if targetS3URL == "" {
+		return nil
+	}
+	if err := r.deps.EnsureBucketFn(ctx, assets.S3BucketOptions{
+		DestinationURL:  targetS3URL,
+		Endpoint:        cfg.S3.Endpoint,
+		Region:          cfg.S3.Region,
+		Secure:          cfg.S3.Secure,
+		AccessKeyID:     cfg.S3.AccessKeyID,
+		SecretAccessKey: cfg.S3.SecretKey,
+		SessionToken:    cfg.S3.SessionToken,
+	}); err != nil {
+		return fmt.Errorf("ensure configured s3 bucket: %w", err)
+	}
+	return nil
+}
+
+func stageOptionsFromConfig(cfg *config.WorkerConfig) assets.StageOptions {
+	return assets.StageOptions{
+		S3: assets.StageS3Options{
+			Endpoint:        cfg.S3.Endpoint,
+			Region:          cfg.S3.Region,
+			Secure:          cfg.S3.Secure,
+			AccessKeyID:     cfg.S3.AccessKeyID,
+			SecretAccessKey: cfg.S3.SecretKey,
+			SessionToken:    cfg.S3.SessionToken,
+		},
+	}
 }
 
 func isManagedResourceSource(source string) bool {

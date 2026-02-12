@@ -42,6 +42,9 @@ func TestNewRunner_DefaultDeps(t *testing.T) {
 	if runner.deps.UploadDirFn == nil {
 		t.Fatal("UploadDirFn should be initialized")
 	}
+	if runner.deps.EnsureBucketFn == nil {
+		t.Fatal("EnsureBucketFn should be initialized")
+	}
 }
 
 func TestIsManagedResourceSource_LocalScriptUnchanged(t *testing.T) {
