@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Rapid-Vision/rv/internal/assets"
+	"github.com/Rapid-Vision/rv/internal/config"
 )
 
 func TestUploadRenderedOutput_Success(t *testing.T) {
@@ -14,9 +15,10 @@ func TestUploadRenderedOutput_Success(t *testing.T) {
 		uploadDirectoryToS3 = origUploader
 	})
 
-	workerS3Endpoint = "s3.amazonaws.com"
-	workerS3Region = "us-east-1"
-	workerS3Secure = true
+	cfg := &config.WorkerConfig{}
+	cfg.S3.Endpoint = "s3.amazonaws.com"
+	cfg.S3.Region = "us-east-1"
+	cfg.S3.Secure = true
 
 	var got assets.S3UploadOptions
 	uploadDirectoryToS3 = func(_ context.Context, opts assets.S3UploadOptions) (string, error) {
@@ -24,7 +26,7 @@ func TestUploadRenderedOutput_Success(t *testing.T) {
 		return opts.DestinationURL, nil
 	}
 
-	uploaded, target, err := uploadRenderedOutput(context.Background(), 19, "s3://bucket/base", "/tmp/out/5")
+	uploaded, target, err := uploadRenderedOutput(context.Background(), cfg, 19, "s3://bucket/base", "/tmp/out/5")
 	if err != nil {
 		t.Fatalf("uploadRenderedOutput() error = %v", err)
 	}
@@ -51,7 +53,8 @@ func TestUploadRenderedOutput_UploadError(t *testing.T) {
 		return "", errors.New("boom")
 	}
 
-	uploaded, target, err := uploadRenderedOutput(context.Background(), 3, "s3://bucket/base", "/tmp/out/8")
+	cfg := &config.WorkerConfig{}
+	uploaded, target, err := uploadRenderedOutput(context.Background(), cfg, 3, "s3://bucket/base", "/tmp/out/8")
 	if err == nil {
 		t.Fatal("expected uploadRenderedOutput to return an error")
 	}
