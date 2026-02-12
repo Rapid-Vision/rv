@@ -36,17 +36,17 @@ func TestWorkerScriptDestination(t *testing.T) {
 		{
 			name:   "s3 filename",
 			source: "s3://bucket/path/scene.py",
-			want:   "scripts/scene.py",
+			want:   "__scene.py",
 		},
 		{
 			name:   "http filename",
 			source: "https://example.com/files/scene_main.py",
-			want:   "scripts/scene_main.py",
+			want:   "__scene.py",
 		},
 		{
 			name:   "fallback filename",
 			source: "file://",
-			want:   "scripts/script.py",
+			want:   "__scene.py",
 		},
 	}
 
@@ -69,12 +69,12 @@ func TestWorkerAssetDestination(t *testing.T) {
 		{
 			name:        "simple file",
 			destination: "a.png",
-			want:        "assets/a.png",
+			want:        "a.png",
 		},
 		{
 			name:        "nested path",
 			destination: "textures/a.png",
-			want:        "assets/textures/a.png",
+			want:        "textures/a.png",
 		},
 	}
 

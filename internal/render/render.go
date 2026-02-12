@@ -147,6 +147,7 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		filepath.Join(libPath, "template.blend"),
 		"--factory-startup",
 		"--background",
+		"--python-exit-code", "1",
 		"--python", filepath.Join(libPath, "render.py"),
 		"--",
 		"--script", opts.ScriptPath,

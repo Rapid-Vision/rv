@@ -36,6 +36,8 @@ type Runner struct {
 	deps Deps
 }
 
+const managedTaskScriptFilename = "__scene.py"
+
 func defaultUUIDFn() UUIDFn {
 	return uuid.NewString
 }
@@ -535,6 +537,10 @@ func parseWorkerPayload(raw *json.RawMessage) (*WorkerTaskPayload, error) {
 		if mapping.Destination == "" {
 			return nil, fmt.Errorf("payload.asset_mappings[%d].destination is required", i)
 		}
+		destBase := filepath.Base(filepath.Clean(mapping.Destination))
+		if destBase == managedTaskScriptFilename {
+			return nil, fmt.Errorf("payload.asset_mappings[%d].destination must not use reserved filename %q", i, managedTaskScriptFilename)
+		}
 	}
 
 	return &payload, nil
@@ -659,16 +665,7 @@ func isManagedResourceSource(source string) bool {
 }
 
 func workerScriptDestination(source string) string {
-	base := "script.py"
-	if parsed, err := url.Parse(source); err == nil {
-		if parsed.Path != "" {
-			candidate := filepath.Base(parsed.Path)
-			if candidate != "" && candidate != "." && candidate != "/" {
-				base = candidate
-			}
-		}
-	}
-	return filepath.Join("scripts", base)
+	return managedTaskScriptFilename
 }
 
 func buildTaskWorkDir(baseCwd string, taskUUID string) string {
@@ -676,7 +673,7 @@ func buildTaskWorkDir(baseCwd string, taskUUID string) string {
 }
 
 func workerAssetDestination(destination string) string {
-	return filepath.Join("assets", destination)
+	return filepath.Clean(destination)
 }
 
 func (r *Runner) resolveManagedTaskRuntimeCwd(baseCwd string) (string, string, error) {

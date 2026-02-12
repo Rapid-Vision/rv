@@ -131,6 +131,22 @@ func TestParseWorkerPayload_InvalidOptionalRenderFields(t *testing.T) {
 				"noise_threshold":0.05
 			}`,
 		},
+		{
+			name: "asset destination reserved script filename",
+			raw: `{
+				"script":"scene.py",
+				"resolution":[640,640],
+				"asset_mappings":[{"source":"s3://bucket/cube.blend","destination":"__scene.py"}]
+			}`,
+		},
+		{
+			name: "asset destination nested reserved script filename",
+			raw: `{
+				"script":"scene.py",
+				"resolution":[640,640],
+				"asset_mappings":[{"source":"s3://bucket/cube.blend","destination":"models/__scene.py"}]
+			}`,
+		},
 	}
 
 	for _, tc := range tests {

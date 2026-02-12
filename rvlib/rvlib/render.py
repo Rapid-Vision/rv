@@ -125,8 +125,7 @@ def run_script(
             scene_classes.append(obj)
 
     if len(scene_classes) != 1:
-        print(CLASS_COUNT_ERROR_MESSAGE)
-        return
+        raise RuntimeError(CLASS_COUNT_ERROR_MESSAGE.strip())
 
     def run_script():
         rv.begin_run(purge_orphans=True)

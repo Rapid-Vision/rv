@@ -89,6 +89,11 @@ func TestBuildBlenderRenderArgs_UnsetOptionalArgs(t *testing.T) {
 	}
 
 	got := buildBlenderRenderArgs(opts, "/tmp/lib", "/tmp/out/1", 3)
+	pythonExitIdx := slices.Index(got, "--python-exit-code")
+	if pythonExitIdx < 0 || pythonExitIdx+1 >= len(got) || got[pythonExitIdx+1] != "1" {
+		t.Fatalf("expected --python-exit-code 1 in args: %v", got)
+	}
+
 	for _, forbidden := range []string{
 		"--time-limit",
 		"--max-samples",
