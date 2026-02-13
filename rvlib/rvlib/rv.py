@@ -1159,17 +1159,23 @@ class Object(_Serializable):
         self.obj.rotation_quaternion = rot_quat @ self.obj.rotation_quaternion
         return self
 
-    def set_shading(self, shading: Literal["flat", "smooth"]):
-        """
-        Set shading to flat or smooth.
-        """
+    def _select_for_shading_ops(self) -> None:
         bpy.ops.object.select_all(action="DESELECT")
         self.obj.select_set(True)
+        bpy.context.view_layer.objects.active = self.obj
+
+    def set_shading(self, shading: Literal["flat", "smooth", "auto"]):
+        """
+        Set shading to flat, smooth, or auto.
+        """
+        self._select_for_shading_ops()
 
         if shading == "flat":
             bpy.ops.object.shade_flat()
         elif shading == "smooth":
             bpy.ops.object.shade_smooth()
+        elif shading == "auto":
+            bpy.ops.object.shade_auto_smooth()
         else:
             raise ValueError(f"Unknown shading mode: {shading}")
 
