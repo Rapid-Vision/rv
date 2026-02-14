@@ -38,7 +38,7 @@ class BasicScene(rv.Scene):
 ## Classes
 
 ### `class Domain` {#class-domain}
-Scatter domain descriptor used by `Scene.scatter_non_intersecting`.
+Scatter domain descriptor used by scene scattering methods.
 
 ::: details Attributes
 
@@ -52,7 +52,8 @@ Scatter domain descriptor used by `Scene.scatter_non_intersecting`.
 
 ::: details Methods
 
-##### `rect`
+---
+#### `rect`
 
 **Signature**
 
@@ -63,13 +64,15 @@ def rect(center: tuple[float, float]=(0.0, 0.0), size: tuple[float, float]=(10.0
 
 **Arguments**
 
-- **`center`** : `tuple[float, float]`
-- **`size`** : `tuple[float, float]`
-- **`z`** : `float`
+- **`center`** : `tuple[float, float]` — XY center of the rectangle
+- **`size`** : `tuple[float, float]` — Rectangle width and depth
+- **`z`** : `float` — Fixed Z plane for 2D scattering
 
 **Returns**: `'Domain'`
 
-##### `ellipse`
+---
+---
+#### `ellipse`
 
 **Signature**
 
@@ -80,13 +83,15 @@ def ellipse(center: tuple[float, float]=(0.0, 0.0), radii: tuple[float, float]=(
 
 **Arguments**
 
-- **`center`** : `tuple[float, float]`
-- **`radii`** : `tuple[float, float]`
-- **`z`** : `float`
+- **`center`** : `tuple[float, float]` — XY center of the ellipse
+- **`radii`** : `tuple[float, float]` — Ellipse radii along X and Y
+- **`z`** : `float` — Fixed Z plane for 2D scattering
 
 **Returns**: `'Domain'`
 
-##### `polygon`
+---
+---
+#### `polygon`
 
 **Signature**
 
@@ -97,12 +102,14 @@ def polygon(points: list[tuple[float, float]], z: float=0.0) -> 'Domain'
 
 **Arguments**
 
-- **`points`** : `list[tuple[float, float]]`
-- **`z`** : `float`
+- **`points`** : `list[tuple[float, float]]` — Polygon vertices in XY
+- **`z`** : `float` — Fixed Z plane for 2D scattering
 
 **Returns**: `'Domain'`
 
-##### `box`
+---
+---
+#### `box`
 
 **Signature**
 
@@ -113,12 +120,14 @@ def box(center: tuple[float, float, float]=(0.0, 0.0, 0.0), size: tuple[float, f
 
 **Arguments**
 
-- **`center`** : `tuple[float, float, float]`
-- **`size`** : `tuple[float, float, float]`
+- **`center`** : `tuple[float, float, float]` — 3D center
+- **`size`** : `tuple[float, float, float]` — Box side lengths
 
 **Returns**: `'Domain'`
 
-##### `cylinder`
+---
+---
+#### `cylinder`
 
 **Signature**
 
@@ -129,14 +138,16 @@ def cylinder(center: tuple[float, float, float]=(0.0, 0.0, 0.0), radius: float=5
 
 **Arguments**
 
-- **`center`** : `tuple[float, float, float]`
-- **`radius`** : `float`
-- **`height`** : `float`
-- **`axis`** : `str`
+- **`center`** : `tuple[float, float, float]` — Cylinder center
+- **`radius`** : `float` — Radial extent
+- **`height`** : `float` — Length along the selected axis
+- **`axis`** : `str` — Longitudinal axis: X, Y, or Z
 
 **Returns**: `'Domain'`
 
-##### `ellipsoid`
+---
+---
+#### `ellipsoid`
 
 **Signature**
 
@@ -147,12 +158,14 @@ def ellipsoid(center: tuple[float, float, float]=(0.0, 0.0, 0.0), radii: tuple[f
 
 **Arguments**
 
-- **`center`** : `tuple[float, float, float]`
-- **`radii`** : `tuple[float, float, float]`
+- **`center`** : `tuple[float, float, float]` — Ellipsoid center
+- **`radii`** : `tuple[float, float, float]` — Radii along X, Y, Z
 
 **Returns**: `'Domain'`
 
-##### `convex_hull`
+---
+---
+#### `convex_hull`
 
 **Signature**
 
@@ -163,12 +176,14 @@ def convex_hull(rv_obj: 'Object', project_2d: bool=False) -> 'Domain'
 
 **Arguments**
 
-- **`rv_obj`** : `'Object'`
-- **`project_2d`** : `bool`
+- **`rv_obj`** : `'Object'` — Source object to build the hull from
+- **`project_2d`** : `bool` — If true, project hull to XY polygon
 
 **Returns**: `'Domain'`
 
-##### `sample_point`
+---
+---
+#### `sample_point`
 
 **Signature**
 
@@ -178,11 +193,13 @@ def sample_point(self, rng: random.Random) -> mathutils.Vector
 
 **Arguments**
 
-- **`rng`** : `random.Random`
+- **`rng`** : `random.Random` — Random generator
 
 **Returns**: `mathutils.Vector`
 
-##### `contains_point`
+---
+---
+#### `contains_point`
 
 **Signature**
 
@@ -192,12 +209,14 @@ def contains_point(self, point: mathutils.Vector, margin: float=0.0) -> bool
 
 **Arguments**
 
-- **`point`** : `mathutils.Vector`
-- **`margin`** : `float`
+- **`point`** : `mathutils.Vector` — Candidate point in world coordinates
+- **`margin`** : `float` — Inset margin from boundary
 
 **Returns**: `bool`
 
-##### `aabb`
+---
+---
+#### `aabb`
 
 **Signature**
 
@@ -210,6 +229,7 @@ def aabb(self) -> tuple[mathutils.Vector, mathutils.Vector]
 
 **Returns**: `tuple[mathutils.Vector, mathutils.Vector]`
 
+---
 :::
 
 ---
@@ -242,7 +262,8 @@ Base class for describing rv scene. To set up a scene, implement `generate` func
 
 ::: details Methods
 
-##### `generate`
+---
+#### `generate`
 
 Method to describe scene generation. To use framework you must implement it in a derrived class.
 
@@ -258,7 +279,9 @@ def generate(self) -> None
 
 **Returns**: `None`
 
-##### `set_rendering_time_limit`
+---
+---
+#### `set_rendering_time_limit`
 
 Set the maximum allowed rendering time for a single image. Higher value leads to better quality.
 
@@ -274,7 +297,9 @@ def set_rendering_time_limit(self, time_limit: float=3.0)
 
 **Returns**: `Self`
 
-##### `set_passes`
+---
+---
+#### `set_passes`
 
 Set a list of render passes that will be saved when rendering.
 
@@ -290,7 +315,9 @@ def set_passes(self, *passes: tuple[RenderPass | list[RenderPass], ...])
 
 **Returns**: `Self`
 
-##### `create_empty`
+---
+---
+#### `create_empty`
 
 Create an empty object. May be useful to point camera at or for debugging during `preview` stage.
 
@@ -306,7 +333,9 @@ def create_empty(self, name: str='Empty') -> 'Object'
 
 **Returns**: `'Object'`
 
-##### `create_sphere`
+---
+---
+#### `create_sphere`
 
 Create a sphere primitive.
 
@@ -325,7 +354,9 @@ def create_sphere(self, name: str='Sphere', radius: float=1.0, segments: int=32,
 
 **Returns**: `'Object'`
 
-##### `create_cube`
+---
+---
+#### `create_cube`
 
 Create a cube primitive.
 
@@ -342,7 +373,9 @@ def create_cube(self, name: str='Cube', size: float=2.0) -> 'Object'
 
 **Returns**: `'Object'`
 
-##### `create_plane`
+---
+---
+#### `create_plane`
 
 Create a plane primitive.
 
@@ -359,7 +392,9 @@ def create_plane(self, name: str='Plane', size: float=2.0) -> 'Object'
 
 **Returns**: `'Object'`
 
-##### `create_point_light`
+---
+---
+#### `create_point_light`
 
 Create a point light.
 
@@ -376,7 +411,9 @@ def create_point_light(self, name: str='Point', power: float=1000.0) -> 'PointLi
 
 **Returns**: `'PointLight'`
 
-##### `create_sun_light`
+---
+---
+#### `create_sun_light`
 
 Create a sun light.
 
@@ -393,7 +430,9 @@ def create_sun_light(self, name: str='Sun', power: float=1.0) -> 'SunLight'
 
 **Returns**: `'SunLight'`
 
-##### `create_area_light`
+---
+---
+#### `create_area_light`
 
 Create an area light.
 
@@ -410,7 +449,9 @@ def create_area_light(self, name: str='Area', power: float=100.0) -> 'AreaLight'
 
 **Returns**: `'AreaLight'`
 
-##### `create_spot_light`
+---
+---
+#### `create_spot_light`
 
 Create a spot light.
 
@@ -427,7 +468,9 @@ def create_spot_light(self, name: str='Spot', power: float=1000.0) -> 'SpotLight
 
 **Returns**: `'SpotLight'`
 
-##### `get_camera`
+---
+---
+#### `get_camera`
 
 Get the `Camera` object used for rendering.
 
@@ -442,7 +485,9 @@ def get_camera(self) -> 'Camera'
 
 **Returns**: `'Camera'`
 
-##### `set_world`
+---
+---
+#### `set_world`
 
 Set a new `World` representing environmental lighting.
 
@@ -458,7 +503,9 @@ def set_world(self, world: 'World') -> 'World'
 
 **Returns**: `Self`
 
-##### `get_world`
+---
+---
+#### `get_world`
 
 Get current used `World`.
 
@@ -473,7 +520,9 @@ def get_world(self) -> 'World'
 
 **Returns**: `'World'`
 
-##### `set_tags`
+---
+---
+#### `set_tags`
 
 Set scene's global tags.
 
@@ -491,7 +540,9 @@ def set_tags(self, *tags) -> 'Scene'
 
 **Returns**: `Self`
 
-##### `add_tags`
+---
+---
+#### `add_tags`
 
 Add tags to the scene.
 
@@ -509,7 +560,9 @@ def add_tags(self, *tags) -> 'Scene'
 
 **Returns**: `Self`
 
-##### `load_object`
+---
+---
+#### `load_object`
 
 Get a loader object to import from a blender file.
 
@@ -531,7 +584,9 @@ def load_object(self, blendfile: str, import_name: str=None) -> 'ObjectLoader'
 
 **Returns**: `'ObjectLoader'`
 
-##### `load_objects`
+---
+---
+#### `load_objects`
 
 Get a list of loader objects to import from a blender file.
 
@@ -553,7 +608,9 @@ def load_objects(self, blendfile: str, import_names: list[str]=None) -> list['Ob
 
 **Returns**: `Self`
 
-##### `create_material`
+---
+---
+#### `create_material`
 
 Create a new basic (Principled BSDF) material.
 
@@ -569,7 +626,9 @@ def create_material(self, name: str='Material') -> 'BasicMaterial'
 
 **Returns**: `'BasicMaterial'`
 
-##### `import_material`
+---
+---
+#### `import_material`
 
 Create an imported material descriptor from a .blend file.
 
@@ -586,7 +645,9 @@ def import_material(self, blendfile: str, material_name: str=None) -> 'ImportedM
 
 **Returns**: `'ImportedMaterial'`
 
-##### `scatter_by_sphere`
+---
+---
+#### `scatter_by_sphere`
 
 Scatter objects using bounding-sphere collisions.
 
@@ -598,21 +659,23 @@ def scatter_by_sphere(self, source: 'ObjectLoader | list[ObjectLoader]', count: 
 
 **Arguments**
 
-- **`source`** : `'ObjectLoader | list[ObjectLoader]'`
-- **`count`** : `int`
-- **`domain`** : `'Domain'`
-- **`min_gap`** : `float`
-- **`yaw_range`** : `tuple[float, float]`
-- **`rotation_mode`** : `Literal['yaw', 'free']`
-- **`scale_range`** : `tuple[float, float]`
-- **`max_attempts_per_object`** : `int`
-- **`boundary_mode`** : `Literal['center_margin']`
-- **`boundary_margin`** : `float`
-- **`seed`** : `int | None`
+- **`source`** : `'ObjectLoader | list[ObjectLoader]'` — Source loader(s)
+- **`count`** : `int` — Requested number of objects to place
+- **`domain`** : `'Domain'` — Scatter domain descriptor
+- **`min_gap`** : `float` — Extra spacing between placed objects
+- **`yaw_range`** : `tuple[float, float]` — Yaw range in degrees
+- **`rotation_mode`** : `Literal['yaw', 'free']` — Rotation sampling strategy
+- **`scale_range`** : `tuple[float, float]` — Uniform scale range
+- **`max_attempts_per_object`** : `int` — Retry budget per requested object
+- **`boundary_mode`** : `Literal['center_margin']` — Boundary policy
+- **`boundary_margin`** : `float` — Required inset distance from domain edge
+- **`seed`** : `int | None` — RNG seed for deterministic sampling
 
 **Returns**: `Self`
 
-##### `scatter_by_bvh`
+---
+---
+#### `scatter_by_bvh`
 
 Scatter objects using exact BVH overlap checks with broad-phase pruning.
 
@@ -624,21 +687,23 @@ def scatter_by_bvh(self, source: 'ObjectLoader | list[ObjectLoader]', count: int
 
 **Arguments**
 
-- **`source`** : `'ObjectLoader | list[ObjectLoader]'`
-- **`count`** : `int`
-- **`domain`** : `'Domain'`
-- **`min_gap`** : `float`
-- **`yaw_range`** : `tuple[float, float]`
-- **`rotation_mode`** : `Literal['yaw', 'free']`
-- **`scale_range`** : `tuple[float, float]`
-- **`max_attempts_per_object`** : `int`
-- **`boundary_mode`** : `Literal['center_margin']`
-- **`boundary_margin`** : `float`
-- **`seed`** : `int | None`
+- **`source`** : `'ObjectLoader | list[ObjectLoader]'` — Source loader(s)
+- **`count`** : `int` — Requested number of objects to place
+- **`domain`** : `'Domain'` — Scatter domain descriptor
+- **`min_gap`** : `float` — Extra spacing between placed objects
+- **`yaw_range`** : `tuple[float, float]` — Yaw range in degrees
+- **`rotation_mode`** : `Literal['yaw', 'free']` — Rotation sampling strategy
+- **`scale_range`** : `tuple[float, float]` — Uniform scale range
+- **`max_attempts_per_object`** : `int` — Retry budget per requested object
+- **`boundary_mode`** : `Literal['center_margin']` — Boundary policy
+- **`boundary_margin`** : `float` — Required inset distance from domain edge
+- **`seed`** : `int | None` — RNG seed for deterministic sampling
 
 **Returns**: `Self`
 
-##### `scatter_parametric`
+---
+---
+#### `scatter_parametric`
 
 Scatter parameterized objects. Dimensions are measured on candidate geometry per attempt.
 
@@ -650,48 +715,22 @@ def scatter_parametric(self, source: 'ParametricSource', count: int, domain: 'Do
 
 **Arguments**
 
-- **`source`** : `'ParametricSource'`
-- **`count`** : `int`
-- **`domain`** : `'Domain'`
-- **`strategy`** : `Literal['sphere', 'bvh']`
-- **`min_gap`** : `float`
-- **`yaw_range`** : `tuple[float, float]`
-- **`rotation_mode`** : `Literal['yaw', 'free']`
-- **`scale_range`** : `tuple[float, float]`
-- **`max_attempts_per_object`** : `int`
-- **`boundary_mode`** : `Literal['center_margin']`
-- **`boundary_margin`** : `float`
-- **`seed`** : `int | None`
+- **`source`** : `'ParametricSource'` — Parameterized source descriptor
+- **`count`** : `int` — Requested number of objects to place
+- **`domain`** : `'Domain'` — Scatter domain descriptor
+- **`strategy`** : `Literal['sphere', 'bvh']` — Collision strategy
+- **`min_gap`** : `float` — Extra spacing between placed objects
+- **`yaw_range`** : `tuple[float, float]` — Yaw range in degrees
+- **`rotation_mode`** : `Literal['yaw', 'free']` — Rotation sampling strategy
+- **`scale_range`** : `tuple[float, float]` — Uniform scale range
+- **`max_attempts_per_object`** : `int` — Retry budget per requested object
+- **`boundary_mode`** : `Literal['center_margin']` — Boundary policy
+- **`boundary_margin`** : `float` — Required inset distance from domain edge
+- **`seed`** : `int | None` — RNG seed for deterministic sampling
 
 **Returns**: `Self`
 
-##### `scatter_non_intersecting`
-
-Backward-compatible wrapper for scattering.
-
-**Signature**
-
-```python
-def scatter_non_intersecting(self, source: 'ObjectLoader | list[ObjectLoader]', count: int, domain: 'Domain', min_gap: float=0.0, yaw_range: tuple[float, float]=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: tuple[float, float]=(1.0, 1.0), max_attempts_per_object: int=100, collision_mode: Literal['bounds', 'mesh']='bounds', boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None) -> list['Object']
-```
-
-**Arguments**
-
-- **`source`** : `'ObjectLoader | list[ObjectLoader]'`
-- **`count`** : `int`
-- **`domain`** : `'Domain'`
-- **`min_gap`** : `float`
-- **`yaw_range`** : `tuple[float, float]`
-- **`rotation_mode`** : `Literal['yaw', 'free']`
-- **`scale_range`** : `tuple[float, float]`
-- **`max_attempts_per_object`** : `int`
-- **`collision_mode`** : `Literal['bounds', 'mesh']`
-- **`boundary_mode`** : `Literal['center_margin']`
-- **`boundary_margin`** : `float`
-- **`seed`** : `int | None`
-
-**Returns**: `list['Object']`
-
+---
 :::
 
 ---
@@ -701,7 +740,8 @@ Helper for creating object instances from a loaded Blender object source.
 
 ::: details Methods
 
-##### `create_instance`
+---
+#### `create_instance`
 
 Create a single object instance from a loader.
 
@@ -714,10 +754,11 @@ def create_instance(self, name: str=None, register_object: bool=True) -> 'Object
 **Arguments**
 
 - **`name`** : `str` — Instanced object name
-- **`register_object`** : `bool`
+- **`register_object`** : `bool` — Register in scene metadata/indexes
 
 **Returns**: `'Object'`
 
+---
 :::
 
 ---
@@ -729,7 +770,8 @@ It can sample parameters per candidate and apply them to each created instance.
 
 ::: details Methods
 
-##### `set_sampler`
+---
+#### `set_sampler`
 
 Set a callback that samples a parameter dictionary for each candidate.
 
@@ -741,11 +783,13 @@ def set_sampler(self, sampler: typing.Callable[[random.Random], dict]) -> 'Param
 
 **Arguments**
 
-- **`sampler`** : `typing.Callable[[random.Random], dict]`
+- **`sampler`** : `typing.Callable[[random.Random], dict]` — Samples a params dict from RNG
 
 **Returns**: `Self`
 
-##### `set_applier`
+---
+---
+#### `set_applier`
 
 Set a callback that applies sampled parameters to the created object.
 
@@ -757,11 +801,13 @@ def set_applier(self, applier: typing.Callable[['Object', dict], None]) -> 'Para
 
 **Arguments**
 
-- **`applier`** : `typing.Callable[['Object', dict], None]`
+- **`applier`** : `typing.Callable[['Object', dict], None]` — Applies params to created object
 
 **Returns**: `Self`
 
-##### `sample_params`
+---
+---
+#### `sample_params`
 
 **Signature**
 
@@ -771,11 +817,13 @@ def sample_params(self, rng: random.Random) -> dict
 
 **Arguments**
 
-- **`rng`** : `random.Random`
+- **`rng`** : `random.Random` — Random generator
 
 **Returns**: `dict`
 
-##### `create_instance`
+---
+---
+#### `create_instance`
 
 **Signature**
 
@@ -785,12 +833,13 @@ def create_instance(self, params: dict | None=None, register_object: bool=True, 
 
 **Arguments**
 
-- **`params`** : `dict | None`
-- **`register_object`** : `bool`
-- **`name`** : `str`
+- **`params`** : `dict | None` — Sampled parameter dictionary
+- **`register_object`** : `bool` — Register in scene metadata/indexes
+- **`name`** : `str` — Instance object name
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -806,14 +855,15 @@ A material descriptor is converted to a real Blender material when assigned to a
 
 | Name | Type | Description |
 | - | - | - |
-| `name` | `str | None` |  |
-| `index` | `int | None` |  |
+| `name` | `str \| None` |  |
+| `index` | `int \| None` |  |
 
 :::
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Update descriptor-specific material parameters and return `self`.
 
@@ -828,6 +878,7 @@ def set_params(self, **kwargs)
 
 - **`**kwargs`**
 
+---
 :::
 
 ---
@@ -841,22 +892,23 @@ Material descriptor backed by Blender's Principled BSDF shader.
 
 | Name | Type | Description |
 | - | - | - |
-| `base_color` | `tuple[float, float, float, float] | None` |  |
-| `roughness` | `float | None` |  |
-| `metallic` | `float | None` |  |
-| `specular` | `float | None` |  |
-| `emission_color` | `tuple[float, float, float, float] | None` |  |
-| `emission_strength` | `float | None` |  |
-| `alpha` | `float | None` |  |
-| `transmission` | `float | None` |  |
-| `ior` | `float | None` |  |
+| `base_color` | `tuple[float, float, float, float] \| None` |  |
+| `roughness` | `float \| None` |  |
+| `metallic` | `float \| None` |  |
+| `specular` | `float \| None` |  |
+| `emission_color` | `tuple[float, float, float, float] \| None` |  |
+| `emission_strength` | `float \| None` |  |
+| `alpha` | `float \| None` |  |
+| `transmission` | `float \| None` |  |
+| `ior` | `float \| None` |  |
 | `properties` | `dict` |  |
 
 :::
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Set Principled BSDF parameters used when building the material.
 
@@ -878,7 +930,9 @@ def set_params(self, base_color: tuple[float, float, float, float] | tuple[float
 - **`transmission`** : `float`
 - **`ior`** : `float`
 
-##### `set_property`
+---
+---
+#### `set_property`
 
 Set a custom Blender property on the generated material.
 
@@ -895,6 +949,7 @@ def set_property(self, key: str, value: any)
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -909,14 +964,15 @@ Material descriptor that imports a material from another `.blend` file.
 | Name | Type | Description |
 | - | - | - |
 | `filepath` | `str` |  |
-| `material_name` | `str | None` |  |
+| `material_name` | `str \| None` |  |
 | `params` | `dict` |  |
 
 :::
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Set custom properties applied to the imported material.
 
@@ -932,6 +988,7 @@ def set_params(self, **kwargs)
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -949,13 +1006,14 @@ Wrapper around a Blender object with chainable transformation and metadata helpe
 | `scene` | `Scene` |  |
 | `tags` | `set[str]` |  |
 | `properties` | `dict` |  |
-| `index` | `int | None` |  |
+| `index` | `int \| None` |  |
 
 :::
 
 ::: details Methods
 
-##### `set_location`
+---
+#### `set_location`
 
 Set the location of the object in 3D space.
 
@@ -971,7 +1029,9 @@ def set_location(self, location: Union[mathutils.Vector, typing.Sequence[float]]
 
 **Returns**: `Self`
 
-##### `set_rotation`
+---
+---
+#### `set_rotation`
 
 Set the rotation of the object.
 
@@ -987,7 +1047,9 @@ def set_rotation(self, rotation: Union[mathutils.Euler, mathutils.Quaternion])
 
 **Returns**: `Self`
 
-##### `set_scale`
+---
+---
+#### `set_scale`
 
 Set the scale of the object.
 
@@ -1006,7 +1068,9 @@ def set_scale(self, scale: Union[mathutils.Vector, typing.Sequence[float], float
 
 **Returns**: `Self`
 
-##### `set_property`
+---
+---
+#### `set_property`
 
 Set a property of the object. Properties can be used inside object's material nodes.
 
@@ -1023,7 +1087,9 @@ def set_property(self, key: str, value: any)
 
 **Returns**: `Self`
 
-##### `set_material`
+---
+---
+#### `set_material`
 
 Set object material in the given slot.
 
@@ -1040,7 +1106,9 @@ def set_material(self, material: 'Material', slot: int=0)
 
 **Returns**: `Self`
 
-##### `add_material`
+---
+---
+#### `add_material`
 
 Append material to object's material slots.
 
@@ -1056,7 +1124,9 @@ def add_material(self, material: 'Material')
 
 **Returns**: `Self`
 
-##### `clear_materials`
+---
+---
+#### `clear_materials`
 
 Remove all materials from object.
 
@@ -1071,7 +1141,9 @@ def clear_materials(self)
 
 **Returns**: `Self`
 
-##### `set_tags`
+---
+---
+#### `set_tags`
 
 Set object's tags.
 
@@ -1089,7 +1161,9 @@ def set_tags(self, *tags: str | list[str])
 
 **Returns**: `Self`
 
-##### `add_tags`
+---
+---
+#### `add_tags`
 
 Add tags to the object.
 
@@ -1107,7 +1181,9 @@ def add_tags(self, *tags: str | list[str])
 
 **Returns**: `Self`
 
-##### `point_at`
+---
+---
+#### `point_at`
 
 Orients the current object to point at another object, with an optional rotation around the direction vector.
 
@@ -1124,7 +1200,9 @@ def point_at(self, rv_obj: 'Object', angle: float=0.0)
 
 **Returns**: `Self`
 
-##### `rotate_around_axis`
+---
+---
+#### `rotate_around_axis`
 
 Rotate object around an axis.
 
@@ -1141,7 +1219,9 @@ def rotate_around_axis(self, axis: mathutils.Vector, angle: float)
 
 **Returns**: `Self`
 
-##### `set_shading`
+---
+---
+#### `set_shading`
 
 Set shading to flat, smooth, or auto.
 
@@ -1157,7 +1237,9 @@ def set_shading(self, shading: Literal['flat', 'smooth', 'auto'])
 
 **Returns**: `Self`
 
-##### `show_debug_axes`
+---
+---
+#### `show_debug_axes`
 
 Show debug axes that can be seen in the `preview` mode.
 
@@ -1173,7 +1255,9 @@ def show_debug_axes(self, show=True)
 
 **Returns**: `Self`
 
-##### `show_debug_name`
+---
+---
+#### `show_debug_name`
 
 Show object's name that can be seen in the `preview` mode.
 
@@ -1189,6 +1273,7 @@ def show_debug_name(self, show)
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -1200,7 +1285,8 @@ Inherits from: `Object`
 
 ::: details Methods
 
-##### `set_fov`
+---
+#### `set_fov`
 
 Sets the field of view (FOV) for the object's camera in degrees.
 
@@ -1216,6 +1302,7 @@ def set_fov(self, angle: float)
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -1227,7 +1314,8 @@ Base object wrapper for Blender lights with chainable parameter setters.
 
 ::: details Methods
 
-##### `light_data`
+---
+#### `light_data`
 
 Return the underlying Blender light datablock.
 
@@ -1243,7 +1331,9 @@ def light_data(self) -> bpy.types.Light
 
 **Returns**: `bpy.types.Light`
 
-##### `set_color`
+---
+---
+#### `set_color`
 
 Set light RGB color. Alpha (if provided) is ignored.
 
@@ -1259,7 +1349,9 @@ def set_color(self, color: tuple[float, float, float] | tuple[float, float, floa
 
 **Returns**: `Self`
 
-##### `set_power`
+---
+---
+#### `set_power`
 
 Set light power in Blender `energy` units.
 
@@ -1275,7 +1367,9 @@ def set_power(self, power: float) -> 'Light'
 
 **Returns**: `Self`
 
-##### `set_cast_shadow`
+---
+---
+#### `set_cast_shadow`
 
 Enable or disable shadow casting.
 
@@ -1291,7 +1385,9 @@ def set_cast_shadow(self, enabled: bool=True) -> 'Light'
 
 **Returns**: `Self`
 
-##### `set_specular_factor`
+---
+---
+#### `set_specular_factor`
 
 Set the light contribution to specular highlights.
 
@@ -1307,7 +1403,9 @@ def set_specular_factor(self, factor: float) -> 'Light'
 
 **Returns**: `Self`
 
-##### `set_softness`
+---
+---
+#### `set_softness`
 
 Set softness parameter mapped to the current light type.
 
@@ -1323,7 +1421,9 @@ def set_softness(self, value: float) -> 'Light'
 
 **Returns**: `Self`
 
-##### `set_params`
+---
+---
+#### `set_params`
 
 Set known light-data attributes or custom properties.
 
@@ -1339,6 +1439,7 @@ def set_params(self, **kwargs) -> 'Light'
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -1350,7 +1451,8 @@ Point light with radius control.
 
 ::: details Methods
 
-##### `set_radius`
+---
+#### `set_radius`
 
 Set point light radius.
 
@@ -1366,6 +1468,7 @@ def set_radius(self, radius: float) -> 'PointLight'
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -1377,7 +1480,8 @@ Directional sun light with angular size control.
 
 ::: details Methods
 
-##### `set_angle`
+---
+#### `set_angle`
 
 Set sun angular size in radians.
 
@@ -1393,6 +1497,7 @@ def set_angle(self, angle_radians: float) -> 'SunLight'
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -1404,7 +1509,8 @@ Area light with shape and size controls.
 
 ::: details Methods
 
-##### `set_shape`
+---
+#### `set_shape`
 
 Set area light shape.
 
@@ -1420,7 +1526,9 @@ def set_shape(self, shape: Literal['SQUARE', 'RECTANGLE', 'DISK', 'ELLIPSE']) ->
 
 **Returns**: `Self`
 
-##### `set_size`
+---
+---
+#### `set_size`
 
 Set primary area light size.
 
@@ -1436,7 +1544,9 @@ def set_size(self, size: float) -> 'AreaLight'
 
 **Returns**: `Self`
 
-##### `set_size_xy`
+---
+---
+#### `set_size_xy`
 
 Set area light X and Y sizes.
 
@@ -1453,6 +1563,7 @@ def set_size_xy(self, size_x: float, size_y: float) -> 'AreaLight'
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -1464,7 +1575,8 @@ Spot light with cone and blend controls.
 
 ::: details Methods
 
-##### `set_spot_size`
+---
+#### `set_spot_size`
 
 Set spotlight cone angle in radians.
 
@@ -1480,7 +1592,9 @@ def set_spot_size(self, angle_radians: float) -> 'SpotLight'
 
 **Returns**: `Self`
 
-##### `set_blend`
+---
+---
+#### `set_blend`
 
 Set spotlight edge softness in the [0, 1] range.
 
@@ -1496,7 +1610,9 @@ def set_blend(self, blend: float) -> 'SpotLight'
 
 **Returns**: `Self`
 
-##### `set_show_cone`
+---
+---
+#### `set_show_cone`
 
 Show or hide the spotlight cone in viewport.
 
@@ -1512,6 +1628,7 @@ def set_show_cone(self, show: bool=True) -> 'SpotLight'
 
 **Returns**: `Self`
 
+---
 :::
 
 ---
@@ -1523,7 +1640,8 @@ Base class representing world (environment ligthing).
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Update world-specific lighting parameters.
 
@@ -1537,6 +1655,7 @@ def set_params(self)
 **Arguments**
 
 
+---
 :::
 
 ---
@@ -1557,7 +1676,8 @@ Inherits from: `World`
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Set ligthing parameters.
 
@@ -1572,6 +1692,7 @@ def set_params(self, color: tuple[float, float, float, float]=None, strength: fl
 - **`color`** : `tuple[float, float, float, float]` — environement color
 - **`strength`** : `float` — envronement light strength
 
+---
 :::
 
 ---
@@ -1601,7 +1722,8 @@ For more information, view [official blender docs](https://docs.blender.org/manu
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Set procedural sky parameters for the current world.
 
@@ -1622,6 +1744,7 @@ def set_params(self, strength: float=None, sun_size: float=None, sun_intensity: 
 - **`aerosol_density`** : `float` — Aerosol density
 - **`ozone`** : `float` — Ozone density
 
+---
 :::
 
 ---
@@ -1645,7 +1768,8 @@ HDRI files can be captured by a 360 camera or a smartphone app or downloaded fro
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Set HDRI source and environment lighting parameters.
 
@@ -1661,6 +1785,7 @@ def set_params(self, hdri_path: str=None, strength: float=None, rotation_z: floa
 - **`strength`** : `float`
 - **`rotation_z`** : `float`
 
+---
 :::
 
 ---
@@ -1684,7 +1809,8 @@ Use it to bring in custom procedural lighting setups and adjust their parameters
 
 ::: details Methods
 
-##### `set_params`
+---
+#### `set_params`
 
 Set custom properties applied to the imported world.
 
@@ -1698,6 +1824,7 @@ def set_params(self, **kwargs)
 
 - **`**kwargs`**
 
+---
 :::
 
 ---

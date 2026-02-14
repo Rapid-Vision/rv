@@ -353,12 +353,12 @@ class _Serializable:
 
 class Domain:
     """
-    Scatter domain descriptor used by `Scene.scatter_non_intersecting`.
+    Scatter domain descriptor used by scene scattering methods.
     """
 
-    kind: str
-    data: dict
-    dimension: int
+    kind: str  # Domain kind identifier (rect, ellipse, hull3d, etc.)
+    data: dict  # Domain parameters required by sampling/containment logic
+    dimension: int  # Domain dimensionality (2 for planar, 3 for volumetric)
 
     def __init__(self, kind: str, data: dict, dimension: int):
         self.kind = kind
@@ -367,18 +367,18 @@ class Domain:
 
     @staticmethod
     def rect(
-        center: tuple[float, float] = (0.0, 0.0),
-        size: tuple[float, float] = (10.0, 10.0),
-        z: float = 0.0,
+        center: tuple[float, float] = (0.0, 0.0),  # XY center of the rectangle
+        size: tuple[float, float] = (10.0, 10.0),  # Rectangle width and depth
+        z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
         _ensure_positive_tuple(size, 2, "size")
         return Domain("rect", {"center": tuple(center), "size": tuple(size), "z": z}, 2)
 
     @staticmethod
     def ellipse(
-        center: tuple[float, float] = (0.0, 0.0),
-        radii: tuple[float, float] = (5.0, 3.0),
-        z: float = 0.0,
+        center: tuple[float, float] = (0.0, 0.0),  # XY center of the ellipse
+        radii: tuple[float, float] = (5.0, 3.0),  # Ellipse radii along X and Y
+        z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
         _ensure_positive_tuple(radii, 2, "radii")
         return Domain(
@@ -387,8 +387,8 @@ class Domain:
 
     @staticmethod
     def polygon(
-        points: list[tuple[float, float]],
-        z: float = 0.0,
+        points: list[tuple[float, float]],  # Polygon vertices in XY
+        z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
         if points is None or len(points) < 3:
             raise ValueError("polygon requires at least 3 points.")
@@ -401,18 +401,18 @@ class Domain:
 
     @staticmethod
     def box(
-        center: tuple[float, float, float] = (0.0, 0.0, 0.0),
-        size: tuple[float, float, float] = (10.0, 10.0, 10.0),
+        center: tuple[float, float, float] = (0.0, 0.0, 0.0),  # 3D center
+        size: tuple[float, float, float] = (10.0, 10.0, 10.0),  # Box side lengths
     ) -> "Domain":
         _ensure_positive_tuple(size, 3, "size")
         return Domain("box", {"center": tuple(center), "size": tuple(size)}, 3)
 
     @staticmethod
     def cylinder(
-        center: tuple[float, float, float] = (0.0, 0.0, 0.0),
-        radius: float = 5.0,
-        height: float = 10.0,
-        axis: str = "Z",
+        center: tuple[float, float, float] = (0.0, 0.0, 0.0),  # Cylinder center
+        radius: float = 5.0,  # Radial extent
+        height: float = 10.0,  # Length along the selected axis
+        axis: str = "Z",  # Longitudinal axis: X, Y, or Z
     ) -> "Domain":
         if radius <= 0:
             raise ValueError("radius must be > 0.")
@@ -429,14 +429,17 @@ class Domain:
 
     @staticmethod
     def ellipsoid(
-        center: tuple[float, float, float] = (0.0, 0.0, 0.0),
-        radii: tuple[float, float, float] = (5.0, 3.0, 2.0),
+        center: tuple[float, float, float] = (0.0, 0.0, 0.0),  # Ellipsoid center
+        radii: tuple[float, float, float] = (5.0, 3.0, 2.0),  # Radii along X, Y, Z
     ) -> "Domain":
         _ensure_positive_tuple(radii, 3, "radii")
         return Domain("ellipsoid", {"center": tuple(center), "radii": tuple(radii)}, 3)
 
     @staticmethod
-    def convex_hull(rv_obj: "Object", project_2d: bool = False) -> "Domain":
+    def convex_hull(
+        rv_obj: "Object",  # Source object to build the hull from
+        project_2d: bool = False,  # If true, project hull to XY polygon
+    ) -> "Domain":
         points = _get_object_world_vertices(rv_obj.obj)
         if len(points) < 3:
             raise ValueError("convex_hull requires an object with mesh geometry.")
@@ -464,7 +467,7 @@ class Domain:
             3,
         )
 
-    def sample_point(self, rng: random.Random) -> mathutils.Vector:
+    def sample_point(self, rng: random.Random) -> mathutils.Vector:  # Random generator
         if self.kind == "rect":
             cx, cy = self.data["center"]
             sx, sy = self.data["size"]
@@ -546,7 +549,11 @@ class Domain:
 
         raise ValueError(f"Unsupported domain kind: {self.kind}")
 
-    def contains_point(self, point: mathutils.Vector, margin: float = 0.0) -> bool:
+    def contains_point(
+        self,
+        point: mathutils.Vector,  # Candidate point in world coordinates
+        margin: float = 0.0,  # Inset margin from boundary
+    ) -> bool:
         if margin < 0:
             raise ValueError("margin must be >= 0.")
 
@@ -731,24 +738,24 @@ class Scene(ABC, _Serializable):
     Base class for describing rv scene. To set up a scene, implement `generate` function.
     """
 
-    resolution: tuple[int, int] = (640, 640)
-    time_limit: float = 3.0
-    passes: set[RenderPass] = None
+    resolution: tuple[int, int] = (640, 640)  # Output image resolution (width, height)
+    time_limit: float = 3.0  # Per-frame render time limit in seconds
+    passes: set[RenderPass] = None  # Enabled auxiliary render passes
     output_dir: Optional[
         str
     ]  # Directory for storing all outputs generated by a single `rv render` run
     subdir: str  # Directory to store results of a single rendering
-    camera: "Camera"
-    world: "World"
-    tags: set[str]
+    camera: "Camera"  # Scene camera wrapper
+    world: "World"  # Active environment lighting descriptor
+    tags: set[str]  # Scene-level classification tags
 
-    objects: set["Object"]
-    materials: set["Material"]
-    lights: set["Light"]
+    objects: set["Object"]  # Registered scene objects
+    materials: set["Material"]  # Registered material descriptors
+    lights: set["Light"]  # Registered lights
 
-    object_index_counter: int = 0
-    material_index_counter: int = 0
-    light_index_counter: int = 0
+    object_index_counter: int = 0  # Monotonic object pass-index counter
+    material_index_counter: int = 0  # Monotonic material pass-index counter
+    light_index_counter: int = 0  # Monotonic light index counter
 
     @abstractmethod
     def generate(self) -> None:
@@ -1023,17 +1030,17 @@ class Scene(ABC, _Serializable):
 
     def scatter_by_sphere(
         self,
-        source: "ObjectLoader | list[ObjectLoader]",
-        count: int,
-        domain: "Domain",
-        min_gap: float = 0.0,
-        yaw_range: tuple[float, float] = (0.0, 360.0),
-        rotation_mode: Literal["yaw", "free"] = "yaw",
-        scale_range: tuple[float, float] = (1.0, 1.0),
-        max_attempts_per_object: int = 100,
-        boundary_mode: Literal["center_margin"] = "center_margin",
-        boundary_margin: float = 0.0,
-        seed: int | None = None,
+        source: "ObjectLoader | list[ObjectLoader]",  # Source loader(s)
+        count: int,  # Requested number of objects to place
+        domain: "Domain",  # Scatter domain descriptor
+        min_gap: float = 0.0,  # Extra spacing between placed objects
+        yaw_range: tuple[float, float] = (0.0, 360.0),  # Yaw range in degrees
+        rotation_mode: Literal["yaw", "free"] = "yaw",  # Rotation sampling strategy
+        scale_range: tuple[float, float] = (1.0, 1.0),  # Uniform scale range
+        max_attempts_per_object: int = 100,  # Retry budget per requested object
+        boundary_mode: Literal["center_margin"] = "center_margin",  # Boundary policy
+        boundary_margin: float = 0.0,  # Required inset distance from domain edge
+        seed: int | None = None,  # RNG seed for deterministic sampling
     ) -> list["Object"]:
         """
         Scatter objects using bounding-sphere collisions.
@@ -1115,17 +1122,17 @@ class Scene(ABC, _Serializable):
 
     def scatter_by_bvh(
         self,
-        source: "ObjectLoader | list[ObjectLoader]",
-        count: int,
-        domain: "Domain",
-        min_gap: float = 0.0,
-        yaw_range: tuple[float, float] = (0.0, 360.0),
-        rotation_mode: Literal["yaw", "free"] = "yaw",
-        scale_range: tuple[float, float] = (1.0, 1.0),
-        max_attempts_per_object: int = 100,
-        boundary_mode: Literal["center_margin"] = "center_margin",
-        boundary_margin: float = 0.0,
-        seed: int | None = None,
+        source: "ObjectLoader | list[ObjectLoader]",  # Source loader(s)
+        count: int,  # Requested number of objects to place
+        domain: "Domain",  # Scatter domain descriptor
+        min_gap: float = 0.0,  # Extra spacing between placed objects
+        yaw_range: tuple[float, float] = (0.0, 360.0),  # Yaw range in degrees
+        rotation_mode: Literal["yaw", "free"] = "yaw",  # Rotation sampling strategy
+        scale_range: tuple[float, float] = (1.0, 1.0),  # Uniform scale range
+        max_attempts_per_object: int = 100,  # Retry budget per requested object
+        boundary_mode: Literal["center_margin"] = "center_margin",  # Boundary policy
+        boundary_margin: float = 0.0,  # Required inset distance from domain edge
+        seed: int | None = None,  # RNG seed for deterministic sampling
     ) -> list["Object"]:
         """
         Scatter objects using exact BVH overlap checks with broad-phase pruning.
@@ -1216,18 +1223,18 @@ class Scene(ABC, _Serializable):
 
     def scatter_parametric(
         self,
-        source: "ParametricSource",
-        count: int,
-        domain: "Domain",
-        strategy: Literal["sphere", "bvh"] = "sphere",
-        min_gap: float = 0.0,
-        yaw_range: tuple[float, float] = (0.0, 360.0),
-        rotation_mode: Literal["yaw", "free"] = "yaw",
-        scale_range: tuple[float, float] = (1.0, 1.0),
-        max_attempts_per_object: int = 100,
-        boundary_mode: Literal["center_margin"] = "center_margin",
-        boundary_margin: float = 0.0,
-        seed: int | None = None,
+        source: "ParametricSource",  # Parameterized source descriptor
+        count: int,  # Requested number of objects to place
+        domain: "Domain",  # Scatter domain descriptor
+        strategy: Literal["sphere", "bvh"] = "sphere",  # Collision strategy
+        min_gap: float = 0.0,  # Extra spacing between placed objects
+        yaw_range: tuple[float, float] = (0.0, 360.0),  # Yaw range in degrees
+        rotation_mode: Literal["yaw", "free"] = "yaw",  # Rotation sampling strategy
+        scale_range: tuple[float, float] = (1.0, 1.0),  # Uniform scale range
+        max_attempts_per_object: int = 100,  # Retry budget per requested object
+        boundary_mode: Literal["center_margin"] = "center_margin",  # Boundary policy
+        boundary_margin: float = 0.0,  # Required inset distance from domain edge
+        seed: int | None = None,  # RNG seed for deterministic sampling
     ) -> list["Object"]:
         """
         Scatter parameterized objects. Dimensions are measured on candidate geometry per attempt.
@@ -1318,54 +1325,6 @@ class Scene(ABC, _Serializable):
         _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
         return placed
 
-    def scatter_non_intersecting(
-        self,
-        source: "ObjectLoader | list[ObjectLoader]",
-        count: int,
-        domain: "Domain",
-        min_gap: float = 0.0,
-        yaw_range: tuple[float, float] = (0.0, 360.0),
-        rotation_mode: Literal["yaw", "free"] = "yaw",
-        scale_range: tuple[float, float] = (1.0, 1.0),
-        max_attempts_per_object: int = 100,
-        collision_mode: Literal["bounds", "mesh"] = "bounds",
-        boundary_mode: Literal["center_margin"] = "center_margin",
-        boundary_margin: float = 0.0,
-        seed: int | None = None,
-    ) -> list["Object"]:
-        """
-        Backward-compatible wrapper for scattering.
-        """
-        if collision_mode == "bounds":
-            return self.scatter_by_sphere(
-                source=source,
-                count=count,
-                domain=domain,
-                min_gap=min_gap,
-                yaw_range=yaw_range,
-                rotation_mode=rotation_mode,
-                scale_range=scale_range,
-                max_attempts_per_object=max_attempts_per_object,
-                boundary_mode=boundary_mode,
-                boundary_margin=boundary_margin,
-                seed=seed,
-            )
-        if collision_mode == "mesh":
-            return self.scatter_by_bvh(
-                source=source,
-                count=count,
-                domain=domain,
-                min_gap=min_gap,
-                yaw_range=yaw_range,
-                rotation_mode=rotation_mode,
-                scale_range=scale_range,
-                max_attempts_per_object=max_attempts_per_object,
-                boundary_mode=boundary_mode,
-                boundary_margin=boundary_margin,
-                seed=seed,
-            )
-        raise ValueError("collision_mode must be one of: bounds, mesh.")
-
     def _set_user_view(self) -> None:
         for area in bpy.context.screen.areas:
             if area.type == "VIEW_3D":
@@ -1440,7 +1399,7 @@ class ObjectLoader:
     def create_instance(
         self,
         name: str = None,  # Instanced object name
-        register_object: bool = True,
+        register_object: bool = True,  # Register in scene metadata/indexes
     ) -> "Object":
         """
         Create a single object instance from a loader.
@@ -1468,7 +1427,10 @@ class ParametricSource:
         self._applier: typing.Callable[["Object", dict], None] | None = None
 
     def set_sampler(
-        self, sampler: typing.Callable[[random.Random], dict]
+        self,
+        sampler: typing.Callable[
+            [random.Random], dict
+        ],  # Samples a params dict from RNG
     ) -> "ParametricSource":
         """
         Set a callback that samples a parameter dictionary for each candidate.
@@ -1477,7 +1439,10 @@ class ParametricSource:
         return self
 
     def set_applier(
-        self, applier: typing.Callable[["Object", dict], None]
+        self,
+        applier: typing.Callable[
+            ["Object", dict], None
+        ],  # Applies params to created object
     ) -> "ParametricSource":
         """
         Set a callback that applies sampled parameters to the created object.
@@ -1485,7 +1450,7 @@ class ParametricSource:
         self._applier = applier
         return self
 
-    def sample_params(self, rng: random.Random) -> dict:
+    def sample_params(self, rng: random.Random) -> dict:  # Random generator
         if self._sampler is None:
             return {}
         params = self._sampler(rng)
@@ -1497,9 +1462,9 @@ class ParametricSource:
 
     def create_instance(
         self,
-        params: dict | None = None,
-        register_object: bool = True,
-        name: str = None,
+        params: dict | None = None,  # Sampled parameter dictionary
+        register_object: bool = True,  # Register in scene metadata/indexes
+        name: str = None,  # Instance object name
     ) -> "Object":
         obj = self.source.create_instance(name=name, register_object=register_object)
         if params is None:
@@ -1520,9 +1485,9 @@ class Material(ABC, _Serializable):
     A material descriptor is converted to a real Blender material when assigned to an object.
     """
 
-    name: str | None
-    index: int | None
-    _resolved_material: bpy.types.Material | None
+    name: str | None  # Material display name
+    index: int | None  # Assigned material pass index in the scene
+    _resolved_material: bpy.types.Material | None  # Cached built Blender material
 
     def __init__(self, name: str | None = None) -> None:
         super().__init__()
@@ -1589,16 +1554,16 @@ class BasicMaterial(Material):
     Material descriptor backed by Blender's Principled BSDF shader.
     """
 
-    base_color: tuple[float, float, float, float] | None
-    roughness: float | None
-    metallic: float | None
-    specular: float | None
-    emission_color: tuple[float, float, float, float] | None
-    emission_strength: float | None
-    alpha: float | None
-    transmission: float | None
-    ior: float | None
-    properties: dict
+    base_color: tuple[float, float, float, float] | None  # Principled base RGBA color
+    roughness: float | None  # Surface roughness
+    metallic: float | None  # Metallic factor
+    specular: float | None  # Specular IOR level
+    emission_color: tuple[float, float, float, float] | None  # Emission RGBA color
+    emission_strength: float | None  # Emission intensity
+    alpha: float | None  # Surface alpha/transparency
+    transmission: float | None  # Transmission weight
+    ior: float | None  # Index of refraction
+    properties: dict  # Custom Blender properties to set on the material
 
     def __init__(self, name: str = "Material"):
         super().__init__(name=name)
@@ -1729,9 +1694,9 @@ class ImportedMaterial(Material):
     Material descriptor that imports a material from another `.blend` file.
     """
 
-    filepath: str
-    material_name: str | None
-    params: dict
+    filepath: str  # Source .blend file path
+    material_name: str | None  # Material name inside the .blend file
+    params: dict  # Custom properties to apply after import
 
     def __init__(self, filepath: str, material_name: str = None):
         super().__init__(name=material_name)
@@ -1783,12 +1748,12 @@ class Object(_Serializable):
     Wrapper around a Blender object with chainable transformation and metadata helpers.
     """
 
-    obj: bpy.types.Object
-    scene: Scene
-    tags: set[str]
-    properties: dict
+    obj: bpy.types.Object  # Underlying Blender object
+    scene: Scene  # Owning scene
+    tags: set[str]  # Object-level semantic tags
+    properties: dict  # Custom properties assigned to this object
 
-    index: int | None
+    index: int | None  # Assigned object pass index
 
     def __init__(
         self, obj: bpy.types.Object, scene: "Scene", register_object: bool = True
@@ -2271,8 +2236,8 @@ class BasicWorld(World):
     `World` class representing a single color environmental lighting.
     """
 
-    color: tuple[float, float, float, float] = None
-    strength: float = None
+    color: tuple[float, float, float, float] = None  # Environment RGBA color
+    strength: float = None  # Background light intensity
 
     def __init__(self):
         pass
@@ -2324,19 +2289,19 @@ class SkyWorld(World):
     For more information, view [official blender docs](https://docs.blender.org/manual/en/latest/render/shader_nodes/textures/sky.html).
     """
 
-    strength: float = None
+    strength: float = None  # Background light intensity
 
-    sun_size: float = None
-    sun_intensity: float = None
+    sun_size: float = None  # Sun angular size
+    sun_intensity: float = None  # Sun intensity
 
-    sun_elevation: float = None
-    rotation_z: float = None
+    sun_elevation: float = None  # Sun elevation angle
+    rotation_z: float = None  # Sun azimuth rotation
 
-    altitude: float = None
+    altitude: float = None  # Observer altitude
 
-    air: float = 0.1
-    aerosol_density: float = 0.01
-    ozone: float = 10.0
+    air: float = 0.1  # Air density
+    aerosol_density: float = 0.01  # Aerosol density
+    ozone: float = 10.0  # Ozone density
 
     def __init__(self):
         pass
@@ -2427,9 +2392,9 @@ class HDRIWorld(World):
     HDRI files can be captured by a 360 camera or a smartphone app or downloaded from public libraries such as [polyhaven](https://polyhaven.com/hdris).
     """
 
-    hdri_path: str
-    strength: float = None
-    rotation_z: float = None
+    hdri_path: str  # Path to HDRI image file
+    strength: float = None  # Environment light intensity multiplier
+    rotation_z: float = None  # Rotation around world Z axis
 
     def __init__(self, hdri_path: str):
         self.hdri_path = hdri_path
@@ -2500,9 +2465,9 @@ class ImportedWorld(World):
     Use it to bring in custom procedural lighting setups and adjust their parameters by the script.
     """
 
-    filepath: str
-    world_name: str = None
-    params: dict
+    filepath: str  # Source .blend file path
+    world_name: str = None  # World name inside source .blend
+    params: dict  # Custom properties applied to imported world
 
     def __init__(self, filepath: str, world_name: str = None):
         self.filepath = filepath
