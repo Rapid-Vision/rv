@@ -41,13 +41,17 @@ from mathutils import Vector
 from typing import Literal, Union, Optional
 import bpy
 import bpy_extras
+import bmesh
 import json
 import math
 import os
 import pathlib
+import random
 import uuid
 import mathutils
+import warnings
 from enum import Enum
+from mathutils.bvhtree import BVHTree
 
 JSONSerializable = Union[
     str, int, float, bool, None, list["json.JSONType"], dict[str, "json.JSONType"]
@@ -347,6 +351,381 @@ class _Serializable:
         }
 
 
+class Domain:
+    """
+    Scatter domain descriptor used by `Scene.scatter_non_intersecting`.
+    """
+
+    kind: str
+    data: dict
+    dimension: int
+
+    def __init__(self, kind: str, data: dict, dimension: int):
+        self.kind = kind
+        self.data = data
+        self.dimension = dimension
+
+    @staticmethod
+    def rect(
+        center: tuple[float, float] = (0.0, 0.0),
+        size: tuple[float, float] = (10.0, 10.0),
+        z: float = 0.0,
+    ) -> "Domain":
+        _ensure_positive_tuple(size, 2, "size")
+        return Domain("rect", {"center": tuple(center), "size": tuple(size), "z": z}, 2)
+
+    @staticmethod
+    def ellipse(
+        center: tuple[float, float] = (0.0, 0.0),
+        radii: tuple[float, float] = (5.0, 3.0),
+        z: float = 0.0,
+    ) -> "Domain":
+        _ensure_positive_tuple(radii, 2, "radii")
+        return Domain(
+            "ellipse", {"center": tuple(center), "radii": tuple(radii), "z": z}, 2
+        )
+
+    @staticmethod
+    def polygon(
+        points: list[tuple[float, float]],
+        z: float = 0.0,
+    ) -> "Domain":
+        if points is None or len(points) < 3:
+            raise ValueError("polygon requires at least 3 points.")
+        convex = _convex_hull_2d(points)
+        if len(convex) < 3:
+            raise ValueError("polygon is degenerate.")
+        if _polygon_signed_area(convex) <= 0:
+            convex = list(reversed(convex))
+        return Domain("polygon", {"points": convex, "z": z}, 2)
+
+    @staticmethod
+    def box(
+        center: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        size: tuple[float, float, float] = (10.0, 10.0, 10.0),
+    ) -> "Domain":
+        _ensure_positive_tuple(size, 3, "size")
+        return Domain("box", {"center": tuple(center), "size": tuple(size)}, 3)
+
+    @staticmethod
+    def cylinder(
+        center: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        radius: float = 5.0,
+        height: float = 10.0,
+        axis: str = "Z",
+    ) -> "Domain":
+        if radius <= 0:
+            raise ValueError("radius must be > 0.")
+        if height <= 0:
+            raise ValueError("height must be > 0.")
+        axis_up = axis.upper()
+        if axis_up not in {"X", "Y", "Z"}:
+            raise ValueError("axis must be one of: X, Y, Z.")
+        return Domain(
+            "cylinder",
+            {"center": tuple(center), "radius": radius, "height": height, "axis": axis_up},
+            3,
+        )
+
+    @staticmethod
+    def ellipsoid(
+        center: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        radii: tuple[float, float, float] = (5.0, 3.0, 2.0),
+    ) -> "Domain":
+        _ensure_positive_tuple(radii, 3, "radii")
+        return Domain("ellipsoid", {"center": tuple(center), "radii": tuple(radii)}, 3)
+
+    @staticmethod
+    def convex_hull(rv_obj: "Object", project_2d: bool = False) -> "Domain":
+        points = _get_object_world_vertices(rv_obj.obj)
+        if len(points) < 3:
+            raise ValueError("convex_hull requires an object with mesh geometry.")
+        if project_2d:
+            hull = _convex_hull_2d([(p.x, p.y) for p in points])
+            if len(hull) < 3:
+                raise ValueError("2D projected convex hull is degenerate.")
+            if _polygon_signed_area(hull) <= 0:
+                hull = list(reversed(hull))
+            z = float(rv_obj.obj.location.z)
+            return Domain("hull2d", {"points": hull, "z": z}, 2)
+
+        planes = _convex_hull_planes(points)
+        if len(planes) < 4:
+            raise ValueError("3D convex hull is degenerate.")
+        aabb_min, aabb_max = _aabb_from_points(points)
+        return Domain(
+            "hull3d",
+            {
+                "planes": planes,
+                "aabb_min": tuple(aabb_min),
+                "aabb_max": tuple(aabb_max),
+                "centroid": tuple(_points_centroid(points)),
+            },
+            3,
+        )
+
+    def sample_point(self, rng: random.Random) -> mathutils.Vector:
+        if self.kind == "rect":
+            cx, cy = self.data["center"]
+            sx, sy = self.data["size"]
+            z = self.data["z"]
+            return Vector(
+                (
+                    rng.uniform(cx - sx * 0.5, cx + sx * 0.5),
+                    rng.uniform(cy - sy * 0.5, cy + sy * 0.5),
+                    z,
+                )
+            )
+
+        if self.kind == "ellipse":
+            cx, cy = self.data["center"]
+            rx, ry = self.data["radii"]
+            z = self.data["z"]
+            theta = rng.uniform(0.0, 2.0 * math.pi)
+            rr = math.sqrt(rng.random())
+            return Vector((cx + rr * rx * math.cos(theta), cy + rr * ry * math.sin(theta), z))
+
+        if self.kind in {"polygon", "hull2d"}:
+            points = self.data["points"]
+            z = self.data["z"]
+            x, y = _sample_convex_polygon(points, rng)
+            return Vector((x, y, z))
+
+        if self.kind == "box":
+            cx, cy, cz = self.data["center"]
+            sx, sy, sz = self.data["size"]
+            return Vector(
+                (
+                    rng.uniform(cx - sx * 0.5, cx + sx * 0.5),
+                    rng.uniform(cy - sy * 0.5, cy + sy * 0.5),
+                    rng.uniform(cz - sz * 0.5, cz + sz * 0.5),
+                )
+            )
+
+        if self.kind == "cylinder":
+            cx, cy, cz = self.data["center"]
+            radius = self.data["radius"]
+            height = self.data["height"]
+            axis = self.data["axis"]
+            theta = rng.uniform(0.0, 2.0 * math.pi)
+            rr = math.sqrt(rng.random()) * radius
+            h = rng.uniform(-height * 0.5, height * 0.5)
+            if axis == "X":
+                return Vector((cx + h, cy + rr * math.cos(theta), cz + rr * math.sin(theta)))
+            if axis == "Y":
+                return Vector((cx + rr * math.cos(theta), cy + h, cz + rr * math.sin(theta)))
+            return Vector((cx + rr * math.cos(theta), cy + rr * math.sin(theta), cz + h))
+
+        if self.kind == "ellipsoid":
+            cx, cy, cz = self.data["center"]
+            rx, ry, rz = self.data["radii"]
+            direction = _random_unit_vector(rng)
+            radial = rng.random() ** (1.0 / 3.0)
+            return Vector(
+                (
+                    cx + direction.x * rx * radial,
+                    cy + direction.y * ry * radial,
+                    cz + direction.z * rz * radial,
+                )
+            )
+
+        if self.kind == "hull3d":
+            aabb_min = Vector(self.data["aabb_min"])
+            aabb_max = Vector(self.data["aabb_max"])
+            for _ in range(512):
+                p = Vector(
+                    (
+                        rng.uniform(aabb_min.x, aabb_max.x),
+                        rng.uniform(aabb_min.y, aabb_max.y),
+                        rng.uniform(aabb_min.z, aabb_max.z),
+                    )
+                )
+                if self.contains_point(p, margin=0.0):
+                    return p
+            return Vector(self.data["centroid"])
+
+        raise ValueError(f"Unsupported domain kind: {self.kind}")
+
+    def contains_point(self, point: mathutils.Vector, margin: float = 0.0) -> bool:
+        if margin < 0:
+            raise ValueError("margin must be >= 0.")
+
+        if self.kind == "rect":
+            cx, cy = self.data["center"]
+            sx, sy = self.data["size"]
+            half_x = sx * 0.5 - margin
+            half_y = sy * 0.5 - margin
+            if half_x <= 0 or half_y <= 0:
+                return False
+            return (
+                abs(point.x - cx) <= half_x + 1e-9
+                and abs(point.y - cy) <= half_y + 1e-9
+                and abs(point.z - self.data["z"]) <= 1e-6
+            )
+
+        if self.kind == "ellipse":
+            cx, cy = self.data["center"]
+            rx, ry = self.data["radii"]
+            rx_in = rx - margin
+            ry_in = ry - margin
+            if rx_in <= 0 or ry_in <= 0:
+                return False
+            dx = (point.x - cx) / rx_in
+            dy = (point.y - cy) / ry_in
+            return dx * dx + dy * dy <= 1.0 + 1e-9 and abs(point.z - self.data["z"]) <= 1e-6
+
+        if self.kind in {"polygon", "hull2d"}:
+            if abs(point.z - self.data["z"]) > 1e-6:
+                return False
+            pt = (point.x, point.y)
+            if not _point_in_convex_polygon(pt, self.data["points"]):
+                return False
+            if margin <= 0:
+                return True
+            return _distance_to_polygon_edges(pt, self.data["points"]) >= margin - 1e-9
+
+        if self.kind == "box":
+            cx, cy, cz = self.data["center"]
+            sx, sy, sz = self.data["size"]
+            hx = sx * 0.5 - margin
+            hy = sy * 0.5 - margin
+            hz = sz * 0.5 - margin
+            if hx <= 0 or hy <= 0 or hz <= 0:
+                return False
+            return (
+                abs(point.x - cx) <= hx + 1e-9
+                and abs(point.y - cy) <= hy + 1e-9
+                and abs(point.z - cz) <= hz + 1e-9
+            )
+
+        if self.kind == "cylinder":
+            cx, cy, cz = self.data["center"]
+            radius = self.data["radius"] - margin
+            half_h = self.data["height"] * 0.5 - margin
+            if radius <= 0 or half_h <= 0:
+                return False
+            axis = self.data["axis"]
+            if axis == "X":
+                radial = math.hypot(point.y - cy, point.z - cz)
+                return radial <= radius + 1e-9 and abs(point.x - cx) <= half_h + 1e-9
+            if axis == "Y":
+                radial = math.hypot(point.x - cx, point.z - cz)
+                return radial <= radius + 1e-9 and abs(point.y - cy) <= half_h + 1e-9
+            radial = math.hypot(point.x - cx, point.y - cy)
+            return radial <= radius + 1e-9 and abs(point.z - cz) <= half_h + 1e-9
+
+        if self.kind == "ellipsoid":
+            cx, cy, cz = self.data["center"]
+            rx, ry, rz = self.data["radii"]
+            rx_in = rx - margin
+            ry_in = ry - margin
+            rz_in = rz - margin
+            if rx_in <= 0 or ry_in <= 0 or rz_in <= 0:
+                return False
+            dx = (point.x - cx) / rx_in
+            dy = (point.y - cy) / ry_in
+            dz = (point.z - cz) / rz_in
+            return dx * dx + dy * dy + dz * dz <= 1.0 + 1e-9
+
+        if self.kind == "hull3d":
+            for nx, ny, nz, d in self.data["planes"]:
+                if nx * point.x + ny * point.y + nz * point.z + d > -margin + 1e-9:
+                    return False
+            return True
+
+        raise ValueError(f"Unsupported domain kind: {self.kind}")
+
+    def aabb(self) -> tuple[mathutils.Vector, mathutils.Vector]:
+        if self.kind == "rect":
+            cx, cy = self.data["center"]
+            sx, sy = self.data["size"]
+            z = self.data["z"]
+            return Vector((cx - sx * 0.5, cy - sy * 0.5, z)), Vector(
+                (cx + sx * 0.5, cy + sy * 0.5, z)
+            )
+
+        if self.kind == "ellipse":
+            cx, cy = self.data["center"]
+            rx, ry = self.data["radii"]
+            z = self.data["z"]
+            return Vector((cx - rx, cy - ry, z)), Vector((cx + rx, cy + ry, z))
+
+        if self.kind in {"polygon", "hull2d"}:
+            xs = [p[0] for p in self.data["points"]]
+            ys = [p[1] for p in self.data["points"]]
+            z = self.data["z"]
+            return Vector((min(xs), min(ys), z)), Vector((max(xs), max(ys), z))
+
+        if self.kind == "box":
+            cx, cy, cz = self.data["center"]
+            sx, sy, sz = self.data["size"]
+            return Vector((cx - sx * 0.5, cy - sy * 0.5, cz - sz * 0.5)), Vector(
+                (cx + sx * 0.5, cy + sy * 0.5, cz + sz * 0.5)
+            )
+
+        if self.kind == "cylinder":
+            cx, cy, cz = self.data["center"]
+            r = self.data["radius"]
+            h = self.data["height"] * 0.5
+            axis = self.data["axis"]
+            if axis == "X":
+                return Vector((cx - h, cy - r, cz - r)), Vector((cx + h, cy + r, cz + r))
+            if axis == "Y":
+                return Vector((cx - r, cy - h, cz - r)), Vector((cx + r, cy + h, cz + r))
+            return Vector((cx - r, cy - r, cz - h)), Vector((cx + r, cy + r, cz + h))
+
+        if self.kind == "ellipsoid":
+            cx, cy, cz = self.data["center"]
+            rx, ry, rz = self.data["radii"]
+            return Vector((cx - rx, cy - ry, cz - rz)), Vector((cx + rx, cy + ry, cz + rz))
+
+        if self.kind == "hull3d":
+            return Vector(self.data["aabb_min"]), Vector(self.data["aabb_max"])
+
+        raise ValueError(f"Unsupported domain kind: {self.kind}")
+
+
+class _SpatialHash:
+    def __init__(self, cell_size: float, dimension: int) -> None:
+        self.cell_size = max(cell_size, 1e-6)
+        self.dimension = dimension
+        self.cells: dict[tuple[int, ...], list[int]] = {}
+
+    def _cell_coords(self, point: mathutils.Vector) -> tuple[int, ...]:
+        if self.dimension == 2:
+            return (
+                math.floor(point.x / self.cell_size),
+                math.floor(point.y / self.cell_size),
+            )
+        return (
+            math.floor(point.x / self.cell_size),
+            math.floor(point.y / self.cell_size),
+            math.floor(point.z / self.cell_size),
+        )
+
+    def insert(self, point: mathutils.Vector, idx: int) -> None:
+        cell = self._cell_coords(point)
+        if cell not in self.cells:
+            self.cells[cell] = []
+        self.cells[cell].append(idx)
+
+    def neighbors(self, point: mathutils.Vector) -> list[int]:
+        base = self._cell_coords(point)
+        result: list[int] = []
+        if self.dimension == 2:
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    result.extend(self.cells.get((base[0] + dx, base[1] + dy), []))
+            return result
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    result.extend(
+                        self.cells.get((base[0] + dx, base[1] + dy, base[2] + dz), [])
+                    )
+        return result
+
+
 class Scene(ABC, _Serializable):
     """
     Base class for describing rv scene. To set up a scene, implement `generate` function.
@@ -642,6 +1021,351 @@ class Scene(ABC, _Serializable):
         path = str(pathlib.Path(blendfile).expanduser())
         return ImportedMaterial(filepath=path, material_name=material_name)
 
+    def scatter_by_sphere(
+        self,
+        source: "ObjectLoader | list[ObjectLoader]",
+        count: int,
+        domain: "Domain",
+        min_gap: float = 0.0,
+        yaw_range: tuple[float, float] = (0.0, 360.0),
+        rotation_mode: Literal["yaw", "free"] = "yaw",
+        scale_range: tuple[float, float] = (1.0, 1.0),
+        max_attempts_per_object: int = 100,
+        boundary_mode: Literal["center_margin"] = "center_margin",
+        boundary_margin: float = 0.0,
+        seed: int | None = None,
+    ) -> list["Object"]:
+        """
+        Scatter objects using bounding-sphere collisions.
+        """
+        loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(
+            source=source,
+            count=count,
+            domain=domain,
+            min_gap=min_gap,
+            yaw_range=yaw_range,
+            rotation_mode=rotation_mode,
+            scale_range=scale_range,
+            max_attempts_per_object=max_attempts_per_object,
+            boundary_mode=boundary_mode,
+            boundary_margin=boundary_margin,
+        )
+
+        rng = random.Random(seed)
+        base_radii: dict[int, float] = {}
+        max_scaled_radius = 0.0
+        for idx, loader in enumerate(loaders):
+            radius = _estimate_loader_radius(loader, domain.dimension)
+            base_radii[idx] = radius
+            max_scaled_radius = max(max_scaled_radius, radius * scale_max)
+
+        cell_size = max(1e-6, (2.0 * max_scaled_radius) + min_gap)
+        grid = _SpatialHash(cell_size=cell_size, dimension=domain.dimension)
+        placed: list[Object] = []
+        placed_infos: list[dict] = []
+        stats = _init_scatter_stats(count, domain.kind, "sphere", seed)
+
+        for _ in range(count):
+            loader_idx = rng.randrange(0, len(loaders))
+            loader = loaders[loader_idx]
+            placed_one = False
+            for _attempt in range(max_attempts_per_object):
+                stats["attempts"] += 1
+                scale = rng.uniform(scale_min, scale_max)
+                pos = domain.sample_point(rng)
+                if not domain.contains_point(pos, margin=boundary_margin):
+                    stats["rejected_boundary"] += 1
+                    continue
+
+                rot = _sample_rotation_quaternion(
+                    rng=rng,
+                    domain_dimension=domain.dimension,
+                    rotation_mode=rotation_mode,
+                    yaw_min=yaw_min,
+                    yaw_max=yaw_max,
+                )
+                radius = base_radii[loader_idx] * scale
+                neighbors = grid.neighbors(pos)
+                if _overlaps_by_radius(
+                    position=pos,
+                    radius=radius,
+                    neighbors=neighbors,
+                    placed_infos=placed_infos,
+                    dimension=domain.dimension,
+                    min_gap=min_gap,
+                ):
+                    stats["rejected_overlap"] += 1
+                    continue
+
+                obj = loader.create_instance()
+                obj.set_scale(scale).set_rotation(rot).set_location(pos)
+                placed.append(obj)
+                placed_infos.append(
+                    {"position": Vector(pos), "radius": radius, "object": obj}
+                )
+                grid.insert(pos, len(placed_infos) - 1)
+                placed_one = True
+                break
+
+            if not placed_one:
+                stats["rejected_attempt_limit"] += 1
+
+        _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
+        return placed
+
+    def scatter_by_bvh(
+        self,
+        source: "ObjectLoader | list[ObjectLoader]",
+        count: int,
+        domain: "Domain",
+        min_gap: float = 0.0,
+        yaw_range: tuple[float, float] = (0.0, 360.0),
+        rotation_mode: Literal["yaw", "free"] = "yaw",
+        scale_range: tuple[float, float] = (1.0, 1.0),
+        max_attempts_per_object: int = 100,
+        boundary_mode: Literal["center_margin"] = "center_margin",
+        boundary_margin: float = 0.0,
+        seed: int | None = None,
+    ) -> list["Object"]:
+        """
+        Scatter objects using exact BVH overlap checks with broad-phase pruning.
+        """
+        loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(
+            source=source,
+            count=count,
+            domain=domain,
+            min_gap=min_gap,
+            yaw_range=yaw_range,
+            rotation_mode=rotation_mode,
+            scale_range=scale_range,
+            max_attempts_per_object=max_attempts_per_object,
+            boundary_mode=boundary_mode,
+            boundary_margin=boundary_margin,
+        )
+
+        rng = random.Random(seed)
+        base_radii: dict[int, float] = {}
+        max_scaled_radius = 0.0
+        for idx, loader in enumerate(loaders):
+            radius = _estimate_loader_radius(loader, domain.dimension)
+            base_radii[idx] = radius
+            max_scaled_radius = max(max_scaled_radius, radius * scale_max)
+
+        cell_size = max(1e-6, (2.0 * max_scaled_radius) + min_gap)
+        grid = _SpatialHash(cell_size=cell_size, dimension=domain.dimension)
+        placed: list[Object] = []
+        placed_infos: list[dict] = []
+        stats = _init_scatter_stats(count, domain.kind, "bvh", seed)
+
+        for _ in range(count):
+            loader_idx = rng.randrange(0, len(loaders))
+            loader = loaders[loader_idx]
+            placed_one = False
+            for _attempt in range(max_attempts_per_object):
+                stats["attempts"] += 1
+                scale = rng.uniform(scale_min, scale_max)
+                pos = domain.sample_point(rng)
+                if not domain.contains_point(pos, margin=boundary_margin):
+                    stats["rejected_boundary"] += 1
+                    continue
+
+                rot = _sample_rotation_quaternion(
+                    rng=rng,
+                    domain_dimension=domain.dimension,
+                    rotation_mode=rotation_mode,
+                    yaw_min=yaw_min,
+                    yaw_max=yaw_max,
+                )
+                radius = base_radii[loader_idx] * scale
+                neighbors = grid.neighbors(pos)
+                if _overlaps_by_radius(
+                    position=pos,
+                    radius=radius,
+                    neighbors=neighbors,
+                    placed_infos=placed_infos,
+                    dimension=domain.dimension,
+                    min_gap=min_gap,
+                ):
+                    stats["rejected_overlap"] += 1
+                    continue
+
+                temp_obj = loader.create_instance(register_object=False)
+                temp_obj.set_scale(scale).set_rotation(rot).set_location(pos)
+                neighbor_objs = [placed_infos[idx]["object"].obj for idx in neighbors]
+                if _mesh_object_overlaps_any(temp_obj.obj, neighbor_objs):
+                    _remove_blender_object(temp_obj.obj)
+                    stats["rejected_overlap"] += 1
+                    continue
+                _remove_blender_object(temp_obj.obj)
+
+                obj = loader.create_instance()
+                obj.set_scale(scale).set_rotation(rot).set_location(pos)
+                placed.append(obj)
+                placed_infos.append(
+                    {"position": Vector(pos), "radius": radius, "object": obj}
+                )
+                grid.insert(pos, len(placed_infos) - 1)
+                placed_one = True
+                break
+
+            if not placed_one:
+                stats["rejected_attempt_limit"] += 1
+
+        _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
+        return placed
+
+    def scatter_parametric(
+        self,
+        source: "ParametricSource",
+        count: int,
+        domain: "Domain",
+        strategy: Literal["sphere", "bvh"] = "sphere",
+        min_gap: float = 0.0,
+        yaw_range: tuple[float, float] = (0.0, 360.0),
+        rotation_mode: Literal["yaw", "free"] = "yaw",
+        scale_range: tuple[float, float] = (1.0, 1.0),
+        max_attempts_per_object: int = 100,
+        boundary_mode: Literal["center_margin"] = "center_margin",
+        boundary_margin: float = 0.0,
+        seed: int | None = None,
+    ) -> list["Object"]:
+        """
+        Scatter parameterized objects. Dimensions are measured on candidate geometry per attempt.
+        """
+        if not isinstance(source, ParametricSource):
+            raise TypeError("source must be ParametricSource.")
+        if strategy not in {"sphere", "bvh"}:
+            raise ValueError("strategy must be one of: sphere, bvh.")
+
+        _loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(
+            source=source.source,
+            count=count,
+            domain=domain,
+            min_gap=min_gap,
+            yaw_range=yaw_range,
+            rotation_mode=rotation_mode,
+            scale_range=scale_range,
+            max_attempts_per_object=max_attempts_per_object,
+            boundary_mode=boundary_mode,
+            boundary_margin=boundary_margin,
+        )
+
+        rng = random.Random(seed)
+        placed: list[Object] = []
+        placed_infos: list[dict] = []
+        stats = _init_scatter_stats(count, domain.kind, f"parametric_{strategy}", seed)
+
+        for _ in range(count):
+            placed_one = False
+            for _attempt in range(max_attempts_per_object):
+                stats["attempts"] += 1
+                params = source.sample_params(rng)
+                scale = rng.uniform(scale_min, scale_max)
+                pos = domain.sample_point(rng)
+                if not domain.contains_point(pos, margin=boundary_margin):
+                    stats["rejected_boundary"] += 1
+                    continue
+                rot = _sample_rotation_quaternion(
+                    rng=rng,
+                    domain_dimension=domain.dimension,
+                    rotation_mode=rotation_mode,
+                    yaw_min=yaw_min,
+                    yaw_max=yaw_max,
+                )
+
+                temp_obj = source.create_instance(params=params, register_object=False)
+                temp_obj.set_scale(scale).set_rotation(rot).set_location(pos)
+                radius = _object_world_radius(temp_obj.obj, domain.dimension)
+                # Radius depends on sampled params, so use full-set checks for correctness.
+                neighbors = list(range(len(placed_infos)))
+                if _overlaps_by_radius(
+                    position=pos,
+                    radius=radius,
+                    neighbors=neighbors,
+                    placed_infos=placed_infos,
+                    dimension=domain.dimension,
+                    min_gap=min_gap,
+                ):
+                    _remove_blender_object(temp_obj.obj)
+                    stats["rejected_overlap"] += 1
+                    continue
+
+                if strategy == "bvh":
+                    neighbor_objs = [placed_infos[idx]["object"].obj for idx in neighbors]
+                    if _mesh_object_overlaps_any(temp_obj.obj, neighbor_objs):
+                        _remove_blender_object(temp_obj.obj)
+                        stats["rejected_overlap"] += 1
+                        continue
+                _remove_blender_object(temp_obj.obj)
+
+                obj = source.create_instance(params=params, register_object=True)
+                obj.set_scale(scale).set_rotation(rot).set_location(pos)
+                placed.append(obj)
+                placed_infos.append(
+                    {
+                        "position": Vector(pos),
+                        "radius": radius,
+                        "object": obj,
+                        "params": params,
+                    }
+                )
+                placed_one = True
+                break
+
+            if not placed_one:
+                stats["rejected_attempt_limit"] += 1
+
+        _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
+        return placed
+
+    def scatter_non_intersecting(
+        self,
+        source: "ObjectLoader | list[ObjectLoader]",
+        count: int,
+        domain: "Domain",
+        min_gap: float = 0.0,
+        yaw_range: tuple[float, float] = (0.0, 360.0),
+        rotation_mode: Literal["yaw", "free"] = "yaw",
+        scale_range: tuple[float, float] = (1.0, 1.0),
+        max_attempts_per_object: int = 100,
+        collision_mode: Literal["bounds", "mesh"] = "bounds",
+        boundary_mode: Literal["center_margin"] = "center_margin",
+        boundary_margin: float = 0.0,
+        seed: int | None = None,
+    ) -> list["Object"]:
+        """
+        Backward-compatible wrapper for scattering.
+        """
+        if collision_mode == "bounds":
+            return self.scatter_by_sphere(
+                source=source,
+                count=count,
+                domain=domain,
+                min_gap=min_gap,
+                yaw_range=yaw_range,
+                rotation_mode=rotation_mode,
+                scale_range=scale_range,
+                max_attempts_per_object=max_attempts_per_object,
+                boundary_mode=boundary_mode,
+                boundary_margin=boundary_margin,
+                seed=seed,
+            )
+        if collision_mode == "mesh":
+            return self.scatter_by_bvh(
+                source=source,
+                count=count,
+                domain=domain,
+                min_gap=min_gap,
+                yaw_range=yaw_range,
+                rotation_mode=rotation_mode,
+                scale_range=scale_range,
+                max_attempts_per_object=max_attempts_per_object,
+                boundary_mode=boundary_mode,
+                boundary_margin=boundary_margin,
+                seed=seed,
+            )
+        raise ValueError("collision_mode must be one of: bounds, mesh.")
+
     def _set_user_view(self) -> None:
         for area in bpy.context.screen.areas:
             if area.type == "VIEW_3D":
@@ -716,6 +1440,7 @@ class ObjectLoader:
     def create_instance(
         self,
         name: str = None,  # Instanced object name
+        register_object: bool = True,
     ) -> "Object":
         """
         Create a single object instance from a loader.
@@ -727,7 +1452,65 @@ class ObjectLoader:
         if name is not None:
             res.name = name
 
-        return Object(res, self.scene)
+        return Object(res, self.scene, register_object=register_object)
+
+
+class ParametricSource:
+    """
+    Source wrapper for parameterized scattering.
+
+    It can sample parameters per candidate and apply them to each created instance.
+    """
+
+    def __init__(self, source: ObjectLoader) -> None:
+        self.source = source
+        self._sampler: typing.Callable[[random.Random], dict] | None = None
+        self._applier: typing.Callable[["Object", dict], None] | None = None
+
+    def set_sampler(
+        self, sampler: typing.Callable[[random.Random], dict]
+    ) -> "ParametricSource":
+        """
+        Set a callback that samples a parameter dictionary for each candidate.
+        """
+        self._sampler = sampler
+        return self
+
+    def set_applier(
+        self, applier: typing.Callable[["Object", dict], None]
+    ) -> "ParametricSource":
+        """
+        Set a callback that applies sampled parameters to the created object.
+        """
+        self._applier = applier
+        return self
+
+    def sample_params(self, rng: random.Random) -> dict:
+        if self._sampler is None:
+            return {}
+        params = self._sampler(rng)
+        if params is None:
+            return {}
+        if not isinstance(params, dict):
+            raise TypeError("ParametricSource sampler must return a dict.")
+        return params
+
+    def create_instance(
+        self,
+        params: dict | None = None,
+        register_object: bool = True,
+        name: str = None,
+    ) -> "Object":
+        obj = self.source.create_instance(name=name, register_object=register_object)
+        if params is None:
+            params = {}
+        if not isinstance(params, dict):
+            raise TypeError("params must be a dict.")
+        for key, value in params.items():
+            obj.set_property(key, value)
+        if self._applier is not None:
+            self._applier(obj, params)
+        return obj
 
 
 class Material(ABC, _Serializable):
@@ -2042,6 +2825,418 @@ def _find_socket_by_name(sockets, candidate: str):
         if _normalize_socket_name(socket.name) == target:
             return socket
     return None
+
+
+def _ensure_positive_tuple(values, expected_len: int, name: str) -> None:
+    if len(values) != expected_len:
+        raise ValueError(f"{name} must contain exactly {expected_len} values.")
+    for value in values:
+        if float(value) <= 0:
+            raise ValueError(f"{name} values must be > 0.")
+
+
+def _validate_scatter_common(
+    source: "ObjectLoader | list[ObjectLoader]",
+    count: int,
+    domain: "Domain",
+    min_gap: float,
+    yaw_range: tuple[float, float],
+    rotation_mode: str,
+    scale_range: tuple[float, float],
+    max_attempts_per_object: int,
+    boundary_mode: str,
+    boundary_margin: float,
+) -> tuple[list["ObjectLoader"], float, float, float, float]:
+    if count <= 0:
+        raise ValueError("count must be > 0.")
+    if not isinstance(domain, Domain):
+        raise TypeError("domain must be an instance of Domain.")
+    if min_gap < 0:
+        raise ValueError("min_gap must be >= 0.")
+    if boundary_margin < 0:
+        raise ValueError("boundary_margin must be >= 0.")
+    if max_attempts_per_object <= 0:
+        raise ValueError("max_attempts_per_object must be > 0.")
+    if boundary_mode != "center_margin":
+        raise ValueError("boundary_mode must be center_margin.")
+    if rotation_mode not in {"yaw", "free"}:
+        raise ValueError("rotation_mode must be one of: yaw, free.")
+    if len(scale_range) != 2:
+        raise ValueError("scale_range must contain exactly two values.")
+    scale_min = float(scale_range[0])
+    scale_max = float(scale_range[1])
+    if scale_min <= 0 or scale_max <= 0:
+        raise ValueError("scale_range values must be > 0.")
+    if scale_min > scale_max:
+        raise ValueError("scale_range must satisfy min <= max.")
+    if len(yaw_range) != 2:
+        raise ValueError("yaw_range must contain exactly two values.")
+    yaw_min = float(yaw_range[0])
+    yaw_max = float(yaw_range[1])
+    if yaw_min > yaw_max:
+        raise ValueError("yaw_range must satisfy min <= max.")
+
+    loaders: list[ObjectLoader]
+    if isinstance(source, ObjectLoader):
+        loaders = [source]
+    elif isinstance(source, list) and len(source) > 0:
+        if not all(isinstance(loader, ObjectLoader) for loader in source):
+            raise TypeError("source list must contain only ObjectLoader instances.")
+        loaders = source
+    else:
+        raise TypeError("source must be ObjectLoader or non-empty list[ObjectLoader].")
+
+    for loader in loaders:
+        if getattr(loader.obj, "data", None) is None:
+            raise ValueError("source object must have geometry data.")
+
+    return loaders, scale_min, scale_max, yaw_min, yaw_max
+
+
+def _init_scatter_stats(
+    requested: int, domain_kind: str, strategy: str, seed: int | None
+) -> dict:
+    return {
+        "requested": requested,
+        "placed": 0,
+        "attempts": 0,
+        "rejected_boundary": 0,
+        "rejected_overlap": 0,
+        "rejected_attempt_limit": 0,
+        "strategy": strategy,
+        "domain_kind": domain_kind,
+        "seed": seed,
+    }
+
+
+def _finalize_scatter_stats(
+    scene: Scene, stats: dict, placed: list["Object"], requested: int
+) -> None:
+    stats["placed"] = len(placed)
+    if len(placed) < requested:
+        warnings.warn(
+            "scatter placed "
+            f"{len(placed)}/{requested} objects after {stats['attempts']} attempts "
+            f"(strategy={stats['strategy']}, domain={stats['domain_kind']}, seed={stats['seed']})."
+        )
+
+    scatter_runs = scene.custom_meta.get("scatter_runs", [])
+    if not isinstance(scatter_runs, list):
+        scatter_runs = [scatter_runs]
+    scatter_runs.append(stats)
+    scene.custom_meta["scatter_runs"] = scatter_runs
+
+
+def _overlaps_by_radius(
+    position: Vector,
+    radius: float,
+    neighbors: list[int],
+    placed_infos: list[dict],
+    dimension: int,
+    min_gap: float,
+) -> bool:
+    for neighbor_idx in neighbors:
+        neighbor = placed_infos[neighbor_idx]
+        if dimension == 2:
+            dist = math.hypot(
+                position.x - neighbor["position"].x,
+                position.y - neighbor["position"].y,
+            )
+        else:
+            dist = (position - neighbor["position"]).length
+        if dist + 1e-9 < radius + neighbor["radius"] + min_gap:
+            return True
+    return False
+
+
+def _remove_blender_object(obj: bpy.types.Object) -> None:
+    if obj is None:
+        return
+    try:
+        bpy.data.objects.remove(obj, do_unlink=True)
+    except Exception:
+        pass
+
+
+def _estimate_loader_radius(loader: "ObjectLoader", dimension: int) -> float:
+    temp = loader.create_instance(register_object=False)
+    try:
+        return _object_world_radius(temp.obj, dimension)
+    finally:
+        _remove_blender_object(temp.obj)
+
+
+def _cross_2d(o, a, b) -> float:
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _convex_hull_2d(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    pts = sorted(set((float(p[0]), float(p[1])) for p in points))
+    if len(pts) <= 1:
+        return pts
+    lower = []
+    for p in pts:
+        while len(lower) >= 2 and _cross_2d(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and _cross_2d(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def _polygon_signed_area(points: list[tuple[float, float]]) -> float:
+    area = 0.0
+    for i in range(len(points)):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % len(points)]
+        area += x1 * y2 - x2 * y1
+    return area * 0.5
+
+
+def _sample_convex_polygon(
+    points: list[tuple[float, float]], rng: random.Random
+) -> tuple[float, float]:
+    p0 = points[0]
+    tris = []
+    total_area = 0.0
+    for i in range(1, len(points) - 1):
+        p1 = points[i]
+        p2 = points[i + 1]
+        area = abs(_cross_2d(p0, p1, p2))
+        if area > 1e-12:
+            tris.append((p0, p1, p2, area))
+            total_area += area
+    if total_area <= 0:
+        raise ValueError("polygon is degenerate.")
+
+    choice = rng.uniform(0.0, total_area)
+    accum = 0.0
+    selected = tris[-1]
+    for tri in tris:
+        accum += tri[3]
+        if choice <= accum:
+            selected = tri
+            break
+
+    a, b, c, _ = selected
+    r1 = math.sqrt(rng.random())
+    r2 = rng.random()
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+    x = (1 - r1) * ax + r1 * ((1 - r2) * bx + r2 * cx)
+    y = (1 - r1) * ay + r1 * ((1 - r2) * by + r2 * cy)
+    return (x, y)
+
+
+def _point_in_convex_polygon(point: tuple[float, float], points) -> bool:
+    sign = 0
+    for i in range(len(points)):
+        a = points[i]
+        b = points[(i + 1) % len(points)]
+        cross = _cross_2d(a, b, point)
+        if abs(cross) <= 1e-10:
+            continue
+        current_sign = 1 if cross > 0 else -1
+        if sign == 0:
+            sign = current_sign
+        elif sign != current_sign:
+            return False
+    return True
+
+
+def _distance_point_segment_2d(point, a, b) -> float:
+    px, py = point
+    ax, ay = a
+    bx, by = b
+    abx, aby = bx - ax, by - ay
+    apx, apy = px - ax, py - ay
+    denom = abx * abx + aby * aby
+    if denom <= 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, (apx * abx + apy * aby) / denom))
+    cx = ax + t * abx
+    cy = ay + t * aby
+    return math.hypot(px - cx, py - cy)
+
+
+def _distance_to_polygon_edges(point: tuple[float, float], points) -> float:
+    best = float("inf")
+    for i in range(len(points)):
+        best = min(best, _distance_point_segment_2d(point, points[i], points[(i + 1) % len(points)]))
+    return best
+
+
+def _random_unit_vector(rng: random.Random) -> Vector:
+    z = rng.uniform(-1.0, 1.0)
+    theta = rng.uniform(0.0, 2.0 * math.pi)
+    t = math.sqrt(max(0.0, 1.0 - z * z))
+    return Vector((t * math.cos(theta), t * math.sin(theta), z))
+
+
+def _points_centroid(points: list[Vector]) -> Vector:
+    if len(points) == 0:
+        return Vector((0.0, 0.0, 0.0))
+    total = Vector((0.0, 0.0, 0.0))
+    for p in points:
+        total += p
+    return total / len(points)
+
+
+def _aabb_from_points(points: list[Vector]) -> tuple[Vector, Vector]:
+    xs = [p.x for p in points]
+    ys = [p.y for p in points]
+    zs = [p.z for p in points]
+    return Vector((min(xs), min(ys), min(zs))), Vector((max(xs), max(ys), max(zs)))
+
+
+def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
+    if obj is None:
+        return []
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    if obj_eval.type != "MESH":
+        return []
+    mesh = obj_eval.to_mesh()
+    try:
+        return [obj_eval.matrix_world @ v.co for v in mesh.vertices]
+    finally:
+        obj_eval.to_mesh_clear()
+
+
+def _convex_hull_planes(points: list[Vector]) -> list[tuple[float, float, float, float]]:
+    bm = bmesh.new()
+    for p in points:
+        bm.verts.new(p)
+    bm.verts.ensure_lookup_table()
+    if len(bm.verts) < 4:
+        bm.free()
+        return []
+
+    hull = bmesh.ops.convex_hull(bm, input=list(bm.verts))
+    if len(hull.get("geom", [])) == 0:
+        bm.free()
+        return []
+
+    bm.normal_update()
+    centroid = _points_centroid(points)
+    planes = []
+    for face in bm.faces:
+        n = Vector(face.normal)
+        p = Vector(face.verts[0].co)
+        d = -n.dot(p)
+        if n.dot(centroid) + d > 0:
+            n = -n
+            d = -d
+        planes.append((n.x, n.y, n.z, d))
+    bm.free()
+    return planes
+
+
+def _sample_rotation_quaternion(
+    rng: random.Random,
+    domain_dimension: int,
+    rotation_mode: str,
+    yaw_min: float,
+    yaw_max: float,
+) -> mathutils.Quaternion:
+    if rotation_mode == "yaw" or domain_dimension == 2:
+        yaw_deg = rng.uniform(yaw_min, yaw_max)
+        return mathutils.Euler((0.0, 0.0, math.radians(yaw_deg))).to_quaternion()
+
+    u1, u2, u3 = rng.random(), rng.random(), rng.random()
+    qx = math.sqrt(1.0 - u1) * math.sin(2.0 * math.pi * u2)
+    qy = math.sqrt(1.0 - u1) * math.cos(2.0 * math.pi * u2)
+    qz = math.sqrt(u1) * math.sin(2.0 * math.pi * u3)
+    qw = math.sqrt(u1) * math.cos(2.0 * math.pi * u3)
+    return mathutils.Quaternion((qw, qx, qy, qz))
+
+
+def _object_world_radius(obj: bpy.types.Object, dimension: int) -> float:
+    if obj is None:
+        return 0.0
+
+    points = _get_object_world_vertices(obj)
+    if len(points) == 0:
+        corners = []
+        for corner in getattr(obj, "bound_box", []):
+            corners.append(obj.matrix_world @ Vector(corner))
+        points = corners
+    if len(points) == 0:
+        dims = getattr(obj, "dimensions", Vector((1.0, 1.0, 1.0)))
+        if dimension == 2:
+            return 0.5 * math.hypot(dims.x, dims.y)
+        return 0.5 * math.sqrt(dims.x * dims.x + dims.y * dims.y + dims.z * dims.z)
+
+    center = obj.matrix_world.translation
+    if dimension == 2:
+        return max(math.hypot(p.x - center.x, p.y - center.y) for p in points)
+    return max((p - center).length for p in points)
+
+
+def _build_bvh_from_object(
+    obj: bpy.types.Object,
+    transform: mathutils.Matrix | None = None,
+) -> BVHTree | None:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    if obj_eval.type != "MESH":
+        return None
+    mesh = obj_eval.to_mesh()
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        if transform is None:
+            transform = obj_eval.matrix_world.copy()
+        bmesh.ops.transform(bm, matrix=transform, verts=bm.verts)
+        if len(bm.faces) == 0:
+            return None
+        return BVHTree.FromBMesh(bm, epsilon=0.0)
+    finally:
+        bm.free()
+        obj_eval.to_mesh_clear()
+
+
+def _mesh_overlaps_any(
+    source_obj: bpy.types.Object,
+    location: Vector,
+    rotation: mathutils.Quaternion,
+    scale: float,
+    others: list[bpy.types.Object],
+) -> bool:
+    transform = (
+        mathutils.Matrix.Translation(location)
+        @ rotation.to_matrix().to_4x4()
+        @ mathutils.Matrix.Diagonal((scale, scale, scale, 1.0))
+    )
+    candidate_bvh = _build_bvh_from_object(source_obj, transform=transform)
+    if candidate_bvh is None:
+        return False
+    for other in others:
+        other_bvh = _build_bvh_from_object(other)
+        if other_bvh is None:
+            continue
+        if len(candidate_bvh.overlap(other_bvh)) > 0:
+            return True
+    return False
+
+
+def _mesh_object_overlaps_any(
+    candidate: bpy.types.Object, others: list[bpy.types.Object]
+) -> bool:
+    candidate_bvh = _build_bvh_from_object(candidate)
+    if candidate_bvh is None:
+        return False
+    for other in others:
+        other_bvh = _build_bvh_from_object(other)
+        if other_bvh is None:
+            continue
+        if len(candidate_bvh.overlap(other_bvh)) > 0:
+            return True
+    return False
 
 
 def _load_single_object(path: str):
