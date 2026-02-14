@@ -89,3 +89,26 @@ rv render scene.py
 
 ## Use `rv` for generating your next synthetic dataset
 For more information view the [API reference](/docs/api).
+
+## Testing
+
+Run Go tests:
+
+```bash
+go test ./...
+```
+
+Run Python unit tests that do not require Blender:
+
+```bash
+make test-python-unit
+```
+
+Run Blender integration tests:
+
+```bash
+make test-blender
+```
+
+The Blender test command resolves Blender the same way as `rv` runtime:
+`BLENDER_PATH`, then `blender` from `PATH`, then OS fallback locations.

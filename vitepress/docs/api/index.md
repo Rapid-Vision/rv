@@ -23,6 +23,9 @@ class BasicScene(rv.Scene):
         )
         plane = self.create_plane(size=1000)
         empty = self.create_empty().set_location((0, 0, 1))
+        key_light = self.create_area_light(power=250).set_location((4, -4, 6)).point_at(
+            empty
+        )
 
         cam = self.get_camera().set_location((7, 7, 3)).point_at(empty)
 ```
@@ -33,6 +36,183 @@ class BasicScene(rv.Scene):
 | ![resulting image](/examples/1_primitives/1_res.png) | ![resulting image](/examples/1_primitives/1_segs.png)|
 
 ## Classes
+
+### `class Domain` {#class-domain}
+Scatter domain descriptor used by `Scene.scatter_non_intersecting`.
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `kind` | `str` |  |
+| `data` | `dict` |  |
+| `dimension` | `int` |  |
+
+:::
+
+::: details Methods
+
+##### `rect`
+
+**Signature**
+
+```python
+@staticmethod
+def rect(center: tuple[float, float]=(0.0, 0.0), size: tuple[float, float]=(10.0, 10.0), z: float=0.0) -> 'Domain'
+```
+
+**Arguments**
+
+- **`center`** : `tuple[float, float]`
+- **`size`** : `tuple[float, float]`
+- **`z`** : `float`
+
+**Returns**: `'Domain'`
+
+##### `ellipse`
+
+**Signature**
+
+```python
+@staticmethod
+def ellipse(center: tuple[float, float]=(0.0, 0.0), radii: tuple[float, float]=(5.0, 3.0), z: float=0.0) -> 'Domain'
+```
+
+**Arguments**
+
+- **`center`** : `tuple[float, float]`
+- **`radii`** : `tuple[float, float]`
+- **`z`** : `float`
+
+**Returns**: `'Domain'`
+
+##### `polygon`
+
+**Signature**
+
+```python
+@staticmethod
+def polygon(points: list[tuple[float, float]], z: float=0.0) -> 'Domain'
+```
+
+**Arguments**
+
+- **`points`** : `list[tuple[float, float]]`
+- **`z`** : `float`
+
+**Returns**: `'Domain'`
+
+##### `box`
+
+**Signature**
+
+```python
+@staticmethod
+def box(center: tuple[float, float, float]=(0.0, 0.0, 0.0), size: tuple[float, float, float]=(10.0, 10.0, 10.0)) -> 'Domain'
+```
+
+**Arguments**
+
+- **`center`** : `tuple[float, float, float]`
+- **`size`** : `tuple[float, float, float]`
+
+**Returns**: `'Domain'`
+
+##### `cylinder`
+
+**Signature**
+
+```python
+@staticmethod
+def cylinder(center: tuple[float, float, float]=(0.0, 0.0, 0.0), radius: float=5.0, height: float=10.0, axis: str='Z') -> 'Domain'
+```
+
+**Arguments**
+
+- **`center`** : `tuple[float, float, float]`
+- **`radius`** : `float`
+- **`height`** : `float`
+- **`axis`** : `str`
+
+**Returns**: `'Domain'`
+
+##### `ellipsoid`
+
+**Signature**
+
+```python
+@staticmethod
+def ellipsoid(center: tuple[float, float, float]=(0.0, 0.0, 0.0), radii: tuple[float, float, float]=(5.0, 3.0, 2.0)) -> 'Domain'
+```
+
+**Arguments**
+
+- **`center`** : `tuple[float, float, float]`
+- **`radii`** : `tuple[float, float, float]`
+
+**Returns**: `'Domain'`
+
+##### `convex_hull`
+
+**Signature**
+
+```python
+@staticmethod
+def convex_hull(rv_obj: 'Object', project_2d: bool=False) -> 'Domain'
+```
+
+**Arguments**
+
+- **`rv_obj`** : `'Object'`
+- **`project_2d`** : `bool`
+
+**Returns**: `'Domain'`
+
+##### `sample_point`
+
+**Signature**
+
+```python
+def sample_point(self, rng: random.Random) -> mathutils.Vector
+```
+
+**Arguments**
+
+- **`rng`** : `random.Random`
+
+**Returns**: `mathutils.Vector`
+
+##### `contains_point`
+
+**Signature**
+
+```python
+def contains_point(self, point: mathutils.Vector, margin: float=0.0) -> bool
+```
+
+**Arguments**
+
+- **`point`** : `mathutils.Vector`
+- **`margin`** : `float`
+
+**Returns**: `bool`
+
+##### `aabb`
+
+**Signature**
+
+```python
+def aabb(self) -> tuple[mathutils.Vector, mathutils.Vector]
+```
+
+**Arguments**
+
+
+**Returns**: `tuple[mathutils.Vector, mathutils.Vector]`
+
+:::
+
+---
 
 ### `class Scene` {#class-scene}
 Inherits from: `ABC`, `_Serializable`
@@ -53,8 +233,10 @@ Base class for describing rv scene. To set up a scene, implement `generate` func
 | `tags` | `set[str]` |  |
 | `objects` | `set['Object']` |  |
 | `materials` | `set['Material']` |  |
+| `lights` | `set['Light']` |  |
 | `object_index_counter` | `int` |  |
 | `material_index_counter` | `int` |  |
+| `light_index_counter` | `int` |  |
 
 :::
 
@@ -75,23 +257,6 @@ def generate(self) -> None
 
 
 **Returns**: `None`
-
-##### `set_resolution`
-
-Set resulting image resolution. If only width is passed, resulting image will be a square.
-
-**Signature**
-
-```python
-def set_resolution(self, width: float, height: float=None)
-```
-
-**Arguments**
-
-- **`width`** : `float`
-- **`height`** : `float`
-
-**Returns**: `Self`
 
 ##### `set_rendering_time_limit`
 
@@ -193,6 +358,74 @@ def create_plane(self, name: str='Plane', size: float=2.0) -> 'Object'
 - **`size`** : `float`
 
 **Returns**: `'Object'`
+
+##### `create_point_light`
+
+Create a point light.
+
+**Signature**
+
+```python
+def create_point_light(self, name: str='Point', power: float=1000.0) -> 'PointLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `'PointLight'`
+
+##### `create_sun_light`
+
+Create a sun light.
+
+**Signature**
+
+```python
+def create_sun_light(self, name: str='Sun', power: float=1.0) -> 'SunLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `'SunLight'`
+
+##### `create_area_light`
+
+Create an area light.
+
+**Signature**
+
+```python
+def create_area_light(self, name: str='Area', power: float=100.0) -> 'AreaLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `'AreaLight'`
+
+##### `create_spot_light`
+
+Create a spot light.
+
+**Signature**
+
+```python
+def create_spot_light(self, name: str='Spot', power: float=1000.0) -> 'SpotLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `'SpotLight'`
 
 ##### `get_camera`
 
@@ -353,6 +586,112 @@ def import_material(self, blendfile: str, material_name: str=None) -> 'ImportedM
 
 **Returns**: `'ImportedMaterial'`
 
+##### `scatter_by_sphere`
+
+Scatter objects using bounding-sphere collisions.
+
+**Signature**
+
+```python
+def scatter_by_sphere(self, source: 'ObjectLoader | list[ObjectLoader]', count: int, domain: 'Domain', min_gap: float=0.0, yaw_range: tuple[float, float]=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: tuple[float, float]=(1.0, 1.0), max_attempts_per_object: int=100, boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None) -> list['Object']
+```
+
+**Arguments**
+
+- **`source`** : `'ObjectLoader | list[ObjectLoader]'`
+- **`count`** : `int`
+- **`domain`** : `'Domain'`
+- **`min_gap`** : `float`
+- **`yaw_range`** : `tuple[float, float]`
+- **`rotation_mode`** : `Literal['yaw', 'free']`
+- **`scale_range`** : `tuple[float, float]`
+- **`max_attempts_per_object`** : `int`
+- **`boundary_mode`** : `Literal['center_margin']`
+- **`boundary_margin`** : `float`
+- **`seed`** : `int | None`
+
+**Returns**: `Self`
+
+##### `scatter_by_bvh`
+
+Scatter objects using exact BVH overlap checks with broad-phase pruning.
+
+**Signature**
+
+```python
+def scatter_by_bvh(self, source: 'ObjectLoader | list[ObjectLoader]', count: int, domain: 'Domain', min_gap: float=0.0, yaw_range: tuple[float, float]=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: tuple[float, float]=(1.0, 1.0), max_attempts_per_object: int=100, boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None) -> list['Object']
+```
+
+**Arguments**
+
+- **`source`** : `'ObjectLoader | list[ObjectLoader]'`
+- **`count`** : `int`
+- **`domain`** : `'Domain'`
+- **`min_gap`** : `float`
+- **`yaw_range`** : `tuple[float, float]`
+- **`rotation_mode`** : `Literal['yaw', 'free']`
+- **`scale_range`** : `tuple[float, float]`
+- **`max_attempts_per_object`** : `int`
+- **`boundary_mode`** : `Literal['center_margin']`
+- **`boundary_margin`** : `float`
+- **`seed`** : `int | None`
+
+**Returns**: `Self`
+
+##### `scatter_parametric`
+
+Scatter parameterized objects. Dimensions are measured on candidate geometry per attempt.
+
+**Signature**
+
+```python
+def scatter_parametric(self, source: 'ParametricSource', count: int, domain: 'Domain', strategy: Literal['sphere', 'bvh']='sphere', min_gap: float=0.0, yaw_range: tuple[float, float]=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: tuple[float, float]=(1.0, 1.0), max_attempts_per_object: int=100, boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None) -> list['Object']
+```
+
+**Arguments**
+
+- **`source`** : `'ParametricSource'`
+- **`count`** : `int`
+- **`domain`** : `'Domain'`
+- **`strategy`** : `Literal['sphere', 'bvh']`
+- **`min_gap`** : `float`
+- **`yaw_range`** : `tuple[float, float]`
+- **`rotation_mode`** : `Literal['yaw', 'free']`
+- **`scale_range`** : `tuple[float, float]`
+- **`max_attempts_per_object`** : `int`
+- **`boundary_mode`** : `Literal['center_margin']`
+- **`boundary_margin`** : `float`
+- **`seed`** : `int | None`
+
+**Returns**: `Self`
+
+##### `scatter_non_intersecting`
+
+Backward-compatible wrapper for scattering.
+
+**Signature**
+
+```python
+def scatter_non_intersecting(self, source: 'ObjectLoader | list[ObjectLoader]', count: int, domain: 'Domain', min_gap: float=0.0, yaw_range: tuple[float, float]=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: tuple[float, float]=(1.0, 1.0), max_attempts_per_object: int=100, collision_mode: Literal['bounds', 'mesh']='bounds', boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None) -> list['Object']
+```
+
+**Arguments**
+
+- **`source`** : `'ObjectLoader | list[ObjectLoader]'`
+- **`count`** : `int`
+- **`domain`** : `'Domain'`
+- **`min_gap`** : `float`
+- **`yaw_range`** : `tuple[float, float]`
+- **`rotation_mode`** : `Literal['yaw', 'free']`
+- **`scale_range`** : `tuple[float, float]`
+- **`max_attempts_per_object`** : `int`
+- **`collision_mode`** : `Literal['bounds', 'mesh']`
+- **`boundary_mode`** : `Literal['center_margin']`
+- **`boundary_margin`** : `float`
+- **`seed`** : `int | None`
+
+**Returns**: `list['Object']`
+
 :::
 
 ---
@@ -369,14 +708,88 @@ Create a single object instance from a loader.
 **Signature**
 
 ```python
-def create_instance(self, name: str=None) -> 'Object'
+def create_instance(self, name: str=None, register_object: bool=True) -> 'Object'
 ```
 
 **Arguments**
 
 - **`name`** : `str` — Instanced object name
+- **`register_object`** : `bool`
 
 **Returns**: `'Object'`
+
+:::
+
+---
+
+### `class ParametricSource` {#class-parametricsource}
+Source wrapper for parameterized scattering.
+
+It can sample parameters per candidate and apply them to each created instance.
+
+::: details Methods
+
+##### `set_sampler`
+
+Set a callback that samples a parameter dictionary for each candidate.
+
+**Signature**
+
+```python
+def set_sampler(self, sampler: typing.Callable[[random.Random], dict]) -> 'ParametricSource'
+```
+
+**Arguments**
+
+- **`sampler`** : `typing.Callable[[random.Random], dict]`
+
+**Returns**: `Self`
+
+##### `set_applier`
+
+Set a callback that applies sampled parameters to the created object.
+
+**Signature**
+
+```python
+def set_applier(self, applier: typing.Callable[['Object', dict], None]) -> 'ParametricSource'
+```
+
+**Arguments**
+
+- **`applier`** : `typing.Callable[['Object', dict], None]`
+
+**Returns**: `Self`
+
+##### `sample_params`
+
+**Signature**
+
+```python
+def sample_params(self, rng: random.Random) -> dict
+```
+
+**Arguments**
+
+- **`rng`** : `random.Random`
+
+**Returns**: `dict`
+
+##### `create_instance`
+
+**Signature**
+
+```python
+def create_instance(self, params: dict | None=None, register_object: bool=True, name: str=None) -> 'Object'
+```
+
+**Arguments**
+
+- **`params`** : `dict | None`
+- **`register_object`** : `bool`
+- **`name`** : `str`
+
+**Returns**: `Self`
 
 :::
 
@@ -536,7 +949,7 @@ Wrapper around a Blender object with chainable transformation and metadata helpe
 | `scene` | `Scene` |  |
 | `tags` | `set[str]` |  |
 | `properties` | `dict` |  |
-| `index` | `int` |  |
+| `index` | `int | None` |  |
 
 :::
 
@@ -730,17 +1143,17 @@ def rotate_around_axis(self, axis: mathutils.Vector, angle: float)
 
 ##### `set_shading`
 
-Set shading to flat or smooth.
+Set shading to flat, smooth, or auto.
 
 **Signature**
 
 ```python
-def set_shading(self, shading: Literal['flat', 'smooth'])
+def set_shading(self, shading: Literal['flat', 'smooth', 'auto'])
 ```
 
 **Arguments**
 
-- **`shading`** : `Literal['flat', 'smooth']`
+- **`shading`** : `Literal['flat', 'smooth', 'auto']`
 
 **Returns**: `Self`
 
@@ -800,6 +1213,302 @@ def set_fov(self, angle: float)
 **Arguments**
 
 - **`angle`** : `float` — Camera FOV in degrees
+
+**Returns**: `Self`
+
+:::
+
+---
+
+### `class Light` {#class-light}
+Inherits from: `Object`
+
+Base object wrapper for Blender lights with chainable parameter setters.
+
+::: details Methods
+
+##### `light_data`
+
+Return the underlying Blender light datablock.
+
+**Signature**
+
+```python
+@property
+def light_data(self) -> bpy.types.Light
+```
+
+**Arguments**
+
+
+**Returns**: `bpy.types.Light`
+
+##### `set_color`
+
+Set light RGB color. Alpha (if provided) is ignored.
+
+**Signature**
+
+```python
+def set_color(self, color: tuple[float, float, float] | tuple[float, float, float, float]) -> 'Light'
+```
+
+**Arguments**
+
+- **`color`** : `tuple[float, float, float] | tuple[float, float, float, float]`
+
+**Returns**: `Self`
+
+##### `set_power`
+
+Set light power in Blender `energy` units.
+
+**Signature**
+
+```python
+def set_power(self, power: float) -> 'Light'
+```
+
+**Arguments**
+
+- **`power`** : `float`
+
+**Returns**: `Self`
+
+##### `set_cast_shadow`
+
+Enable or disable shadow casting.
+
+**Signature**
+
+```python
+def set_cast_shadow(self, enabled: bool=True) -> 'Light'
+```
+
+**Arguments**
+
+- **`enabled`** : `bool`
+
+**Returns**: `Self`
+
+##### `set_specular_factor`
+
+Set the light contribution to specular highlights.
+
+**Signature**
+
+```python
+def set_specular_factor(self, factor: float) -> 'Light'
+```
+
+**Arguments**
+
+- **`factor`** : `float`
+
+**Returns**: `Self`
+
+##### `set_softness`
+
+Set softness parameter mapped to the current light type.
+
+**Signature**
+
+```python
+def set_softness(self, value: float) -> 'Light'
+```
+
+**Arguments**
+
+- **`value`** : `float`
+
+**Returns**: `Self`
+
+##### `set_params`
+
+Set known light-data attributes or custom properties.
+
+**Signature**
+
+```python
+def set_params(self, **kwargs) -> 'Light'
+```
+
+**Arguments**
+
+- **`**kwargs`**
+
+**Returns**: `Self`
+
+:::
+
+---
+
+### `class PointLight` {#class-pointlight}
+Inherits from: `Light`
+
+Point light with radius control.
+
+::: details Methods
+
+##### `set_radius`
+
+Set point light radius.
+
+**Signature**
+
+```python
+def set_radius(self, radius: float) -> 'PointLight'
+```
+
+**Arguments**
+
+- **`radius`** : `float`
+
+**Returns**: `Self`
+
+:::
+
+---
+
+### `class SunLight` {#class-sunlight}
+Inherits from: `Light`
+
+Directional sun light with angular size control.
+
+::: details Methods
+
+##### `set_angle`
+
+Set sun angular size in radians.
+
+**Signature**
+
+```python
+def set_angle(self, angle_radians: float) -> 'SunLight'
+```
+
+**Arguments**
+
+- **`angle_radians`** : `float`
+
+**Returns**: `Self`
+
+:::
+
+---
+
+### `class AreaLight` {#class-arealight}
+Inherits from: `Light`
+
+Area light with shape and size controls.
+
+::: details Methods
+
+##### `set_shape`
+
+Set area light shape.
+
+**Signature**
+
+```python
+def set_shape(self, shape: Literal['SQUARE', 'RECTANGLE', 'DISK', 'ELLIPSE']) -> 'AreaLight'
+```
+
+**Arguments**
+
+- **`shape`** : `Literal['SQUARE', 'RECTANGLE', 'DISK', 'ELLIPSE']`
+
+**Returns**: `Self`
+
+##### `set_size`
+
+Set primary area light size.
+
+**Signature**
+
+```python
+def set_size(self, size: float) -> 'AreaLight'
+```
+
+**Arguments**
+
+- **`size`** : `float`
+
+**Returns**: `Self`
+
+##### `set_size_xy`
+
+Set area light X and Y sizes.
+
+**Signature**
+
+```python
+def set_size_xy(self, size_x: float, size_y: float) -> 'AreaLight'
+```
+
+**Arguments**
+
+- **`size_x`** : `float`
+- **`size_y`** : `float`
+
+**Returns**: `Self`
+
+:::
+
+---
+
+### `class SpotLight` {#class-spotlight}
+Inherits from: `Light`
+
+Spot light with cone and blend controls.
+
+::: details Methods
+
+##### `set_spot_size`
+
+Set spotlight cone angle in radians.
+
+**Signature**
+
+```python
+def set_spot_size(self, angle_radians: float) -> 'SpotLight'
+```
+
+**Arguments**
+
+- **`angle_radians`** : `float`
+
+**Returns**: `Self`
+
+##### `set_blend`
+
+Set spotlight edge softness in the [0, 1] range.
+
+**Signature**
+
+```python
+def set_blend(self, blend: float) -> 'SpotLight'
+```
+
+**Arguments**
+
+- **`blend`** : `float`
+
+**Returns**: `Self`
+
+##### `set_show_cone`
+
+Show or hide the spotlight cone in viewport.
+
+**Signature**
+
+```python
+def set_show_cone(self, show: bool=True) -> 'SpotLight'
+```
+
+**Arguments**
+
+- **`show`** : `bool`
 
 **Returns**: `Self`
 
