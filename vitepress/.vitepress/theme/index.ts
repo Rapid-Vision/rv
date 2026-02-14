@@ -3,6 +3,11 @@ import { h } from 'vue'
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import './style.css'
+import "./steps.css"
+
+import Steps from "./components/Steps.vue"
+import Step from "./components/Step.vue"
+
 
 export default {
   extends: DefaultTheme,
@@ -13,5 +18,7 @@ export default {
   },
   enhanceApp({ app, router, siteData }) {
     // ...
+    app.component("Steps", Steps)
+    app.component("Step", Step)
   }
 } satisfies Theme
