@@ -1,11 +1,27 @@
 package cmd
 
 import (
-	"path/filepath"
+	"fmt"
+	"strconv"
+	"strings"
 
-	"github.com/Rapid-Vision/rv/cmd/internal/logs"
-	"github.com/Rapid-Vision/rv/cmd/internal/render"
+	"github.com/Rapid-Vision/rv/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/render"
+	"github.com/Rapid-Vision/rv/internal/utils"
 	"github.com/spf13/cobra"
+)
+
+var (
+	renderImageNum              int
+	renderProcs                 int
+	renderResolution            string
+	renderOutputDir             string
+	renderCwd                   string
+	renderTimeLimit             float64
+	renderMaxSamples            int
+	renderMinSamples            int
+	renderNoiseThresholdEnabled bool
+	renderNoiseThreshold        float64
 )
 
 var renderCmd = &cobra.Command{
@@ -13,25 +29,85 @@ var renderCmd = &cobra.Command{
 	Short: "Render final dataset",
 	Long:  `Run generation script in several instances of blender and save resulting dataset.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		scriptPath := args[0]
-		imageNum, _ := cmd.Flags().GetInt("number")
-		procs, _ := cmd.Flags().GetInt("procs")
-
-		outputDir, _ := cmd.Flags().GetString("output")
-		outputDirAbs, err := filepath.Abs(outputDir)
-		if err != nil {
-			logs.Err.Fatalln("Failed to parse output path:", err)
-		}
-
-		render.Render(scriptPath, imageNum, procs, outputDirAbs)
-	},
+	Run:   runRender,
 }
 
 func init() {
 	rootCmd.AddCommand(renderCmd)
 
-	renderCmd.Flags().IntP("number", "n", 1, "Number of total images generated")
-	renderCmd.Flags().IntP("procs", "p", 1, "Maximum number of spawned Blender processes")
-	renderCmd.Flags().StringP("output", "o", "./out", "Output directory")
+	renderCmd.Flags().IntVarP(&renderImageNum, "number", "n", 1, "Number of total images generated")
+	renderCmd.Flags().IntVarP(&renderProcs, "procs", "p", 1, "Maximum number of spawned Blender processes")
+	renderCmd.Flags().StringVar(&renderResolution, "resolution", "640,640", "Output image resolution in WIDTH,HEIGHT format")
+	renderCmd.Flags().Float64Var(&renderTimeLimit, "time-limit", 0, "Cycles rendering time limit in seconds")
+	renderCmd.Flags().IntVar(&renderMaxSamples, "max-samples", 0, "Cycles maximum render samples")
+	renderCmd.Flags().IntVar(&renderMinSamples, "min-samples", 0, "Cycles minimum adaptive render samples")
+	renderCmd.Flags().BoolVar(&renderNoiseThresholdEnabled, "noise-threshold-enabled", false, "Enable Cycles adaptive noise threshold")
+	renderCmd.Flags().Float64Var(&renderNoiseThreshold, "noise-threshold", 0, "Cycles adaptive noise threshold value")
+	renderCmd.Flags().StringVarP(&renderOutputDir, "output", "o", "./out", "Output directory")
+	renderCmd.Flags().StringVar(&renderCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
+}
+
+func runRender(cmd *cobra.Command, args []string) {
+	paths, err := utils.ResolveRenderPaths(args[0], renderOutputDir, renderCwd)
+	if err != nil {
+		logs.Err.Fatalln("Failed to resolve paths:", err)
+	}
+
+	resolution, err := parseResolutionFlag(renderResolution)
+	if err != nil {
+		logs.Err.Fatalln("Invalid --resolution:", err)
+	}
+
+	opts := render.RenderOptions{
+		ScriptPath: paths.ScriptPath,
+		Cwd:        paths.Cwd,
+		ImageNum:   renderImageNum,
+		Procs:      renderProcs,
+		Resolution: resolution,
+		OutputDir:  paths.OutputDir,
+	}
+	applyOptionalRenderFlags(cmd, &opts)
+
+	if _, err := render.Render(opts); err != nil {
+		logs.Err.Fatalln("Render failed:", err)
+	}
+}
+
+func applyOptionalRenderFlags(cmd *cobra.Command, opts *render.RenderOptions) {
+	if cmd.Flags().Changed("time-limit") {
+		opts.TimeLimit = &renderTimeLimit
+	}
+	if cmd.Flags().Changed("max-samples") {
+		opts.MaxSamples = &renderMaxSamples
+	}
+	if cmd.Flags().Changed("min-samples") {
+		opts.MinSamples = &renderMinSamples
+	}
+	if cmd.Flags().Changed("noise-threshold-enabled") {
+		opts.NoiseThresholdEnabled = &renderNoiseThresholdEnabled
+	}
+	if cmd.Flags().Changed("noise-threshold") {
+		opts.NoiseThreshold = &renderNoiseThreshold
+	}
+}
+
+func parseResolutionFlag(raw string) ([2]int, error) {
+	parts := strings.Split(strings.TrimSpace(raw), ",")
+	if len(parts) != 2 {
+		return [2]int{}, fmt.Errorf("expected WIDTH,HEIGHT")
+	}
+
+	width, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return [2]int{}, fmt.Errorf("invalid width: %w", err)
+	}
+	height, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return [2]int{}, fmt.Errorf("invalid height: %w", err)
+	}
+	if width <= 0 || height <= 0 {
+		return [2]int{}, fmt.Errorf("width and height must be > 0")
+	}
+
+	return [2]int{width, height}, nil
 }
