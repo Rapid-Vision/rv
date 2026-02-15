@@ -38,7 +38,7 @@ class BasicScene(rv.Scene):
 from abc import ABC, abstractmethod
 import typing
 from mathutils import Vector
-from typing import Literal, Union, Optional
+from typing import Literal, Union, Optional, TypeAlias
 import bpy
 import bpy_extras
 import bmesh
@@ -53,8 +53,27 @@ import warnings
 from enum import Enum
 from mathutils.bvhtree import BVHTree
 
-JSONSerializable = Union[
+JSONSerializable: TypeAlias = Union[
     str, int, float, bool, None, list["json.JSONType"], dict[str, "json.JSONType"]
+]
+
+Resolution: TypeAlias = tuple[int, int]
+Float2: TypeAlias = tuple[float, float]
+Float3: TypeAlias = tuple[float, float, float]
+Float4: TypeAlias = tuple[float, float, float, float]
+ColorRGB: TypeAlias = Float3
+ColorRGBA: TypeAlias = Float4
+Color: TypeAlias = ColorRGB | ColorRGBA
+OptionalColor: TypeAlias = Color | None
+Polygon2D: TypeAlias = list[Float2]
+AABB: TypeAlias = tuple[Vector, Vector]
+CellCoords: TypeAlias = tuple[int, ...]
+RenderPassSet: TypeAlias = set["RenderPass"]
+TagSet: TypeAlias = set[str]
+SemanticChannelSet: TypeAlias = set[str]
+ObjectLoaderSource: TypeAlias = Union["ObjectLoader", list["ObjectLoader"]]
+ScatterValidationResult: TypeAlias = tuple[
+    list["ObjectLoader"], float, float, float, float
 ]
 
 
@@ -367,8 +386,8 @@ class Domain:
 
     @staticmethod
     def rect(
-        center: tuple[float, float] = (0.0, 0.0),  # XY center of the rectangle
-        size: tuple[float, float] = (10.0, 10.0),  # Rectangle width and depth
+        center: Float2 = (0.0, 0.0),  # XY center of the rectangle
+        size: Float2 = (10.0, 10.0),  # Rectangle width and depth
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
         _ensure_positive_tuple(size, 2, "size")
@@ -376,8 +395,8 @@ class Domain:
 
     @staticmethod
     def ellipse(
-        center: tuple[float, float] = (0.0, 0.0),  # XY center of the ellipse
-        radii: tuple[float, float] = (5.0, 3.0),  # Ellipse radii along X and Y
+        center: Float2 = (0.0, 0.0),  # XY center of the ellipse
+        radii: Float2 = (5.0, 3.0),  # Ellipse radii along X and Y
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
         _ensure_positive_tuple(radii, 2, "radii")
@@ -387,7 +406,7 @@ class Domain:
 
     @staticmethod
     def polygon(
-        points: list[tuple[float, float]],  # Polygon vertices in XY
+        points: Polygon2D,  # Polygon vertices in XY
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
         if points is None or len(points) < 3:
@@ -401,15 +420,15 @@ class Domain:
 
     @staticmethod
     def box(
-        center: tuple[float, float, float] = (0.0, 0.0, 0.0),  # 3D center
-        size: tuple[float, float, float] = (10.0, 10.0, 10.0),  # Box side lengths
+        center: Float3 = (0.0, 0.0, 0.0),  # 3D center
+        size: Float3 = (10.0, 10.0, 10.0),  # Box side lengths
     ) -> "Domain":
         _ensure_positive_tuple(size, 3, "size")
         return Domain("box", {"center": tuple(center), "size": tuple(size)}, 3)
 
     @staticmethod
     def cylinder(
-        center: tuple[float, float, float] = (0.0, 0.0, 0.0),  # Cylinder center
+        center: Float3 = (0.0, 0.0, 0.0),  # Cylinder center
         radius: float = 5.0,  # Radial extent
         height: float = 10.0,  # Length along the selected axis
         axis: str = "Z",  # Longitudinal axis: X, Y, or Z
@@ -423,14 +442,19 @@ class Domain:
             raise ValueError("axis must be one of: X, Y, Z.")
         return Domain(
             "cylinder",
-            {"center": tuple(center), "radius": radius, "height": height, "axis": axis_up},
+            {
+                "center": tuple(center),
+                "radius": radius,
+                "height": height,
+                "axis": axis_up,
+            },
             3,
         )
 
     @staticmethod
     def ellipsoid(
-        center: tuple[float, float, float] = (0.0, 0.0, 0.0),  # Ellipsoid center
-        radii: tuple[float, float, float] = (5.0, 3.0, 2.0),  # Radii along X, Y, Z
+        center: Float3 = (0.0, 0.0, 0.0),  # Ellipsoid center
+        radii: Float3 = (5.0, 3.0, 2.0),  # Radii along X, Y, Z
     ) -> "Domain":
         _ensure_positive_tuple(radii, 3, "radii")
         return Domain("ellipsoid", {"center": tuple(center), "radii": tuple(radii)}, 3)
@@ -486,7 +510,9 @@ class Domain:
             z = self.data["z"]
             theta = rng.uniform(0.0, 2.0 * math.pi)
             rr = math.sqrt(rng.random())
-            return Vector((cx + rr * rx * math.cos(theta), cy + rr * ry * math.sin(theta), z))
+            return Vector(
+                (cx + rr * rx * math.cos(theta), cy + rr * ry * math.sin(theta), z)
+            )
 
         if self.kind in {"polygon", "hull2d"}:
             points = self.data["points"]
@@ -514,10 +540,16 @@ class Domain:
             rr = math.sqrt(rng.random()) * radius
             h = rng.uniform(-height * 0.5, height * 0.5)
             if axis == "X":
-                return Vector((cx + h, cy + rr * math.cos(theta), cz + rr * math.sin(theta)))
+                return Vector(
+                    (cx + h, cy + rr * math.cos(theta), cz + rr * math.sin(theta))
+                )
             if axis == "Y":
-                return Vector((cx + rr * math.cos(theta), cy + h, cz + rr * math.sin(theta)))
-            return Vector((cx + rr * math.cos(theta), cy + rr * math.sin(theta), cz + h))
+                return Vector(
+                    (cx + rr * math.cos(theta), cy + h, cz + rr * math.sin(theta))
+                )
+            return Vector(
+                (cx + rr * math.cos(theta), cy + rr * math.sin(theta), cz + h)
+            )
 
         if self.kind == "ellipsoid":
             cx, cy, cz = self.data["center"]
@@ -579,7 +611,10 @@ class Domain:
                 return False
             dx = (point.x - cx) / rx_in
             dy = (point.y - cy) / ry_in
-            return dx * dx + dy * dy <= 1.0 + 1e-9 and abs(point.z - self.data["z"]) <= 1e-6
+            return (
+                dx * dx + dy * dy <= 1.0 + 1e-9
+                and abs(point.z - self.data["z"]) <= 1e-6
+            )
 
         if self.kind in {"polygon", "hull2d"}:
             if abs(point.z - self.data["z"]) > 1e-6:
@@ -642,7 +677,7 @@ class Domain:
 
         raise ValueError(f"Unsupported domain kind: {self.kind}")
 
-    def aabb(self) -> tuple[mathutils.Vector, mathutils.Vector]:
+    def aabb(self) -> AABB:
         if self.kind == "rect":
             cx, cy = self.data["center"]
             sx, sy = self.data["size"]
@@ -676,15 +711,21 @@ class Domain:
             h = self.data["height"] * 0.5
             axis = self.data["axis"]
             if axis == "X":
-                return Vector((cx - h, cy - r, cz - r)), Vector((cx + h, cy + r, cz + r))
+                return Vector((cx - h, cy - r, cz - r)), Vector(
+                    (cx + h, cy + r, cz + r)
+                )
             if axis == "Y":
-                return Vector((cx - r, cy - h, cz - r)), Vector((cx + r, cy + h, cz + r))
+                return Vector((cx - r, cy - h, cz - r)), Vector(
+                    (cx + r, cy + h, cz + r)
+                )
             return Vector((cx - r, cy - r, cz - h)), Vector((cx + r, cy + r, cz + h))
 
         if self.kind == "ellipsoid":
             cx, cy, cz = self.data["center"]
             rx, ry, rz = self.data["radii"]
-            return Vector((cx - rx, cy - ry, cz - rz)), Vector((cx + rx, cy + ry, cz + rz))
+            return Vector((cx - rx, cy - ry, cz - rz)), Vector(
+                (cx + rx, cy + ry, cz + rz)
+            )
 
         if self.kind == "hull3d":
             return Vector(self.data["aabb_min"]), Vector(self.data["aabb_max"])
@@ -696,9 +737,9 @@ class _SpatialHash:
     def __init__(self, cell_size: float, dimension: int) -> None:
         self.cell_size = max(cell_size, 1e-6)
         self.dimension = dimension
-        self.cells: dict[tuple[int, ...], list[int]] = {}
+        self.cells: dict[CellCoords, list[int]] = {}
 
-    def _cell_coords(self, point: mathutils.Vector) -> tuple[int, ...]:
+    def _cell_coords(self, point: mathutils.Vector) -> CellCoords:
         if self.dimension == 2:
             return (
                 math.floor(point.x / self.cell_size),
@@ -738,21 +779,23 @@ class Scene(ABC, _Serializable):
     Base class for describing rv scene. To set up a scene, implement `generate` function.
     """
 
-    resolution: tuple[int, int] = (640, 640)  # Output image resolution (width, height)
+    resolution: Resolution = (640, 640)  # Output image resolution (width, height)
     time_limit: float = 3.0  # Per-frame render time limit in seconds
-    passes: set[RenderPass] = None  # Enabled auxiliary render passes
+    passes: RenderPassSet = None  # Enabled auxiliary render passes
     output_dir: Optional[
         str
     ]  # Directory for storing all outputs generated by a single `rv render` run
     subdir: str  # Directory to store results of a single rendering
     camera: "Camera"  # Scene camera wrapper
     world: "World"  # Active environment lighting descriptor
-    tags: set[str]  # Scene-level classification tags
+    tags: TagSet  # Scene-level classification tags
 
     objects: set["Object"]  # Registered scene objects
     materials: set["Material"]  # Registered material descriptors
     lights: set["Light"]  # Registered lights
-    semantic_channels: set[str]  # Semantic mask channels exported from shader AOVs
+    semantic_channels: (
+        SemanticChannelSet  # Semantic mask channels exported from shader AOVs
+    )
     semantic_mask_threshold: float = 0.5  # Binary threshold for semantic masks
 
     object_index_counter: int = 0  # Monotonic object pass-index counter
@@ -808,7 +851,9 @@ class Scene(ABC, _Serializable):
         self.passes = _combine_arglist_set(passes)
         return self
 
-    def enable_semantic_channels(self, *channels: tuple[str | list[str], ...]) -> "Scene":
+    def enable_semantic_channels(
+        self, *channels: tuple[str | list[str], ...]
+    ) -> "Scene":
         """
         Enable semantic shader channels to be exported as masks.
         In Blender node graphs, write channel values to AOV outputs named `SEM_<channel>`.
@@ -1052,13 +1097,13 @@ class Scene(ABC, _Serializable):
 
     def scatter_by_sphere(
         self,
-        source: "ObjectLoader | list[ObjectLoader]",  # Source loader(s)
+        source: ObjectLoaderSource,  # Source loader(s)
         count: int,  # Requested number of objects to place
         domain: "Domain",  # Scatter domain descriptor
         min_gap: float = 0.0,  # Extra spacing between placed objects
-        yaw_range: tuple[float, float] = (0.0, 360.0),  # Yaw range in degrees
+        yaw_range: Float2 = (0.0, 360.0),  # Yaw range in degrees
         rotation_mode: Literal["yaw", "free"] = "yaw",  # Rotation sampling strategy
-        scale_range: tuple[float, float] = (1.0, 1.0),  # Uniform scale range
+        scale_range: Float2 = (1.0, 1.0),  # Uniform scale range
         max_attempts_per_object: int = 100,  # Retry budget per requested object
         boundary_mode: Literal["center_margin"] = "center_margin",  # Boundary policy
         boundary_margin: float = 0.0,  # Required inset distance from domain edge
@@ -1144,13 +1189,13 @@ class Scene(ABC, _Serializable):
 
     def scatter_by_bvh(
         self,
-        source: "ObjectLoader | list[ObjectLoader]",  # Source loader(s)
+        source: ObjectLoaderSource,  # Source loader(s)
         count: int,  # Requested number of objects to place
         domain: "Domain",  # Scatter domain descriptor
         min_gap: float = 0.0,  # Extra spacing between placed objects
-        yaw_range: tuple[float, float] = (0.0, 360.0),  # Yaw range in degrees
+        yaw_range: Float2 = (0.0, 360.0),  # Yaw range in degrees
         rotation_mode: Literal["yaw", "free"] = "yaw",  # Rotation sampling strategy
-        scale_range: tuple[float, float] = (1.0, 1.0),  # Uniform scale range
+        scale_range: Float2 = (1.0, 1.0),  # Uniform scale range
         max_attempts_per_object: int = 100,  # Retry budget per requested object
         boundary_mode: Literal["center_margin"] = "center_margin",  # Boundary policy
         boundary_margin: float = 0.0,  # Required inset distance from domain edge
@@ -1250,9 +1295,9 @@ class Scene(ABC, _Serializable):
         domain: "Domain",  # Scatter domain descriptor
         strategy: Literal["sphere", "bvh"] = "sphere",  # Collision strategy
         min_gap: float = 0.0,  # Extra spacing between placed objects
-        yaw_range: tuple[float, float] = (0.0, 360.0),  # Yaw range in degrees
+        yaw_range: Float2 = (0.0, 360.0),  # Yaw range in degrees
         rotation_mode: Literal["yaw", "free"] = "yaw",  # Rotation sampling strategy
-        scale_range: tuple[float, float] = (1.0, 1.0),  # Uniform scale range
+        scale_range: Float2 = (1.0, 1.0),  # Uniform scale range
         max_attempts_per_object: int = 100,  # Retry budget per requested object
         boundary_mode: Literal["center_margin"] = "center_margin",  # Boundary policy
         boundary_margin: float = 0.0,  # Required inset distance from domain edge
@@ -1320,7 +1365,9 @@ class Scene(ABC, _Serializable):
                     continue
 
                 if strategy == "bvh":
-                    neighbor_objs = [placed_infos[idx]["object"].obj for idx in neighbors]
+                    neighbor_objs = [
+                        placed_infos[idx]["object"].obj for idx in neighbors
+                    ]
                     if _mesh_object_overlaps_any(temp_obj.obj, neighbor_objs):
                         _remove_blender_object(temp_obj.obj)
                         stats["rejected_overlap"] += 1
@@ -1586,7 +1633,9 @@ def _normalize_semantic_channel(channel: str) -> str:
         "_"
     )
     if normalized == "":
-        raise ValueError("semantic channel must contain at least one alphanumeric char.")
+        raise ValueError(
+            "semantic channel must contain at least one alphanumeric char."
+        )
     return normalized
 
 
@@ -1599,11 +1648,11 @@ class BasicMaterial(Material):
     Material descriptor backed by Blender's Principled BSDF shader.
     """
 
-    base_color: tuple[float, float, float, float] | None  # Principled base RGBA color
+    base_color: ColorRGBA | None  # Principled base RGBA color
     roughness: float | None  # Surface roughness
     metallic: float | None  # Metallic factor
     specular: float | None  # Specular IOR level
-    emission_color: tuple[float, float, float, float] | None  # Emission RGBA color
+    emission_color: ColorRGBA | None  # Emission RGBA color
     emission_strength: float | None  # Emission intensity
     alpha: float | None  # Surface alpha/transparency
     transmission: float | None  # Transmission weight
@@ -1625,15 +1674,11 @@ class BasicMaterial(Material):
 
     def set_params(
         self,
-        base_color: (
-            tuple[float, float, float, float] | tuple[float, float, float] | None
-        ) = None,
+        base_color: OptionalColor = None,
         roughness: float = None,
         metallic: float = None,
         specular: float = None,
-        emission_color: (
-            tuple[float, float, float, float] | tuple[float, float, float] | None
-        ) = None,
+        emission_color: OptionalColor = None,
         emission_strength: float = None,
         alpha: float = None,
         transmission: float = None,
@@ -1644,8 +1689,8 @@ class BasicMaterial(Material):
         """
 
         def _as_rgba(
-            color: tuple[float, float, float, float] | tuple[float, float, float],
-        ) -> tuple[float, float, float, float]:
+            color: Color,
+        ) -> ColorRGBA:
             rgba = tuple(color)
             if len(rgba) == 3:
                 return (rgba[0], rgba[1], rgba[2], 1.0)
@@ -1795,7 +1840,7 @@ class Object(_Serializable):
 
     obj: bpy.types.Object  # Underlying Blender object
     scene: Scene  # Owning scene
-    tags: set[str]  # Object-level semantic tags
+    tags: TagSet  # Object-level semantic tags
     properties: dict  # Custom properties assigned to this object
 
     index: int | None  # Assigned object pass index
@@ -2058,7 +2103,7 @@ class Light(Object):
 
     def set_color(
         self,
-        color: tuple[float, float, float] | tuple[float, float, float, float],
+        color: Color,
     ) -> "Light":
         """
         Set light RGB color. Alpha (if provided) is ignored.
@@ -2281,7 +2326,7 @@ class BasicWorld(World):
     `World` class representing a single color environmental lighting.
     """
 
-    color: tuple[float, float, float, float] = None  # Environment RGBA color
+    color: ColorRGBA | None = None  # Environment RGBA color
     strength: float = None  # Background light intensity
 
     def __init__(self):
@@ -2315,7 +2360,7 @@ class BasicWorld(World):
 
     def set_params(
         self,
-        color: tuple[float, float, float, float] = None,  # environement color
+        color: ColorRGBA | None = None,  # environement color
         strength: float = None,  # envronement light strength
     ):
         """
@@ -2553,7 +2598,7 @@ def _deselect():
     bpy.ops.object.select_all(action="DESELECT")
 
 
-def _set_resolution(resolution: tuple[int, int]):
+def _set_resolution(resolution: Resolution):
     scene = bpy.context.scene
     scene.render.resolution_x = resolution[0]
     scene.render.resolution_y = resolution[1]
@@ -2565,7 +2610,7 @@ def _set_time_limit(time_limit: float):
 
 
 def _configure_passes(
-    passes: set[RenderPass], semantic_channels: set[str] | None = None
+    passes: RenderPassSet, semantic_channels: SemanticChannelSet | None = None
 ):
     """
     Enable/disable Cycles render-passes according to the `passes` list.
@@ -2591,7 +2636,7 @@ def _configure_passes(
     _configure_semantic_aovs(layer, semantic_channels or set())
 
 
-def _configure_semantic_aovs(layer, semantic_channels: set[str]) -> None:
+def _configure_semantic_aovs(layer, semantic_channels: SemanticChannelSet) -> None:
     if not hasattr(layer, "aovs"):
         return
 
@@ -2609,7 +2654,7 @@ def _configure_semantic_aovs(layer, semantic_channels: set[str]) -> None:
 
 def _configure_compositor(
     output_dir: str,  # Directory where rendered output files will be saved
-    semantic_channels: set[str] | None = None,
+    semantic_channels: SemanticChannelSet | None = None,
     semantic_mask_threshold: float = 0.5,
 ) -> None:
     """
@@ -2911,17 +2956,17 @@ def _ensure_positive_tuple(values, expected_len: int, name: str) -> None:
 
 
 def _validate_scatter_common(
-    source: "ObjectLoader | list[ObjectLoader]",
+    source: ObjectLoaderSource,
     count: int,
     domain: "Domain",
     min_gap: float,
-    yaw_range: tuple[float, float],
+    yaw_range: Float2,
     rotation_mode: str,
-    scale_range: tuple[float, float],
+    scale_range: Float2,
     max_attempts_per_object: int,
     boundary_mode: str,
     boundary_margin: float,
-) -> tuple[list["ObjectLoader"], float, float, float, float]:
+) -> ScatterValidationResult:
     if count <= 0:
         raise ValueError("count must be > 0.")
     if not isinstance(domain, Domain):
@@ -3045,7 +3090,7 @@ def _cross_2d(o, a, b) -> float:
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
 
-def _convex_hull_2d(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+def _convex_hull_2d(points: Polygon2D) -> Polygon2D:
     pts = sorted(set((float(p[0]), float(p[1])) for p in points))
     if len(pts) <= 1:
         return pts
@@ -3062,7 +3107,7 @@ def _convex_hull_2d(points: list[tuple[float, float]]) -> list[tuple[float, floa
     return lower[:-1] + upper[:-1]
 
 
-def _polygon_signed_area(points: list[tuple[float, float]]) -> float:
+def _polygon_signed_area(points: Polygon2D) -> float:
     area = 0.0
     for i in range(len(points)):
         x1, y1 = points[i]
@@ -3071,9 +3116,7 @@ def _polygon_signed_area(points: list[tuple[float, float]]) -> float:
     return area * 0.5
 
 
-def _sample_convex_polygon(
-    points: list[tuple[float, float]], rng: random.Random
-) -> tuple[float, float]:
+def _sample_convex_polygon(points: Polygon2D, rng: random.Random) -> Float2:
     p0 = points[0]
     tris = []
     total_area = 0.0
@@ -3107,7 +3150,7 @@ def _sample_convex_polygon(
     return (x, y)
 
 
-def _point_in_convex_polygon(point: tuple[float, float], points) -> bool:
+def _point_in_convex_polygon(point: Float2, points) -> bool:
     sign = 0
     for i in range(len(points)):
         a = points[i]
@@ -3138,10 +3181,13 @@ def _distance_point_segment_2d(point, a, b) -> float:
     return math.hypot(px - cx, py - cy)
 
 
-def _distance_to_polygon_edges(point: tuple[float, float], points) -> float:
+def _distance_to_polygon_edges(point: Float2, points) -> float:
     best = float("inf")
     for i in range(len(points)):
-        best = min(best, _distance_point_segment_2d(point, points[i], points[(i + 1) % len(points)]))
+        best = min(
+            best,
+            _distance_point_segment_2d(point, points[i], points[(i + 1) % len(points)]),
+        )
     return best
 
 
@@ -3161,7 +3207,7 @@ def _points_centroid(points: list[Vector]) -> Vector:
     return total / len(points)
 
 
-def _aabb_from_points(points: list[Vector]) -> tuple[Vector, Vector]:
+def _aabb_from_points(points: list[Vector]) -> AABB:
     xs = [p.x for p in points]
     ys = [p.y for p in points]
     zs = [p.z for p in points]
@@ -3182,7 +3228,7 @@ def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
         obj_eval.to_mesh_clear()
 
 
-def _convex_hull_planes(points: list[Vector]) -> list[tuple[float, float, float, float]]:
+def _convex_hull_planes(points: list[Vector]) -> list[Float4]:
     bm = bmesh.new()
     for p in points:
         bm.verts.new(p)
