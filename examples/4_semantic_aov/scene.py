@@ -12,8 +12,8 @@ class RustySemanticScene(rv.Scene):
         rusty_material = self.import_material("./rusty_metal.blend", "RustyMetal")
 
         panel = (
-            self.create_cube("MetalPanel", size=2.0)
-            .set_scale((1.8, 0.08, 0.9))
+            self.create_sphere(radius=1)
+            .set_shading("smooth")
             .set_location((0, 0, 1))
             .set_material(rusty_material)
             .set_tags("metal_panel")
