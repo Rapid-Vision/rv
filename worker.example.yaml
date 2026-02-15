@@ -18,7 +18,7 @@ worker:
   s3:
     endpoint: localhost:9000
     path: /rv-results/
-    region: us-east-1
+    region: eu-central-1
     secure: false
     cleanup: false
     access_key: minioadmin
