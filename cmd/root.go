@@ -9,6 +9,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "rv",
 	Short: "A lightweight tool for generating labeled synthetic image datasets with just a few commands.",
+	Version: "0.1.0",
 }
 
 func Execute() {
@@ -19,4 +20,5 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
 }
