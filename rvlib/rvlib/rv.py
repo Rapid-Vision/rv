@@ -813,6 +813,7 @@ class Scene(ABC, _Serializable):
         super().__init__()
         self.passes = set()
         self.output_dir = output_dir
+        self.subdir = None
         self.objects = set()
         self.materials = set()
         self.lights = set()
@@ -1418,7 +1419,8 @@ class Scene(ABC, _Serializable):
                 semantic_mask_threshold=self.semantic_mask_threshold,
             )
         else:
-            self.subdir = str(uuid.uuid4())
+            if self.subdir is None:
+                self.subdir = str(uuid.uuid4())
             _configure_compositor(
                 os.path.join(self.output_dir, self.subdir),
                 semantic_channels=self.semantic_channels,

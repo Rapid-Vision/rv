@@ -2,6 +2,7 @@ package preview
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,13 +15,27 @@ import (
 	"github.com/Rapid-Vision/rv/internal/watcher"
 )
 
-func Preview(scriptPathArg string, cwdArg string) {
-	paths, err := utils.ResolveRuntimePaths(scriptPathArg, cwdArg)
+type Options struct {
+	ScriptPathArg string
+	CwdArg        string
+	PreviewFiles  bool
+	PreviewOut    string
+	NoWindow      bool
+	Resolution    [2]int
+	TimeLimit     *float64
+}
+
+func Preview(opts Options) {
+	paths, err := utils.ResolveRuntimePaths(opts.ScriptPathArg, opts.CwdArg)
 	if err != nil {
 		logs.Err.Fatalln("Failed to resolve paths:", err)
 	}
 	scriptPath := paths.ScriptPath
 	cwdAbs := paths.Cwd
+
+	if err := validateOptions(opts); err != nil {
+		logs.Err.Fatalln("Invalid preview options:", err)
+	}
 
 	blenderPath, err := utils.GetBlenderPath()
 	if err != nil {
@@ -48,17 +63,7 @@ func Preview(scriptPathArg string, cwdArg string) {
 	}
 
 	// Start Blender
-	cmd := exec.Command(
-		blenderPath,
-		filepath.Join(libPath, "template.blend"),
-		"--factory-startup",
-		"--python", filepath.Join(libPath, "preview.py"),
-		"--",
-		"--port", fmt.Sprintf("%d", port),
-		"--script", scriptPath,
-		"--libpath", libPath,
-		"--cwd", cwdAbs,
-	)
+	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, libPath, port)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -98,4 +103,53 @@ func Preview(scriptPathArg string, cwdArg string) {
 	}
 
 	cancel()
+}
+
+func validateOptions(opts Options) error {
+	if opts.NoWindow && !opts.PreviewFiles {
+		return errors.New("--no-window requires --preview-files")
+	}
+	if opts.PreviewFiles && opts.PreviewOut == "" {
+		return errors.New("--preview-out is required when --preview-files is enabled")
+	}
+	if opts.Resolution[0] <= 0 || opts.Resolution[1] <= 0 {
+		return errors.New("--resolution must be WIDTH,HEIGHT with positive integers")
+	}
+	if opts.TimeLimit != nil && *opts.TimeLimit <= 0 {
+		return errors.New("--time-limit must be > 0")
+	}
+	return nil
+}
+
+func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, libPath string, port int) []string {
+	args := []string{
+		filepath.Join(libPath, "template.blend"),
+		"--factory-startup",
+	}
+
+	if opts.NoWindow {
+		args = append(args, "--background")
+	}
+
+	args = append(
+		args,
+		"--python", filepath.Join(libPath, "preview.py"),
+		"--",
+		"--port", fmt.Sprintf("%d", port),
+		"--script", scriptPath,
+		"--libpath", libPath,
+		"--cwd", cwdAbs,
+		"--preview-files", fmt.Sprintf("%t", opts.PreviewFiles),
+		"--no-window", fmt.Sprintf("%t", opts.NoWindow),
+		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
+	)
+
+	if opts.PreviewFiles {
+		args = append(args, "--preview-out", opts.PreviewOut)
+	}
+	if opts.TimeLimit != nil {
+		args = append(args, "--time-limit", fmt.Sprintf("%g", *opts.TimeLimit))
+	}
+
+	return args
 }

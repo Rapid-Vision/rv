@@ -55,6 +55,16 @@ rv preview scene.py
 ```
 Don't close the preview window yet.
 
+To also export one live-updating preview sample as files:
+```bash copy
+rv preview scene.py --preview-files --preview-out ./preview_out
+```
+
+To run file-only live preview without opening Blender UI:
+```bash copy
+rv preview scene.py --preview-files --no-window --preview-out ./preview_out
+```
+
 ### Randomize the scene
 See how the preview changes on each file save.
 ```python copy setLineNumebers filename="scene.py" {2, 10}
