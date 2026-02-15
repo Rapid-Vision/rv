@@ -752,6 +752,8 @@ class Scene(ABC, _Serializable):
     objects: set["Object"]  # Registered scene objects
     materials: set["Material"]  # Registered material descriptors
     lights: set["Light"]  # Registered lights
+    semantic_channels: set[str]  # Semantic mask channels exported from shader AOVs
+    semantic_mask_threshold: float = 0.5  # Binary threshold for semantic masks
 
     object_index_counter: int = 0  # Monotonic object pass-index counter
     material_index_counter: int = 0  # Monotonic material pass-index counter
@@ -772,6 +774,8 @@ class Scene(ABC, _Serializable):
         self.materials = set()
         self.lights = set()
         self.tags = set()
+        self.semantic_channels = set()
+        self.semantic_mask_threshold = 0.5
         self.object_index_counter = 0
         self.material_index_counter = 0
         self.light_index_counter = 0
@@ -802,6 +806,24 @@ class Scene(ABC, _Serializable):
         Set a list of render passes that will be saved when rendering.
         """
         self.passes = _combine_arglist_set(passes)
+        return self
+
+    def enable_semantic_channels(self, *channels: tuple[str | list[str], ...]) -> "Scene":
+        """
+        Enable semantic shader channels to be exported as masks.
+        In Blender node graphs, write channel values to AOV outputs named `SEM_<channel>`.
+        """
+        for channel in _combine_arglist_set(channels):
+            self.semantic_channels.add(_normalize_semantic_channel(channel))
+        return self
+
+    def set_semantic_mask_threshold(self, threshold: float) -> "Scene":
+        """
+        Set threshold used when exporting binary semantic masks.
+        """
+        if threshold < 0.0 or threshold > 1.0:
+            raise ValueError("semantic mask threshold must be in [0, 1].")
+        self.semantic_mask_threshold = threshold
         return self
 
     def create_empty(self, name: str = "Empty") -> "Object":
@@ -1340,13 +1362,21 @@ class Scene(ABC, _Serializable):
         _use_cycles()
         _deselect()
         self.world._post_gen()
-        _configure_passes(self.passes)
+        _configure_passes(self.passes, self.semantic_channels)
 
         if self.output_dir is None:
-            _configure_compositor(None)
+            _configure_compositor(
+                None,
+                semantic_channels=self.semantic_channels,
+                semantic_mask_threshold=self.semantic_mask_threshold,
+            )
         else:
             self.subdir = str(uuid.uuid4())
-            _configure_compositor(os.path.join(self.output_dir, self.subdir))
+            _configure_compositor(
+                os.path.join(self.output_dir, self.subdir),
+                semantic_channels=self.semantic_channels,
+                semantic_mask_threshold=self.semantic_mask_threshold,
+            )
 
     def _render(self) -> None:
         if self.output_dir is not None:
@@ -1375,6 +1405,8 @@ class Scene(ABC, _Serializable):
                 "time_limit": self.time_limit,
                 "passes": [p.value for p in self.passes],
                 "tags": list(self.tags),
+                "semantic_channels": sorted(self.semantic_channels),
+                "semantic_mask_threshold": self.semantic_mask_threshold,
                 "objects": list(obj._get_meta() for obj in self.objects),
                 "materials": list(material._get_meta() for material in self.materials),
                 "lights": list(light._get_meta() for light in self.lights),
@@ -1547,6 +1579,19 @@ def _get_principled_bsdf_node(material: bpy.types.Material):
         if node.type == "BSDF_PRINCIPLED":
             return node
     return None
+
+
+def _normalize_semantic_channel(channel: str) -> str:
+    normalized = "".join(ch.lower() if ch.isalnum() else "_" for ch in channel).strip(
+        "_"
+    )
+    if normalized == "":
+        raise ValueError("semantic channel must contain at least one alphanumeric char.")
+    return normalized
+
+
+def _semantic_aov_name(channel: str) -> str:
+    return f"SEM_{_normalize_semantic_channel(channel)}"
 
 
 class BasicMaterial(Material):
@@ -2519,7 +2564,9 @@ def _set_time_limit(time_limit: float):
     bpy.context.scene.cycles.time_limit = time_limit
 
 
-def _configure_passes(passes: set[RenderPass]):
+def _configure_passes(
+    passes: set[RenderPass], semantic_channels: set[str] | None = None
+):
     """
     Enable/disable Cycles render-passes according to the `passes` list.
     """
@@ -2541,9 +2588,29 @@ def _configure_passes(passes: set[RenderPass]):
     # We always need Object-Index for segmentation masks
     layer.use_pass_object_index = True
 
+    _configure_semantic_aovs(layer, semantic_channels or set())
+
+
+def _configure_semantic_aovs(layer, semantic_channels: set[str]) -> None:
+    if not hasattr(layer, "aovs"):
+        return
+
+    for aov in list(layer.aovs):
+        aov_name = getattr(aov, "name", "")
+        if aov_name.startswith("SEM_"):
+            layer.aovs.remove(aov)
+
+    for channel in sorted(semantic_channels):
+        aov = layer.aovs.add()
+        aov.name = _semantic_aov_name(channel)
+        if hasattr(aov, "type"):
+            aov.type = "VALUE"
+
 
 def _configure_compositor(
     output_dir: str,  # Directory where rendered output files will be saved
+    semantic_channels: set[str] | None = None,
+    semantic_mask_threshold: float = 0.5,
 ) -> None:
     """
     Configure compositor nodes in Blender 5 for saving render outputs.
@@ -2580,12 +2647,33 @@ def _configure_compositor(
         color_depth="16",
     )
 
+    semantic_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
+    semantic_file_out_node.location = (2 * dx, -700)
+    _reset_file_output_node(semantic_file_out_node, output_dir)
+    _configure_file_output_node_format(
+        semantic_file_out_node,
+        file_format="PNG",
+        color_mode="BW",
+        color_depth="16",
+    )
+
     index_ob = _find_socket_by_name(render_layers.outputs, "Object Index")
     index_ma = _find_socket_by_name(render_layers.outputs, "Material Index")
     index_sockets = [index_ob, index_ma]
 
+    semantic_outputs: dict[str, typing.Any] = {}
+    semantic_names = {
+        _normalize_socket_name(_semantic_aov_name(channel))
+        for channel in (semantic_channels or set())
+    }
+
     for output in render_layers.outputs:
         if output in index_sockets:
+            continue
+
+        normalized_name = _normalize_socket_name(output.name)
+        if normalized_name in semantic_names:
+            semantic_outputs[output.name] = output
             continue
 
         slot_name = output.name
@@ -2641,6 +2729,28 @@ def _configure_compositor(
                 )
                 tree.links.new(index_output, preview_input)
                 tree.links.new(preview_output, preview_file_input)
+
+    for socket_name, socket in semantic_outputs.items():
+        threshold = tree.nodes.new(type="ShaderNodeMath")
+        threshold.operation = "GREATER_THAN"
+        threshold.inputs[1].default_value = semantic_mask_threshold
+        threshold.location = (dx, -700 - dy)
+        threshold.hide = True
+        tree.links.new(socket, threshold.inputs[0])
+
+        channel = socket_name.removeprefix("SEM_")
+        mask_slot_name = f"Mask_{channel}"
+        sem_input = _add_file_output_item(
+            semantic_file_out_node,
+            mask_slot_name,
+            threshold.outputs[0],
+        )
+        _configure_file_output_item(
+            semantic_file_out_node,
+            mask_slot_name,
+            file_path=mask_slot_name,
+        )
+        tree.links.new(threshold.outputs[0], sem_input)
 
 
 def _get_compositor_tree(scene: bpy.types.Scene):
