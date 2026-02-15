@@ -31,7 +31,7 @@ go install github.com/Rapid-Vision/rv@latest
 
 <Step title="Create scene script">
 
-```python [scene.py]
+```python:line-numbers [scene.py]
 import rv
 
 class BasicScene(rv.Scene):
@@ -68,9 +68,9 @@ Don't close the preview window yet.
 <Step title="Randomize the scene">
 
 See how the preview changes on each file save.
-```python{2,10} [scene.py]
+```python:line-numbers [scene.py]
 import rv
-from random import uniform
+from random import uniform # [!code ++]
 
 class BasicScene(rv.Scene):
     def generate(self):
@@ -78,7 +78,7 @@ class BasicScene(rv.Scene):
         cube = (
             self.create_cube().set_location((1, 0, 0.5)).set_scale(0.5).set_tags("cube")
         )
-        cube.rotate_around_axis(rv.mathutils.Vector((0, 0, 1)), uniform(0, 360))
+        cube.rotate_around_axis(rv.mathutils.Vector((0, 0, 1)), uniform(0, 360)) # [!code ++]
         sphere = (
             self.create_sphere()
             .set_location((-1, 0, 1))
@@ -138,3 +138,8 @@ For more information view the [API reference](/api/).
 </Step>
 
 </Steps>
+
+## Related pages
+
+- [Build from source](/tutorial/github)
+- [API reference](/api/)

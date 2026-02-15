@@ -7,6 +7,9 @@ hero:
 
     actions:
     - theme: brand
+      text: Start Tutorial
+      link: /tutorial/
+    - theme: brand
       text: API Reference
       link: /api
 ---
