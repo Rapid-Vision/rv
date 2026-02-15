@@ -10,8 +10,10 @@ class HullScatterScene(rv.Scene):
         target = self.create_empty().set_location((0, 0, 0))
         seed = 7
 
-        container = self.create_cube(name="Container", size=14).set_scale(
-            (1.2, 0.8, 0.6)
+        container = (
+            self.create_cube(name="Container", size=14)
+            .set_scale((1.2, 0.8, 0.6))
+            .hide(view="wireframe")
         )
         domain = rv.Domain.convex_hull(container, project_2d=False)
 

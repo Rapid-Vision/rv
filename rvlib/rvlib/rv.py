@@ -2035,6 +2035,31 @@ class Object(_Serializable):
         self.obj.show_name = show
         return self
 
+    def hide(self, view: Literal["wireframe", "none"] = "wireframe"):
+        """
+        Hide object from render output while controlling preview visibility.
+        """
+        self.obj.hide_render = True
+        # Also disable Cycles visibility channels to ensure the object never
+        # contributes to rendered outputs in any pass.
+        self.obj.visible_camera = False
+        self.obj.visible_diffuse = False
+        self.obj.visible_glossy = False
+        self.obj.visible_transmission = False
+        self.obj.visible_volume_scatter = False
+        self.obj.visible_shadow = False
+
+        if view == "wireframe":
+            self.obj.hide_set(False)
+            self.obj.hide_viewport = False
+            self.obj.display_type = "WIRE"
+        elif view == "none":
+            self.obj.hide_set(True)
+            self.obj.hide_viewport = True
+        else:
+            raise ValueError("view must be one of: wireframe, none.")
+        return self
+
     def _get_meta(self) -> dict:
         res = super()._get_meta()
         res.update(
