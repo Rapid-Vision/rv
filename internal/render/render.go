@@ -1,12 +1,15 @@
 package render
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
+	"strings"
 	"syscall"
 
 	"github.com/Rapid-Vision/rv/internal/logs"
@@ -29,6 +32,24 @@ type RenderOptions struct {
 
 type RenderResult struct {
 	OutputDir string
+}
+
+type datasetMeta struct {
+	Resolution   [2]int             `json:"resolution"`
+	RenderParams datasetRenderParms `json:"render_params"`
+	SampleFiles  []string           `json:"sample_files"`
+}
+
+type datasetRenderParms struct {
+	ScriptPath            string   `json:"script_path"`
+	Cwd                   string   `json:"cwd"`
+	Number                int      `json:"number"`
+	Procs                 int      `json:"procs"`
+	TimeLimit             *float64 `json:"time_limit,omitempty"`
+	MaxSamples            *int     `json:"max_samples,omitempty"`
+	MinSamples            *int     `json:"min_samples,omitempty"`
+	NoiseThresholdEnabled *bool    `json:"noise_threshold_enabled,omitempty"`
+	NoiseThreshold        *float64 `json:"noise_threshold,omitempty"`
 }
 
 func Render(opts RenderOptions) (RenderResult, error) {
@@ -136,6 +157,9 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if renderErr != nil {
 		return RenderResult{}, renderErr
 	}
+	if err := writeDatasetMetadata(seqOutDir, opts); err != nil {
+		return RenderResult{}, fmt.Errorf("failed to write dataset metadata: %w", err)
+	}
 
 	return RenderResult{
 		OutputDir: seqOutDir,
@@ -204,4 +228,85 @@ func validateOptionalRenderOptions(opts RenderOptions) error {
 		}
 	}
 	return nil
+}
+
+func writeDatasetMetadata(seqOutDir string, opts RenderOptions) error {
+	if err := os.MkdirAll(seqOutDir, os.ModePerm); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(seqOutDir)
+	if err != nil {
+		return err
+	}
+
+	samples := make([]string, 0)
+	sampleFiles := make([]string, 0)
+	haveSampleFiles := false
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		samplePath := filepath.Join(seqOutDir, entry.Name())
+		if !haveSampleFiles {
+			files, err := listFilesRecursive(samplePath)
+			if err != nil {
+				return err
+			}
+			sampleFiles = files
+			haveSampleFiles = true
+		}
+		samples = append(samples, entry.Name())
+	}
+	slices.SortFunc(samples, strings.Compare)
+
+	meta := datasetMeta{
+		Resolution: opts.Resolution,
+		RenderParams: datasetRenderParms{
+			ScriptPath:            opts.ScriptPath,
+			Cwd:                   opts.Cwd,
+			Number:                opts.ImageNum,
+			Procs:                 opts.Procs,
+			TimeLimit:             opts.TimeLimit,
+			MaxSamples:            opts.MaxSamples,
+			MinSamples:            opts.MinSamples,
+			NoiseThresholdEnabled: opts.NoiseThresholdEnabled,
+			NoiseThreshold:        opts.NoiseThreshold,
+		},
+		SampleFiles: sampleFiles,
+	}
+
+	f, err := os.Create(filepath.Join(seqOutDir, "_meta.json"))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "    ")
+	return enc.Encode(meta)
+}
+
+func listFilesRecursive(root string) ([]string, error) {
+	files := make([]string, 0)
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.Sort(files)
+	return files, nil
 }
