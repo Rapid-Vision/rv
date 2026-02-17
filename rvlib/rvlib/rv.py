@@ -36,6 +36,7 @@ class BasicScene(rv.Scene):
 """
 
 from abc import ABC, abstractmethod
+import numbers
 import typing
 from mathutils import Vector
 from typing import Literal, Union, Optional, TypeAlias
@@ -71,7 +72,9 @@ CellCoords: TypeAlias = tuple[int, ...]
 RenderPassSet: TypeAlias = set["RenderPass"]
 TagSet: TypeAlias = set[str]
 SemanticChannelSet: TypeAlias = set[str]
-ObjectLoaderSource: TypeAlias = Union["ObjectLoader", list["ObjectLoader"]]
+ObjectLoaderSource: TypeAlias = Union[
+    "ObjectLoader", list["ObjectLoader"], tuple["ObjectLoader", ...]
+]
 ScatterValidationResult: TypeAlias = tuple[
     list["ObjectLoader"], float, float, float, float
 ]
@@ -1889,16 +1892,18 @@ class Object(_Serializable):
             raise TypeError()
         return self
 
-    def set_scale(self, scale: Union[mathutils.Vector, typing.Sequence[float], float]):
+    def set_scale(
+        self, scale: Union[mathutils.Vector, typing.Sequence[float], float, int]
+    ):
         """
         Set the scale of the object.
 
-        If `scale` is a single float, all axes are set to that value.
+        If `scale` is a single numeric value, all axes are set to that value.
         If `scale` is a sequence or Vector of length 3, each axis is set individually.
         """
         if isinstance(scale, mathutils.Vector):
             self.obj.scale = scale
-        elif isinstance(scale, float):
+        elif isinstance(scale, numbers.Real) and not isinstance(scale, bool):
             self.obj.scale = mathutils.Vector((scale, scale, scale))
         elif len(scale) == 3:
             self.obj.scale = mathutils.Vector(scale)
@@ -3026,12 +3031,16 @@ def _validate_scatter_common(
     loaders: list[ObjectLoader]
     if isinstance(source, ObjectLoader):
         loaders = [source]
-    elif isinstance(source, list) and len(source) > 0:
+    elif isinstance(source, (list, tuple)) and len(source) > 0:
         if not all(isinstance(loader, ObjectLoader) for loader in source):
-            raise TypeError("source list must contain only ObjectLoader instances.")
-        loaders = source
+            raise TypeError(
+                "source sequence must contain only ObjectLoader instances."
+            )
+        loaders = list(source)
     else:
-        raise TypeError("source must be ObjectLoader or non-empty list[ObjectLoader].")
+        raise TypeError(
+            "source must be ObjectLoader or non-empty sequence[ObjectLoader]."
+        )
 
     for loader in loaders:
         if getattr(loader.obj, "data", None) is None:
@@ -3407,7 +3416,7 @@ def _load_all_objects(path: str):
 def _combine_arglist_set(args):
     result = set()
     for p in args:
-        if isinstance(p, list):
+        if isinstance(p, (list, tuple, set, frozenset)):
             result = result.union(set(p))
         else:
             result.add(p)
