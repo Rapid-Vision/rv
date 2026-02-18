@@ -15,6 +15,7 @@ func TestLoadWorkerConfig(t *testing.T) {
 	content := []byte(`worker:
   worker_name: render-1
   task_name: render
+  zip: true
   renderer:
     max_procs: 5
   rtasks:
@@ -45,6 +46,9 @@ func TestLoadWorkerConfig(t *testing.T) {
 	}
 	if cfg.WorkerName != "render-1" || cfg.TaskName != "render" {
 		t.Fatalf("unexpected worker identity: %#v", cfg)
+	}
+	if !cfg.Zip {
+		t.Fatal("zip should be enabled")
 	}
 	if cfg.RTasks.PollInterval != 3*time.Second {
 		t.Fatalf("poll interval = %v", cfg.RTasks.PollInterval)
@@ -94,6 +98,9 @@ func TestLoadWorkerConfig_Defaults(t *testing.T) {
 	}
 	if cfg.Renderer.MaxProcs != 1 {
 		t.Fatalf("max_procs = %d", cfg.Renderer.MaxProcs)
+	}
+	if cfg.Zip {
+		t.Fatal("zip should default to false")
 	}
 	if cfg.Directories.Output != "./out" {
 		t.Fatalf("output = %q", cfg.Directories.Output)

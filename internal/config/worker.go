@@ -14,6 +14,7 @@ import (
 type WorkerConfig struct {
 	WorkerName string `mapstructure:"worker_name"`
 	TaskName   string `mapstructure:"task_name"`
+	Zip        bool   `mapstructure:"zip"`
 	Renderer   struct {
 		MaxProcs int `mapstructure:"max_procs"`
 	} `mapstructure:"renderer"`
@@ -54,6 +55,7 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	v.SetDefault("worker.rtasks.poll_interval", "2s")
 	v.SetDefault("worker.rtasks.heartbeat_interval", "10s")
 	v.SetDefault("worker.renderer.max_procs", 1)
+	v.SetDefault("worker.zip", false)
 	v.SetDefault("worker.directories.output", "./out")
 	v.SetDefault("worker.directories.cleanup_policy", "keep")
 	v.SetDefault("worker.s3.endpoint", "s3.amazonaws.com")
@@ -71,6 +73,7 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	cfg := WorkerConfig{
 		WorkerName: strings.TrimSpace(v.GetString("worker.worker_name")),
 		TaskName:   strings.TrimSpace(v.GetString("worker.task_name")),
+		Zip:        v.GetBool("worker.zip"),
 	}
 	cfg.RTasks.URL = strings.TrimSpace(v.GetString("worker.rtasks.url"))
 	cfg.RTasks.Token = strings.TrimSpace(v.GetString("worker.rtasks.token"))

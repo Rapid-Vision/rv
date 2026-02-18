@@ -435,10 +435,33 @@ func (r *Runner) HandleWorkerTask(ctx context.Context, client *rpcclient.RPCClie
 	if strings.TrimSpace(taskWorkUUID) != "" {
 		resultOutput["task_uuid"] = taskWorkUUID
 	}
+	if cfg.Zip {
+		submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 65, "zipping dataset", nil)
+		archivePath, archiveErr := createDatasetArchive(renderResult.OutputDir)
+		if archiveErr != nil {
+			cleanupErr := runCleanup()
+			result := map[string]any{
+				"error": "dataset zipping failed",
+				"output": map[string]any{
+					"local_dir": renderResult.OutputDir,
+				},
+				"details": map[string]any{
+					"message": archiveErr.Error(),
+				},
+			}
+			addTaskWorkspaceMeta(result)
+			if cleanupErr != nil {
+				result["cleanup_warning"] = cleanupErr.Error()
+			}
+			submitTaskResult(ctx, client, workerUUID, taskUUID, dispatchToken, "failed", result)
+			return archiveErr
+		}
+		resultOutput["zip_file"] = archivePath
+	}
 
 	targetS3URL := strings.TrimSpace(cfg.S3.OutputURL)
 	if targetS3URL != "" {
-		submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 70, "uploading dataset", nil)
+		submitTaskProgress(ctx, client, workerUUID, taskUUID, dispatchToken, 75, "uploading dataset", nil)
 		uploadedS3URL, taskS3URL, uploadErr := r.uploadRenderedOutput(ctx, cfg, task.Id, targetS3URL, renderResult.OutputDir)
 		if uploadErr != nil {
 			cleanupErr := runCleanup()
