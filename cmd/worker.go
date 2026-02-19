@@ -70,13 +70,12 @@ func validateWorkerConfig(cfg *config.WorkerConfig) error {
 	default:
 		return errors.New("worker.directories.cleanup_policy must be either \"keep\" or \"cleanup\"")
 	}
-	resolvedS3URL, errS3URL := config.ResolveWorkerS3BaseURL(cfg.S3.OutputURL, cfg.S3.Path)
+	resolvedS3URL, errS3URL := config.ResolveWorkerS3BaseURL(cfg.S3.Path)
 	if errS3URL != nil {
 		return errS3URL
 	}
-	cfg.S3.OutputURL = resolvedS3URL
-	if cfg.S3.OutputURL != "" && strings.TrimSpace(cfg.S3.Endpoint) == "" {
-		return errors.New("worker.s3.endpoint is required when worker.s3.output_url is set")
+	if resolvedS3URL != "" && strings.TrimSpace(cfg.S3.Endpoint) == "" {
+		return errors.New("worker.s3.endpoint is required when worker.s3.path is set")
 	}
 	if (strings.TrimSpace(cfg.S3.AccessKeyID) == "") != (strings.TrimSpace(cfg.S3.SecretKey) == "") {
 		return errors.New("worker.s3.access_key and worker.s3.secret_key must be set together")
