@@ -78,6 +78,7 @@ ObjectLoaderSource: TypeAlias = Union[
 ScatterValidationResult: TypeAlias = tuple[
     list["ObjectLoader"], float, float, float, float
 ]
+ObjectStats: TypeAlias = dict[str, JSONSerializable]
 
 
 class RenderPass(Enum):
@@ -387,6 +388,21 @@ class Domain:
         self.data = data
         self.dimension = dimension
 
+    def inset(self, margin: float) -> "Domain":
+        """
+        Return a new domain shrunk inward by `margin`.
+        """
+        margin = float(margin)
+        if margin < 0:
+            raise ValueError("margin must be >= 0.")
+
+        data = dict(self.data)
+        data["inset_margin"] = float(data.get("inset_margin", 0.0)) + margin
+        return Domain(self.kind, data, self.dimension)
+
+    def _effective_inset_margin(self) -> float:
+        return float(self.data.get("inset_margin", 0.0))
+
     @staticmethod
     def rect(
         center: Float2 = (0.0, 0.0),  # XY center of the rectangle
@@ -495,14 +511,20 @@ class Domain:
         )
 
     def sample_point(self, rng: random.Random) -> mathutils.Vector:  # Random generator
+        inset_margin = self._effective_inset_margin()
+
         if self.kind == "rect":
             cx, cy = self.data["center"]
             sx, sy = self.data["size"]
+            half_x = sx * 0.5 - inset_margin
+            half_y = sy * 0.5 - inset_margin
+            if half_x <= 0 or half_y <= 0:
+                raise ValueError("domain inset is too large to sample from rect.")
             z = self.data["z"]
             return Vector(
                 (
-                    rng.uniform(cx - sx * 0.5, cx + sx * 0.5),
-                    rng.uniform(cy - sy * 0.5, cy + sy * 0.5),
+                    rng.uniform(cx - half_x, cx + half_x),
+                    rng.uniform(cy - half_y, cy + half_y),
                     z,
                 )
             )
@@ -510,38 +532,59 @@ class Domain:
         if self.kind == "ellipse":
             cx, cy = self.data["center"]
             rx, ry = self.data["radii"]
+            rx_in = rx - inset_margin
+            ry_in = ry - inset_margin
+            if rx_in <= 0 or ry_in <= 0:
+                raise ValueError("domain inset is too large to sample from ellipse.")
             z = self.data["z"]
             theta = rng.uniform(0.0, 2.0 * math.pi)
             rr = math.sqrt(rng.random())
             return Vector(
-                (cx + rr * rx * math.cos(theta), cy + rr * ry * math.sin(theta), z)
+                (
+                    cx + rr * rx_in * math.cos(theta),
+                    cy + rr * ry_in * math.sin(theta),
+                    z,
+                )
             )
 
         if self.kind in {"polygon", "hull2d"}:
             points = self.data["points"]
             z = self.data["z"]
-            x, y = _sample_convex_polygon(points, rng)
-            return Vector((x, y, z))
+            for _ in range(512):
+                x, y = _sample_convex_polygon(points, rng)
+                p = Vector((x, y, z))
+                if self.contains_point(p, margin=0.0):
+                    return p
+            raise ValueError(
+                "domain inset is too large to sample from polygon/hull2d."
+            )
 
         if self.kind == "box":
             cx, cy, cz = self.data["center"]
             sx, sy, sz = self.data["size"]
+            hx = sx * 0.5 - inset_margin
+            hy = sy * 0.5 - inset_margin
+            hz = sz * 0.5 - inset_margin
+            if hx <= 0 or hy <= 0 or hz <= 0:
+                raise ValueError("domain inset is too large to sample from box.")
             return Vector(
                 (
-                    rng.uniform(cx - sx * 0.5, cx + sx * 0.5),
-                    rng.uniform(cy - sy * 0.5, cy + sy * 0.5),
-                    rng.uniform(cz - sz * 0.5, cz + sz * 0.5),
+                    rng.uniform(cx - hx, cx + hx),
+                    rng.uniform(cy - hy, cy + hy),
+                    rng.uniform(cz - hz, cz + hz),
                 )
             )
 
         if self.kind == "cylinder":
             cx, cy, cz = self.data["center"]
-            radius = self.data["radius"]
-            height = self.data["height"]
+            radius = self.data["radius"] - inset_margin
+            half_h = self.data["height"] * 0.5 - inset_margin
+            if radius <= 0 or half_h <= 0:
+                raise ValueError("domain inset is too large to sample from cylinder.")
             axis = self.data["axis"]
             theta = rng.uniform(0.0, 2.0 * math.pi)
             rr = math.sqrt(rng.random()) * radius
-            h = rng.uniform(-height * 0.5, height * 0.5)
+            h = rng.uniform(-half_h, half_h)
             if axis == "X":
                 return Vector(
                     (cx + h, cy + rr * math.cos(theta), cz + rr * math.sin(theta))
@@ -557,13 +600,18 @@ class Domain:
         if self.kind == "ellipsoid":
             cx, cy, cz = self.data["center"]
             rx, ry, rz = self.data["radii"]
+            rx_in = rx - inset_margin
+            ry_in = ry - inset_margin
+            rz_in = rz - inset_margin
+            if rx_in <= 0 or ry_in <= 0 or rz_in <= 0:
+                raise ValueError("domain inset is too large to sample from ellipsoid.")
             direction = _random_unit_vector(rng)
             radial = rng.random() ** (1.0 / 3.0)
             return Vector(
                 (
-                    cx + direction.x * rx * radial,
-                    cy + direction.y * ry * radial,
-                    cz + direction.z * rz * radial,
+                    cx + direction.x * rx_in * radial,
+                    cy + direction.y * ry_in * radial,
+                    cz + direction.z * rz_in * radial,
                 )
             )
 
@@ -591,6 +639,7 @@ class Domain:
     ) -> bool:
         if margin < 0:
             raise ValueError("margin must be >= 0.")
+        margin = float(margin) + float(self.data.get("inset_margin", 0.0))
 
         if self.kind == "rect":
             cx, cy = self.data["center"]
@@ -680,20 +729,67 @@ class Domain:
 
         raise ValueError(f"Unsupported domain kind: {self.kind}")
 
+    def contains_object(
+        self,
+        obj: "Object",  # Object to validate against this domain
+        margin: float = 0.0,  # Additional inset margin
+        mode: Literal["aabb", "mesh"] = "mesh",  # Containment strategy
+    ) -> bool:
+        """
+        Check whether an object is fully contained within this domain.
+        """
+        if not isinstance(obj, Object):
+            raise TypeError("obj must be an instance of Object.")
+        if margin < 0:
+            raise ValueError("margin must be >= 0.")
+        if mode not in {"aabb", "mesh"}:
+            raise ValueError("mode must be one of: aabb, mesh.")
+
+        if mode == "aabb":
+            bounds = obj.get_bounds(space="world")
+            pmin = Vector(bounds["min"])
+            pmax = Vector(bounds["max"])
+            corners = [
+                Vector((x, y, z))
+                for x in (pmin.x, pmax.x)
+                for y in (pmin.y, pmax.y)
+                for z in (pmin.z, pmax.z)
+            ]
+            return all(self.contains_point(corner, margin=margin) for corner in corners)
+
+        points = _get_object_world_vertices(obj.obj)
+        if len(points) == 0:
+            bounds = obj.get_bounds(space="world")
+            pmin = Vector(bounds["min"])
+            pmax = Vector(bounds["max"])
+            points = [
+                Vector((x, y, z))
+                for x in (pmin.x, pmax.x)
+                for y in (pmin.y, pmax.y)
+                for z in (pmin.z, pmax.z)
+            ]
+        return all(self.contains_point(point, margin=margin) for point in points)
+
     def aabb(self) -> AABB:
+        inset_margin = self._effective_inset_margin()
+
         if self.kind == "rect":
             cx, cy = self.data["center"]
             sx, sy = self.data["size"]
+            half_x = max(0.0, sx * 0.5 - inset_margin)
+            half_y = max(0.0, sy * 0.5 - inset_margin)
             z = self.data["z"]
-            return Vector((cx - sx * 0.5, cy - sy * 0.5, z)), Vector(
-                (cx + sx * 0.5, cy + sy * 0.5, z)
+            return Vector((cx - half_x, cy - half_y, z)), Vector(
+                (cx + half_x, cy + half_y, z)
             )
 
         if self.kind == "ellipse":
             cx, cy = self.data["center"]
             rx, ry = self.data["radii"]
+            rx_in = max(0.0, rx - inset_margin)
+            ry_in = max(0.0, ry - inset_margin)
             z = self.data["z"]
-            return Vector((cx - rx, cy - ry, z)), Vector((cx + rx, cy + ry, z))
+            return Vector((cx - rx_in, cy - ry_in, z)), Vector((cx + rx_in, cy + ry_in, z))
 
         if self.kind in {"polygon", "hull2d"}:
             xs = [p[0] for p in self.data["points"]]
@@ -704,14 +800,17 @@ class Domain:
         if self.kind == "box":
             cx, cy, cz = self.data["center"]
             sx, sy, sz = self.data["size"]
-            return Vector((cx - sx * 0.5, cy - sy * 0.5, cz - sz * 0.5)), Vector(
-                (cx + sx * 0.5, cy + sy * 0.5, cz + sz * 0.5)
+            hx = max(0.0, sx * 0.5 - inset_margin)
+            hy = max(0.0, sy * 0.5 - inset_margin)
+            hz = max(0.0, sz * 0.5 - inset_margin)
+            return Vector((cx - hx, cy - hy, cz - hz)), Vector(
+                (cx + hx, cy + hy, cz + hz)
             )
 
         if self.kind == "cylinder":
             cx, cy, cz = self.data["center"]
-            r = self.data["radius"]
-            h = self.data["height"] * 0.5
+            r = max(0.0, self.data["radius"] - inset_margin)
+            h = max(0.0, self.data["height"] * 0.5 - inset_margin)
             axis = self.data["axis"]
             if axis == "X":
                 return Vector((cx - h, cy - r, cz - r)), Vector(
@@ -726,8 +825,11 @@ class Domain:
         if self.kind == "ellipsoid":
             cx, cy, cz = self.data["center"]
             rx, ry, rz = self.data["radii"]
-            return Vector((cx - rx, cy - ry, cz - rz)), Vector(
-                (cx + rx, cy + ry, cz + rz)
+            rx_in = max(0.0, rx - inset_margin)
+            ry_in = max(0.0, ry - inset_margin)
+            rz_in = max(0.0, rz - inset_margin)
+            return Vector((cx - rx_in, cy - ry_in, cz - rz_in)), Vector(
+                (cx + rx_in, cy + ry_in, cz + rz_in)
             )
 
         if self.kind == "hull3d":
@@ -1098,6 +1200,55 @@ class Scene(ABC, _Serializable):
         """
         path = str(pathlib.Path(blendfile).expanduser())
         return ImportedMaterial(filepath=path, material_name=material_name)
+
+    def inspect_object(
+        self,
+        loader_or_obj: Union["ObjectLoader", "Object"],  # Object or loader to inspect
+        applied_scale: bool = True,  # Include object scale in reported local dimensions
+    ) -> ObjectStats:
+        """
+        Inspect geometric stats for a loader/object without manual .blend inspection.
+        """
+        temp_obj = None
+        if isinstance(loader_or_obj, ObjectLoader):
+            temp_obj = loader_or_obj.create_instance(register_object=False)
+            obj = temp_obj
+        elif isinstance(loader_or_obj, Object):
+            obj = loader_or_obj
+        else:
+            raise TypeError("loader_or_obj must be ObjectLoader or Object.")
+
+        try:
+            dims_world = obj.get_dimensions(space="world")
+            dims_local = obj.get_dimensions(space="local")
+            if applied_scale:
+                dims_local_out = (
+                    dims_local[0] * float(obj.obj.scale.x),
+                    dims_local[1] * float(obj.obj.scale.y),
+                    dims_local[2] * float(obj.obj.scale.z),
+                )
+            else:
+                dims_local_out = dims_local
+
+            stats: ObjectStats = {
+                "name": str(obj.obj.name),
+                "type": str(obj.obj.type),
+                "dimensions_world": dims_world,
+                "dimensions_local": dims_local_out,
+                "bounds_world": obj.get_bounds(space="world"),
+                "bounds_local": obj.get_bounds(space="local"),
+                "scale": tuple(float(v) for v in obj.obj.scale),
+            }
+
+            inspected = self.custom_meta.get("inspected_objects", [])
+            if not isinstance(inspected, list):
+                inspected = [inspected]
+            inspected.append(stats)
+            self.custom_meta["inspected_objects"] = inspected
+            return stats
+        finally:
+            if temp_obj is not None:
+                _remove_blender_object(temp_obj.obj)
 
     def scatter_by_sphere(
         self,
@@ -2063,6 +2214,129 @@ class Object(_Serializable):
             self.obj.hide_viewport = True
         else:
             raise ValueError("view must be one of: wireframe, none.")
+        return self
+
+    def get_dimensions(
+        self,
+        space: Literal["world", "local"] = "world",  # Coordinate space for dimensions
+    ) -> Float3:
+        """
+        Get object dimensions (axis-aligned extents) in world or local space.
+        """
+        if space == "world":
+            dims = self.obj.dimensions
+            return (float(dims.x), float(dims.y), float(dims.z))
+        if space != "local":
+            raise ValueError("space must be one of: world, local.")
+
+        points = _get_object_local_vertices(self.obj)
+        if len(points) == 0:
+            points = [Vector(corner) for corner in getattr(self.obj, "bound_box", [])]
+        if len(points) == 0:
+            dims = self.obj.dimensions
+            sx, sy, sz = self.obj.scale
+            if abs(sx) < 1e-9 or abs(sy) < 1e-9 or abs(sz) < 1e-9:
+                return (float(dims.x), float(dims.y), float(dims.z))
+            return (float(dims.x / sx), float(dims.y / sy), float(dims.z / sz))
+
+        pmin, pmax = _aabb_from_points(points)
+        size = pmax - pmin
+        return (float(size.x), float(size.y), float(size.z))
+
+    def get_bounds(
+        self,
+        space: Literal["world", "local"] = "world",  # Coordinate space for bounds
+    ) -> dict[str, Float3]:
+        """
+        Get axis-aligned bounds in world or local space.
+        """
+        if space == "world":
+            points = _get_object_world_vertices(self.obj)
+            if len(points) == 0:
+                points = [
+                    self.obj.matrix_world @ Vector(corner)
+                    for corner in getattr(self.obj, "bound_box", [])
+                ]
+        elif space == "local":
+            points = _get_object_local_vertices(self.obj)
+            if len(points) == 0:
+                points = [Vector(corner) for corner in getattr(self.obj, "bound_box", [])]
+        else:
+            raise ValueError("space must be one of: world, local.")
+
+        if len(points) == 0:
+            origin = Vector((0.0, 0.0, 0.0))
+            return {"min": tuple(origin), "max": tuple(origin), "center": tuple(origin), "size": tuple(origin)}
+
+        pmin, pmax = _aabb_from_points(points)
+        center = (pmin + pmax) * 0.5
+        size = pmax - pmin
+        return {
+            "min": (float(pmin.x), float(pmin.y), float(pmin.z)),
+            "max": (float(pmax.x), float(pmax.y), float(pmax.z)),
+            "center": (float(center.x), float(center.y), float(center.z)),
+            "size": (float(size.x), float(size.y), float(size.z)),
+        }
+
+    def add_rigidbody(
+        self,
+        mode: Literal["box", "sphere", "hull", "mesh", "capsule", "cylinder", "cone"] = "hull",
+        body_type: Literal["ACTIVE", "PASSIVE"] = "ACTIVE",
+        mass: float = 1.0,
+        friction: float = 0.5,
+        restitution: float = 0.0,
+        linear_damping: float = 0.04,
+        angular_damping: float = 0.1,
+    ) -> "Object":
+        """
+        Add or update rigid-body settings for this object.
+        """
+        shape_map = {
+            "box": "BOX",
+            "sphere": "SPHERE",
+            "hull": "CONVEX_HULL",
+            "mesh": "MESH",
+            "capsule": "CAPSULE",
+            "cylinder": "CYLINDER",
+            "cone": "CONE",
+        }
+        if mode not in shape_map:
+            raise ValueError(
+                "mode must be one of: box, sphere, hull, mesh, capsule, cylinder, cone."
+            )
+        if self.obj.type != "MESH":
+            raise TypeError("Rigid body is supported only for mesh objects.")
+        _ensure_rigidbody_world()
+        self._select_for_shading_ops()
+        if self.obj.rigid_body is None:
+            bpy.ops.rigidbody.object_add(type=body_type)
+
+        rb = self.obj.rigid_body
+        rb.type = body_type
+        rb.collision_shape = shape_map[mode]
+        rb.mass = max(float(mass), 1e-6)
+        rb.friction = float(friction)
+        rb.restitution = float(restitution)
+        rb.linear_damping = float(linear_damping)
+        rb.angular_damping = float(angular_damping)
+        if hasattr(rb, "use_margin"):
+            rb.use_margin = True
+        if hasattr(rb, "collision_margin"):
+            rb.collision_margin = max(0.0, min(self.get_dimensions("world")) * 0.01)
+        return self
+
+    def remove_rigidbody(self, keep_transform: bool = True) -> "Object":
+        """
+        Remove rigid body from this object if present.
+        """
+        if self.obj.rigid_body is None:
+            return self
+
+        matrix = self.obj.matrix_world.copy()
+        self._select_for_shading_ops()
+        bpy.ops.rigidbody.object_remove()
+        if keep_transform:
+            self.obj.matrix_world = matrix
         return self
 
     def _get_meta(self) -> dict:
@@ -3114,6 +3388,74 @@ def _remove_blender_object(obj: bpy.types.Object) -> None:
         pass
 
 
+def _ensure_rigidbody_world() -> None:
+    scene = bpy.context.scene
+    if scene.rigidbody_world is None:
+        bpy.ops.rigidbody.world_add()
+
+
+def _configure_rigidbody_world(
+    settle_frames: int, substeps: int, time_scale: float
+) -> tuple[int, int]:
+    _ensure_rigidbody_world()
+    scene = bpy.context.scene
+    rbw = scene.rigidbody_world
+    if rbw is None:
+        raise RuntimeError("Failed to initialize rigid body world.")
+
+    start_frame = int(scene.frame_start)
+    frame_count = max(1, int(settle_frames))
+    end_frame = start_frame + frame_count - 1
+    scene.frame_set(start_frame)
+    if hasattr(scene, "sync_mode"):
+        scene.sync_mode = "NONE"
+    if hasattr(rbw, "time_scale"):
+        rbw.time_scale = float(time_scale)
+    if hasattr(rbw, "substeps_per_frame"):
+        rbw.substeps_per_frame = max(1, int(substeps))
+    if hasattr(rbw, "solver_iterations"):
+        rbw.solver_iterations = max(1, int(substeps) * 2)
+
+    cache = getattr(rbw, "point_cache", None)
+    if cache is not None:
+        cache.frame_start = start_frame
+        cache.frame_end = end_frame
+    return start_frame, end_frame
+
+
+def _simulate_rigidbody(
+    settle_frames: int, substeps: int, time_scale: float
+) -> tuple[int, int]:
+    start_frame, end_frame = _configure_rigidbody_world(
+        settle_frames=settle_frames, substeps=substeps, time_scale=time_scale
+    )
+    for frame in range(start_frame, end_frame + 1):
+        bpy.context.scene.frame_set(frame)
+    return start_frame, end_frame
+
+
+def simulate_physics(
+    frames: int = 20,  # Number of simulation frames
+    substeps: int = 10,  # Substeps per frame
+    time_scale: float = 1.0,  # Physics time scale
+) -> None:
+    """
+    Simulate current Blender rigid-body world for a fixed number of frames.
+
+    Users are expected to explicitly add rigid bodies via `Object.add_rigidbody(...)`
+    and then call `rv.simulate_physics(...)` at chosen points in scene generation.
+    """
+    if frames <= 0:
+        raise ValueError("frames must be > 0.")
+    if substeps <= 0:
+        raise ValueError("substeps must be > 0.")
+    if time_scale <= 0:
+        raise ValueError("time_scale must be > 0.")
+
+    _simulate_rigidbody(
+        settle_frames=int(frames), substeps=int(substeps), time_scale=float(time_scale)
+    )
+
 def _estimate_loader_radius(loader: "ObjectLoader", dimension: int) -> float:
     temp = loader.create_instance(register_object=False)
     try:
@@ -3260,6 +3602,20 @@ def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
     mesh = obj_eval.to_mesh()
     try:
         return [obj_eval.matrix_world @ v.co for v in mesh.vertices]
+    finally:
+        obj_eval.to_mesh_clear()
+
+
+def _get_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
+    if obj is None:
+        return []
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    if obj_eval.type != "MESH":
+        return []
+    mesh = obj_eval.to_mesh()
+    try:
+        return [Vector(v.co) for v in mesh.vertices]
     finally:
         obj_eval.to_mesh_clear()
 
