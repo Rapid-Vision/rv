@@ -3077,6 +3077,16 @@ def _configure_compositor(
         color_depth="32",
     )
 
+    depth_preview_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
+    depth_preview_file_out_node.location = (2 * dx + 160, -1250)
+    _reset_file_output_node(depth_preview_file_out_node, output_dir)
+    _configure_file_output_node_format(
+        depth_preview_file_out_node,
+        file_format="PNG",
+        color_mode="BW",
+        color_depth="16",
+    )
+
     index_ob = _find_socket_by_name(render_layers.outputs, "Object Index")
     index_ma = _find_socket_by_name(render_layers.outputs, "Material Index")
     index_sockets = [index_ob, index_ma]
@@ -3086,6 +3096,7 @@ def _configure_compositor(
         _normalize_socket_name(_semantic_aov_name(channel))
         for channel in (semantic_channels or set())
     }
+    depth_preview_connected = False
 
     for output in render_layers.outputs:
         if output in index_sockets:
@@ -3108,6 +3119,26 @@ def _configure_compositor(
                 file_path=depth_slot_name,
             )
             tree.links.new(output, depth_input)
+
+            if not depth_preview_connected:
+                normalize_node = tree.nodes.new(type="CompositorNodeNormalize")
+                normalize_node.location = (dx, -1200)
+                normalize_node.hide = True
+                tree.links.new(output, normalize_node.inputs[0])
+
+                preview_slot_name = "DepthPreview"
+                preview_input = _add_file_output_item(
+                    depth_preview_file_out_node,
+                    preview_slot_name,
+                    normalize_node.outputs[0],
+                )
+                _configure_file_output_item(
+                    depth_preview_file_out_node,
+                    preview_slot_name,
+                    file_path=preview_slot_name,
+                )
+                tree.links.new(normalize_node.outputs[0], preview_input)
+                depth_preview_connected = True
             continue
 
         slot_name = output.name
