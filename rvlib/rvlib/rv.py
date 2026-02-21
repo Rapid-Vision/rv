@@ -36,6 +36,7 @@ class BasicScene(rv.Scene):
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 import numbers
 import typing
 from mathutils import Vector
@@ -55,7 +56,7 @@ from enum import Enum
 from mathutils.bvhtree import BVHTree
 
 JSONSerializable: TypeAlias = Union[
-    str, int, float, bool, None, list["json.JSONType"], dict[str, "json.JSONType"]
+    str, int, float, bool, None, list["JSONSerializable"], dict[str, "JSONSerializable"]
 ]
 
 Resolution: TypeAlias = tuple[int, int]
@@ -78,7 +79,35 @@ ObjectLoaderSource: TypeAlias = Union[
 ScatterValidationResult: TypeAlias = tuple[
     list["ObjectLoader"], float, float, float, float
 ]
-ObjectStats: TypeAlias = dict[str, JSONSerializable]
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectStats:
+    """
+    Geometric inspection snapshot for an object or loader instance.
+    """
+
+    name: str
+    type: str
+    dimensions_world: Float3
+    dimensions_local: Float3
+    bounds_world: dict[str, Float3]
+    bounds_local: dict[str, Float3]
+    scale: Float3
+
+    def to_dict(self) -> dict[str, JSONSerializable]:
+        """
+        Convert to JSON-compatible dictionary for metadata serialization.
+        """
+        return {
+            "name": self.name,
+            "type": self.type,
+            "dimensions_world": self.dimensions_world,
+            "dimensions_local": self.dimensions_local,
+            "bounds_world": self.bounds_world,
+            "bounds_local": self.bounds_local,
+            "scale": self.scale,
+        }
 
 
 class RenderPass(Enum):
@@ -361,11 +390,15 @@ class _Serializable:
     def __init__(self):
         self.custom_meta = dict()
 
-    def set_custom_meta(self, **custom_meta: dict[str, JSONSerializable]) -> None:
+    def set_custom_meta(
+        self, **custom_meta: Union[JSONSerializable, ObjectStats]
+    ) -> None:
         """
         Set custom metainformation that may be helpful when using dataset later.
         """
         for key, value in custom_meta.items():
+            if isinstance(value, ObjectStats):
+                value = value.to_dict()
             self.custom_meta[key] = value
 
     def _get_meta(self) -> dict:
@@ -555,9 +588,7 @@ class Domain:
                 p = Vector((x, y, z))
                 if self.contains_point(p, margin=0.0):
                     return p
-            raise ValueError(
-                "domain inset is too large to sample from polygon/hull2d."
-            )
+            raise ValueError("domain inset is too large to sample from polygon/hull2d.")
 
         if self.kind == "box":
             cx, cy, cz = self.data["center"]
@@ -789,7 +820,9 @@ class Domain:
             rx_in = max(0.0, rx - inset_margin)
             ry_in = max(0.0, ry - inset_margin)
             z = self.data["z"]
-            return Vector((cx - rx_in, cy - ry_in, z)), Vector((cx + rx_in, cy + ry_in, z))
+            return Vector((cx - rx_in, cy - ry_in, z)), Vector(
+                (cx + rx_in, cy + ry_in, z)
+            )
 
         if self.kind in {"polygon", "hull2d"}:
             xs = [p[0] for p in self.data["points"]]
@@ -1230,20 +1263,20 @@ class Scene(ABC, _Serializable):
             else:
                 dims_local_out = dims_local
 
-            stats: ObjectStats = {
-                "name": str(obj.obj.name),
-                "type": str(obj.obj.type),
-                "dimensions_world": dims_world,
-                "dimensions_local": dims_local_out,
-                "bounds_world": obj.get_bounds(space="world"),
-                "bounds_local": obj.get_bounds(space="local"),
-                "scale": tuple(float(v) for v in obj.obj.scale),
-            }
+            stats = ObjectStats(
+                name=str(obj.obj.name),
+                type=str(obj.obj.type),
+                dimensions_world=dims_world,
+                dimensions_local=dims_local_out,
+                bounds_world=obj.get_bounds(space="world"),
+                bounds_local=obj.get_bounds(space="local"),
+                scale=tuple(float(v) for v in obj.obj.scale),
+            )
 
             inspected = self.custom_meta.get("inspected_objects", [])
             if not isinstance(inspected, list):
                 inspected = [inspected]
-            inspected.append(stats)
+            inspected.append(stats.to_dict())
             self.custom_meta["inspected_objects"] = inspected
             return stats
         finally:
@@ -1630,6 +1663,17 @@ class ObjectLoader:
     def __init__(self, obj, scene: "Scene") -> None:
         self.obj = obj
         self.scene = scene
+
+    def set_source(self, source: "Object") -> "ObjectLoader":
+        """
+        Rebind this loader to use an existing object as its instancing prototype.
+        """
+        if not isinstance(source, Object):
+            raise TypeError("source must be Object.")
+        if source.scene is not self.scene:
+            raise ValueError("source object must belong to the same scene.")
+        self.obj = source.obj
+        return self
 
     def create_instance(
         self,
@@ -2243,6 +2287,12 @@ class Object(_Serializable):
         size = pmax - pmin
         return (float(size.x), float(size.y), float(size.z))
 
+    def inspect(self, applied_scale: bool = True) -> ObjectStats:
+        """
+        Inspect geometric stats for this object.
+        """
+        return self.scene.inspect_object(self, applied_scale=applied_scale)
+
     def get_bounds(
         self,
         space: Literal["world", "local"] = "world",  # Coordinate space for bounds
@@ -2260,13 +2310,20 @@ class Object(_Serializable):
         elif space == "local":
             points = _get_object_local_vertices(self.obj)
             if len(points) == 0:
-                points = [Vector(corner) for corner in getattr(self.obj, "bound_box", [])]
+                points = [
+                    Vector(corner) for corner in getattr(self.obj, "bound_box", [])
+                ]
         else:
             raise ValueError("space must be one of: world, local.")
 
         if len(points) == 0:
             origin = Vector((0.0, 0.0, 0.0))
-            return {"min": tuple(origin), "max": tuple(origin), "center": tuple(origin), "size": tuple(origin)}
+            return {
+                "min": tuple(origin),
+                "max": tuple(origin),
+                "center": tuple(origin),
+                "size": tuple(origin),
+            }
 
         pmin, pmax = _aabb_from_points(points)
         center = (pmin + pmax) * 0.5
@@ -2280,7 +2337,9 @@ class Object(_Serializable):
 
     def add_rigidbody(
         self,
-        mode: Literal["box", "sphere", "hull", "mesh", "capsule", "cylinder", "cone"] = "hull",
+        mode: Literal[
+            "box", "sphere", "hull", "mesh", "capsule", "cylinder", "cone"
+        ] = "hull",
         body_type: Literal["ACTIVE", "PASSIVE"] = "ACTIVE",
         mass: float = 1.0,
         friction: float = 0.5,
@@ -2989,7 +3048,7 @@ def _configure_compositor(
     )
 
     index_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
-    index_file_out_node.location = (2 * dx, -350)
+    index_file_out_node.location = (2 * dx + 40, -350)
     _reset_file_output_node(index_file_out_node, output_dir)
     _configure_file_output_node_format(
         index_file_out_node,
@@ -2999,13 +3058,23 @@ def _configure_compositor(
     )
 
     semantic_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
-    semantic_file_out_node.location = (2 * dx, -700)
+    semantic_file_out_node.location = (2 * dx + 80, -700)
     _reset_file_output_node(semantic_file_out_node, output_dir)
     _configure_file_output_node_format(
         semantic_file_out_node,
         file_format="PNG",
         color_mode="BW",
         color_depth="16",
+    )
+
+    depth_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
+    depth_file_out_node.location = (2 * dx + 120, -1050)
+    _reset_file_output_node(depth_file_out_node, output_dir)
+    _configure_file_output_node_format(
+        depth_file_out_node,
+        file_format="OPEN_EXR",
+        color_mode="BW",
+        color_depth="32",
     )
 
     index_ob = _find_socket_by_name(render_layers.outputs, "Object Index")
@@ -3025,6 +3094,20 @@ def _configure_compositor(
         normalized_name = _normalize_socket_name(output.name)
         if normalized_name in semantic_names:
             semantic_outputs[output.name] = output
+            continue
+
+        # Store raw depth in float EXR to avoid clamping (PNG clips values > 1.0).
+        if normalized_name in {"depth", "z"}:
+            depth_slot_name = output.name
+            depth_input = _add_file_output_item(
+                depth_file_out_node, depth_slot_name, output
+            )
+            _configure_file_output_item(
+                depth_file_out_node,
+                depth_slot_name,
+                file_path=depth_slot_name,
+            )
+            tree.links.new(output, depth_input)
             continue
 
         slot_name = output.name
@@ -3307,9 +3390,7 @@ def _validate_scatter_common(
         loaders = [source]
     elif isinstance(source, (list, tuple)) and len(source) > 0:
         if not all(isinstance(loader, ObjectLoader) for loader in source):
-            raise TypeError(
-                "source sequence must contain only ObjectLoader instances."
-            )
+            raise TypeError("source sequence must contain only ObjectLoader instances.")
         loaders = list(source)
     else:
         raise TypeError(
@@ -3455,6 +3536,7 @@ def simulate_physics(
     _simulate_rigidbody(
         settle_frames=int(frames), substeps=int(substeps), time_scale=float(time_scale)
     )
+
 
 def _estimate_loader_radius(loader: "ObjectLoader", dimension: int) -> float:
     temp = loader.create_instance(register_object=False)
