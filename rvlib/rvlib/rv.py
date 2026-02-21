@@ -343,7 +343,9 @@ def _purge_orphans() -> None:
         pass
 
 
-def begin_run(purge_orphans: bool = True) -> str:
+def begin_run(
+    purge_orphans: bool = True,  # Remove orphaned Blender datablocks after cleanup
+) -> str:
     """
     Start a new rv run by clearing previously generated data and returning a new run ID.
     """
@@ -355,7 +357,9 @@ def begin_run(purge_orphans: bool = True) -> str:
     return _ACTIVE_RUN_ID
 
 
-def end_run(purge_orphans: bool = False) -> None:
+def end_run(
+    purge_orphans: bool = False,  # Remove orphaned Blender datablocks on shutdown
+) -> None:
     """
     Finish the current rv run and optionally purge orphaned Blender datablocks.
     """
@@ -421,7 +425,10 @@ class Domain:
         self.data = data
         self.dimension = dimension
 
-    def inset(self, margin: float) -> "Domain":
+    def inset(
+        self,
+        margin: float,  # Inset distance from the domain boundary
+    ) -> "Domain":
         """
         Return a new domain shrunk inward by `margin`.
         """
@@ -442,6 +449,9 @@ class Domain:
         size: Float2 = (10.0, 10.0),  # Rectangle width and depth
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
+        """
+        Build a rectangular 2D scatter domain.
+        """
         _ensure_positive_tuple(size, 2, "size")
         return Domain("rect", {"center": tuple(center), "size": tuple(size), "z": z}, 2)
 
@@ -451,6 +461,9 @@ class Domain:
         radii: Float2 = (5.0, 3.0),  # Ellipse radii along X and Y
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
+        """
+        Build an elliptical 2D scatter domain.
+        """
         _ensure_positive_tuple(radii, 2, "radii")
         return Domain(
             "ellipse", {"center": tuple(center), "radii": tuple(radii), "z": z}, 2
@@ -461,6 +474,9 @@ class Domain:
         points: Polygon2D,  # Polygon vertices in XY
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
+        """
+        Build a convex 2D scatter domain from polygon vertices.
+        """
         if points is None or len(points) < 3:
             raise ValueError("polygon requires at least 3 points.")
         convex = _convex_hull_2d(points)
@@ -475,6 +491,9 @@ class Domain:
         center: Float3 = (0.0, 0.0, 0.0),  # 3D center
         size: Float3 = (10.0, 10.0, 10.0),  # Box side lengths
     ) -> "Domain":
+        """
+        Build an axis-aligned box scatter domain.
+        """
         _ensure_positive_tuple(size, 3, "size")
         return Domain("box", {"center": tuple(center), "size": tuple(size)}, 3)
 
@@ -485,6 +504,9 @@ class Domain:
         height: float = 10.0,  # Length along the selected axis
         axis: str = "Z",  # Longitudinal axis: X, Y, or Z
     ) -> "Domain":
+        """
+        Build a cylinder scatter domain aligned to X, Y, or Z.
+        """
         if radius <= 0:
             raise ValueError("radius must be > 0.")
         if height <= 0:
@@ -508,6 +530,9 @@ class Domain:
         center: Float3 = (0.0, 0.0, 0.0),  # Ellipsoid center
         radii: Float3 = (5.0, 3.0, 2.0),  # Radii along X, Y, Z
     ) -> "Domain":
+        """
+        Build an ellipsoid scatter domain.
+        """
         _ensure_positive_tuple(radii, 3, "radii")
         return Domain("ellipsoid", {"center": tuple(center), "radii": tuple(radii)}, 3)
 
@@ -516,6 +541,9 @@ class Domain:
         rv_obj: "Object",  # Source object to build the hull from
         project_2d: bool = False,  # If true, project hull to XY polygon
     ) -> "Domain":
+        """
+        Build a convex hull domain from an existing object.
+        """
         points = _get_object_world_vertices(rv_obj.obj)
         if len(points) < 3:
             raise ValueError("convex_hull requires an object with mesh geometry.")
@@ -544,6 +572,9 @@ class Domain:
         )
 
     def sample_point(self, rng: random.Random) -> mathutils.Vector:  # Random generator
+        """
+        Sample a random point inside this domain.
+        """
         inset_margin = self._effective_inset_margin()
 
         if self.kind == "rect":
@@ -668,6 +699,9 @@ class Domain:
         point: mathutils.Vector,  # Candidate point in world coordinates
         margin: float = 0.0,  # Inset margin from boundary
     ) -> bool:
+        """
+        Check whether a world-space point is inside the domain.
+        """
         if margin < 0:
             raise ValueError("margin must be >= 0.")
         margin = float(margin) + float(self.data.get("inset_margin", 0.0))
@@ -802,6 +836,9 @@ class Domain:
         return all(self.contains_point(point, margin=margin) for point in points)
 
     def aabb(self) -> AABB:
+        """
+        Return the axis-aligned bounds of this domain.
+        """
         inset_margin = self._effective_inset_margin()
 
         if self.kind == "rect":
@@ -983,7 +1020,10 @@ class Scene(ABC, _Serializable):
         self.time_limit = time_limit
         return self
 
-    def set_passes(self, *passes: tuple[RenderPass | list[RenderPass], ...]):
+    def set_passes(
+        self,
+        *passes: tuple[RenderPass | list[RenderPass], ...],  # Render passes to enable
+    ):
         """
         Set a list of render passes that will be saved when rendering.
         """
@@ -991,7 +1031,10 @@ class Scene(ABC, _Serializable):
         return self
 
     def enable_semantic_channels(
-        self, *channels: tuple[str | list[str], ...]
+        self,
+        *channels: tuple[
+            str | list[str], ...
+        ],  # Semantic channel names written via AOVs
     ) -> "Scene":
         """
         Enable semantic shader channels to be exported as masks.
@@ -1001,7 +1044,10 @@ class Scene(ABC, _Serializable):
             self.semantic_channels.add(_normalize_semantic_channel(channel))
         return self
 
-    def set_semantic_mask_threshold(self, threshold: float) -> "Scene":
+    def set_semantic_mask_threshold(
+        self,
+        threshold: float,  # Binary mask threshold in [0, 1]
+    ) -> "Scene":
         """
         Set threshold used when exporting binary semantic masks.
         """
@@ -1010,7 +1056,10 @@ class Scene(ABC, _Serializable):
         self.semantic_mask_threshold = threshold
         return self
 
-    def create_empty(self, name: str = "Empty") -> "Object":
+    def create_empty(
+        self,
+        name: str = "Empty",  # Object name
+    ) -> "Object":
         """
         Create an empty object. May be useful to point camera at or for debugging during `preview` stage.
         """
@@ -1022,10 +1071,10 @@ class Scene(ABC, _Serializable):
 
     def create_sphere(
         self,
-        name: str = "Sphere",
-        radius: float = 1.0,
-        segments: int = 32,
-        ring_count: int = 16,
+        name: str = "Sphere",  # Object name
+        radius: float = 1.0,  # Sphere radius
+        segments: int = 32,  # Horizontal segments
+        ring_count: int = 16,  # Vertical segments
     ) -> "Object":
         """
         Create a sphere primitive.
@@ -1039,7 +1088,11 @@ class Scene(ABC, _Serializable):
         sphere.name = name
         return Object(sphere, self)
 
-    def create_cube(self, name: str = "Cube", size: float = 2.0) -> "Object":
+    def create_cube(
+        self,
+        name: str = "Cube",  # Object name
+        size: float = 2.0,  # Cube side size
+    ) -> "Object":
         """
         Create a cube primitive.
         """
@@ -1052,8 +1105,8 @@ class Scene(ABC, _Serializable):
 
     def create_plane(
         self,
-        name: str = "Plane",
-        size: float = 2.0,
+        name: str = "Plane",  # Object name
+        size: float = 2.0,  # Plane side size
     ) -> "Object":
         """
         Create a plane primitive.
@@ -1068,7 +1121,9 @@ class Scene(ABC, _Serializable):
         return Object(plane, self)
 
     def create_point_light(
-        self, name: str = "Point", power: float = 1000.0
+        self,
+        name: str = "Point",  # Light object name
+        power: float = 1000.0,  # Light power in Blender energy units
     ) -> "PointLight":
         """
         Create a point light.
@@ -1079,7 +1134,11 @@ class Scene(ABC, _Serializable):
         _get_generated_collection().objects.link(light_obj)
         return PointLight(light_obj, self).set_power(power)
 
-    def create_sun_light(self, name: str = "Sun", power: float = 1.0) -> "SunLight":
+    def create_sun_light(
+        self,
+        name: str = "Sun",  # Light object name
+        power: float = 1.0,  # Light power in Blender energy units
+    ) -> "SunLight":
         """
         Create a sun light.
         """
@@ -1090,7 +1149,9 @@ class Scene(ABC, _Serializable):
         return SunLight(light_obj, self).set_power(power)
 
     def create_area_light(
-        self, name: str = "Area", power: float = 100.0
+        self,
+        name: str = "Area",  # Light object name
+        power: float = 100.0,  # Light power in Blender energy units
     ) -> "AreaLight":
         """
         Create an area light.
@@ -1102,7 +1163,9 @@ class Scene(ABC, _Serializable):
         return AreaLight(light_obj, self).set_power(power)
 
     def create_spot_light(
-        self, name: str = "Spot", power: float = 1000.0
+        self,
+        name: str = "Spot",  # Light object name
+        power: float = 1000.0,  # Light power in Blender energy units
     ) -> "SpotLight":
         """
         Create a spot light.
@@ -1119,7 +1182,10 @@ class Scene(ABC, _Serializable):
         """
         return self.camera
 
-    def set_world(self, world: "World") -> "World":
+    def set_world(
+        self,
+        world: "World",  # World descriptor to apply to the scene
+    ) -> "World":
         """
         Set a new `World` representing environmental lighting.
         """
@@ -1132,7 +1198,10 @@ class Scene(ABC, _Serializable):
         """
         return self.world
 
-    def set_tags(self, *tags) -> "Scene":
+    def set_tags(
+        self,
+        *tags,  # Scene-level tags
+    ) -> "Scene":
         """
         Set scene's global tags.
 
@@ -1141,7 +1210,10 @@ class Scene(ABC, _Serializable):
         self.tags = _combine_arglist_set(tags)
         return self
 
-    def add_tags(self, *tags) -> "Scene":
+    def add_tags(
+        self,
+        *tags,  # Tags to append to scene-level tags
+    ) -> "Scene":
         """
         Add tags to the scene.
 
@@ -1150,7 +1222,11 @@ class Scene(ABC, _Serializable):
         self.tags |= _combine_arglist_set(tags)
         return self
 
-    def load_object(self, blendfile: str, import_name: str = None) -> "ObjectLoader":
+    def load_object(
+        self,
+        blendfile: str,  # Path to source .blend file
+        import_name: str = None,  # Optional object name to import
+    ) -> "ObjectLoader":
         """
         Get a loader object to import from a blender file.
 
@@ -1179,7 +1255,9 @@ class Scene(ABC, _Serializable):
             )
 
     def load_objects(
-        self, blendfile: str, import_names: list[str] = None
+        self,
+        blendfile: str,  # Path to source .blend file
+        import_names: list[str] = None,  # Optional list of object names to import
     ) -> list["ObjectLoader"]:
         """
         Get a list of loader objects to import from a blender file.
@@ -1219,14 +1297,19 @@ class Scene(ABC, _Serializable):
 
         return res
 
-    def create_material(self, name: str = "Material") -> "BasicMaterial":
+    def create_material(
+        self,
+        name: str = "Material",  # Material name
+    ) -> "BasicMaterial":
         """
         Create a new basic (Principled BSDF) material.
         """
         return BasicMaterial(name=name)
 
     def import_material(
-        self, blendfile: str, material_name: str = None
+        self,
+        blendfile: str,  # Path to source .blend file
+        material_name: str = None,  # Material name to import (defaults to first)
     ) -> "ImportedMaterial":
         """
         Create an imported material descriptor from a .blend file.
@@ -1664,7 +1747,10 @@ class ObjectLoader:
         self.obj = obj
         self.scene = scene
 
-    def set_source(self, source: "Object") -> "ObjectLoader":
+    def set_source(
+        self,
+        source: "Object",  # Object used as instancing prototype
+    ) -> "ObjectLoader":
         """
         Rebind this loader to use an existing object as its instancing prototype.
         """
@@ -1874,15 +1960,15 @@ class BasicMaterial(Material):
 
     def set_params(
         self,
-        base_color: OptionalColor = None,
-        roughness: float = None,
-        metallic: float = None,
-        specular: float = None,
-        emission_color: OptionalColor = None,
-        emission_strength: float = None,
-        alpha: float = None,
-        transmission: float = None,
-        ior: float = None,
+        base_color: OptionalColor = None,  # Base color (RGB/RGBA)
+        roughness: float = None,  # Surface roughness
+        metallic: float = None,  # Metallic factor
+        specular: float = None,  # Specular IOR level
+        emission_color: OptionalColor = None,  # Emission color (RGB/RGBA)
+        emission_strength: float = None,  # Emission intensity
+        alpha: float = None,  # Alpha/transparency
+        transmission: float = None,  # Transmission weight
+        ior: float = None,  # Index of refraction
     ):
         """
         Set Principled BSDF parameters used when building the material.
@@ -1918,7 +2004,11 @@ class BasicMaterial(Material):
             self.ior = ior
         return self
 
-    def set_property(self, key: str, value: any):
+    def set_property(
+        self,
+        key: str,  # Custom property key
+        value: any,  # Custom property value
+    ):
         """
         Set a custom Blender property on the generated material.
         """
@@ -2062,7 +2152,12 @@ class Object(_Serializable):
             self.obj.pass_index = self.index
         self.obj.rotation_mode = "QUATERNION"
 
-    def set_location(self, location: Union[mathutils.Vector, typing.Sequence[float]]):
+    def set_location(
+        self,
+        location: Union[
+            mathutils.Vector, typing.Sequence[float]
+        ],  # Object location in world coordinates
+    ):
         """
         Set the location of the object in 3D space.
         """
@@ -2075,7 +2170,10 @@ class Object(_Serializable):
 
         return self
 
-    def set_rotation(self, rotation: Union[mathutils.Euler, mathutils.Quaternion]):
+    def set_rotation(
+        self,
+        rotation: Union[mathutils.Euler, mathutils.Quaternion],  # Object rotation value
+    ):
         """
         Set the rotation of the object.
         """
@@ -2088,7 +2186,10 @@ class Object(_Serializable):
         return self
 
     def set_scale(
-        self, scale: Union[mathutils.Vector, typing.Sequence[float], float, int]
+        self,
+        scale: Union[
+            mathutils.Vector, typing.Sequence[float], float, int
+        ],  # Uniform scalar or per-axis XYZ scale
     ):
         """
         Set the scale of the object.
@@ -2107,7 +2208,11 @@ class Object(_Serializable):
 
         return self
 
-    def set_property(self, key: str, value: any):
+    def set_property(
+        self,
+        key: str,  # Custom property key
+        value: any,  # Custom property value
+    ):
         """
         Set a property of the object. Properties can be used inside object's material nodes.
         """
@@ -2115,7 +2220,11 @@ class Object(_Serializable):
         self.properties[key] = value
         return self
 
-    def set_material(self, material: "Material", slot: int = 0):
+    def set_material(
+        self,
+        material: "Material",  # Material descriptor to assign
+        slot: int = 0,  # Material slot index
+    ):
         """
         Set object material in the given slot.
         """
@@ -2132,7 +2241,10 @@ class Object(_Serializable):
         _mark_material_tree(bpy_material)
         return self
 
-    def add_material(self, material: "Material"):
+    def add_material(
+        self,
+        material: "Material",  # Material descriptor to append
+    ):
         """
         Append material to object's material slots.
         """
@@ -2152,7 +2264,10 @@ class Object(_Serializable):
         self.obj.data.materials.clear()
         return self
 
-    def set_tags(self, *tags: str | list[str]):
+    def set_tags(
+        self,
+        *tags: str | list[str],  # Object-level tags
+    ):
         """
         Set object's tags.
 
@@ -2161,7 +2276,10 @@ class Object(_Serializable):
         self.tags = _combine_arglist_set(tags)
         return self
 
-    def add_tags(self, *tags: str | list[str]):
+    def add_tags(
+        self,
+        *tags: str | list[str],  # Tags to append to object-level tags
+    ):
         """
         Add tags to the object.
 
@@ -2204,7 +2322,10 @@ class Object(_Serializable):
         self.obj.select_set(True)
         bpy.context.view_layer.objects.active = self.obj
 
-    def set_shading(self, shading: Literal["flat", "smooth", "auto"]):
+    def set_shading(
+        self,
+        shading: Literal["flat", "smooth", "auto"],  # Target shading mode
+    ):
         """
         Set shading to flat, smooth, or auto.
         """
@@ -2221,21 +2342,30 @@ class Object(_Serializable):
 
         return self
 
-    def show_debug_axes(self, show=True):
+    def show_debug_axes(
+        self,
+        show=True,  # Toggle axis visibility in preview
+    ):
         """
         Show debug axes that can be seen in the `preview` mode.
         """
         self.obj.show_axis = show
         return self
 
-    def show_debug_name(self, show):
+    def show_debug_name(
+        self,
+        show,  # Toggle object-name visibility in preview
+    ):
         """
         Show object's name that can be seen in the `preview` mode.
         """
         self.obj.show_name = show
         return self
 
-    def hide(self, view: Literal["wireframe", "none"] = "wireframe"):
+    def hide(
+        self,
+        view: Literal["wireframe", "none"] = "wireframe",  # Preview visibility mode
+    ):
         """
         Hide object from render output while controlling preview visibility.
         """
@@ -2287,7 +2417,10 @@ class Object(_Serializable):
         size = pmax - pmin
         return (float(size.x), float(size.y), float(size.z))
 
-    def inspect(self, applied_scale: bool = True) -> ObjectStats:
+    def inspect(
+        self,
+        applied_scale: bool = True,  # Include object scale in local dimensions
+    ) -> ObjectStats:
         """
         Inspect geometric stats for this object.
         """
@@ -2339,13 +2472,13 @@ class Object(_Serializable):
         self,
         mode: Literal[
             "box", "sphere", "hull", "mesh", "capsule", "cylinder", "cone"
-        ] = "hull",
-        body_type: Literal["ACTIVE", "PASSIVE"] = "ACTIVE",
-        mass: float = 1.0,
-        friction: float = 0.5,
-        restitution: float = 0.0,
-        linear_damping: float = 0.04,
-        angular_damping: float = 0.1,
+        ] = "hull",  # Collision shape
+        body_type: Literal["ACTIVE", "PASSIVE"] = "ACTIVE",  # Rigid body type
+        mass: float = 1.0,  # Body mass
+        friction: float = 0.5,  # Surface friction
+        restitution: float = 0.0,  # Bounciness
+        linear_damping: float = 0.04,  # Linear damping factor
+        angular_damping: float = 0.1,  # Angular damping factor
     ) -> "Object":
         """
         Add or update rigid-body settings for this object.
@@ -2384,7 +2517,10 @@ class Object(_Serializable):
             rb.collision_margin = max(0.0, min(self.get_dimensions("world")) * 0.01)
         return self
 
-    def remove_rigidbody(self, keep_transform: bool = True) -> "Object":
+    def remove_rigidbody(
+        self,
+        keep_transform: bool = True,  # Preserve world transform after removal
+    ) -> "Object":
         """
         Remove rigid body from this object if present.
         """
@@ -2468,7 +2604,7 @@ class Light(Object):
 
     def set_color(
         self,
-        color: Color,
+        color: Color,  # RGB/RGBA light color
     ) -> "Light":
         """
         Set light RGB color. Alpha (if provided) is ignored.
@@ -2479,7 +2615,10 @@ class Light(Object):
         self.light_data.color = rgb[:3]
         return self
 
-    def set_power(self, power: float) -> "Light":
+    def set_power(
+        self,
+        power: float,  # Light power in Blender energy units
+    ) -> "Light":
         """
         Set light power in Blender `energy` units.
         """
@@ -2488,21 +2627,30 @@ class Light(Object):
         self.light_data.energy = power
         return self
 
-    def set_cast_shadow(self, enabled: bool = True) -> "Light":
+    def set_cast_shadow(
+        self,
+        enabled: bool = True,  # Shadow-casting toggle
+    ) -> "Light":
         """
         Enable or disable shadow casting.
         """
         self.light_data.use_shadow = enabled
         return self
 
-    def set_specular_factor(self, factor: float) -> "Light":
+    def set_specular_factor(
+        self,
+        factor: float,  # Specular contribution factor
+    ) -> "Light":
         """
         Set the light contribution to specular highlights.
         """
         self.light_data.specular_factor = factor
         return self
 
-    def set_softness(self, value: float) -> "Light":
+    def set_softness(
+        self,
+        value: float,  # Softness parameter
+    ) -> "Light":
         """
         Set softness parameter mapped to the current light type.
         """
@@ -2548,7 +2696,10 @@ class PointLight(Light):
     Point light with radius control.
     """
 
-    def set_radius(self, radius: float) -> "PointLight":
+    def set_radius(
+        self,
+        radius: float,  # Radius/soft size
+    ) -> "PointLight":
         """
         Set point light radius.
         """
@@ -2566,7 +2717,10 @@ class SunLight(Light):
     Directional sun light with angular size control.
     """
 
-    def set_angle(self, angle_radians: float) -> "SunLight":
+    def set_angle(
+        self,
+        angle_radians: float,  # Angular sun size in radians
+    ) -> "SunLight":
         """
         Set sun angular size in radians.
         """
@@ -2585,7 +2739,8 @@ class AreaLight(Light):
     """
 
     def set_shape(
-        self, shape: Literal["SQUARE", "RECTANGLE", "DISK", "ELLIPSE"]
+        self,
+        shape: Literal["SQUARE", "RECTANGLE", "DISK", "ELLIPSE"],  # Area-light shape
     ) -> "AreaLight":
         """
         Set area light shape.
@@ -2598,7 +2753,10 @@ class AreaLight(Light):
         self.light_data.shape = shape
         return self
 
-    def set_size(self, size: float) -> "AreaLight":
+    def set_size(
+        self,
+        size: float,  # Primary size
+    ) -> "AreaLight":
         """
         Set primary area light size.
         """
@@ -2607,7 +2765,11 @@ class AreaLight(Light):
         self.light_data.size = size
         return self
 
-    def set_size_xy(self, size_x: float, size_y: float) -> "AreaLight":
+    def set_size_xy(
+        self,
+        size_x: float,  # Size along X
+        size_y: float,  # Size along Y
+    ) -> "AreaLight":
         """
         Set area light X and Y sizes.
         """
@@ -2632,7 +2794,10 @@ class SpotLight(Light):
     Spot light with cone and blend controls.
     """
 
-    def set_spot_size(self, angle_radians: float) -> "SpotLight":
+    def set_spot_size(
+        self,
+        angle_radians: float,  # Cone angle in radians
+    ) -> "SpotLight":
         """
         Set spotlight cone angle in radians.
         """
@@ -2641,7 +2806,10 @@ class SpotLight(Light):
         self.light_data.spot_size = angle_radians
         return self
 
-    def set_blend(self, blend: float) -> "SpotLight":
+    def set_blend(
+        self,
+        blend: float,  # Edge softness in [0, 1]
+    ) -> "SpotLight":
         """
         Set spotlight edge softness in the [0, 1] range.
         """
@@ -2650,7 +2818,10 @@ class SpotLight(Light):
         self.light_data.spot_blend = blend
         return self
 
-    def set_show_cone(self, show: bool = True) -> "SpotLight":
+    def set_show_cone(
+        self,
+        show: bool = True,  # Viewport cone visibility
+    ) -> "SpotLight":
         """
         Show or hide the spotlight cone in viewport.
         """
@@ -2899,8 +3070,8 @@ class HDRIWorld(World):
     def set_params(
         self,
         hdri_path: str = None,  # Path to the `.exr` file
-        strength: float = None,  #
-        rotation_z: float = None,
+        strength: float = None,  # Environment intensity multiplier
+        rotation_z: float = None,  # Rotation around world Z axis
     ):
         """
         Set HDRI source and environment lighting parameters.
