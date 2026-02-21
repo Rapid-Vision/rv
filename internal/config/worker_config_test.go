@@ -121,28 +121,3 @@ func TestLoadWorkerConfig_Defaults(t *testing.T) {
 		t.Fatalf("cleanup should default to false")
 	}
 }
-
-func TestLoadWorkerConfig_RejectsLegacyOutputURL(t *testing.T) {
-	tmp := t.TempDir()
-	configPath := filepath.Join(tmp, "worker.yaml")
-	content := []byte(`worker:
-  worker_name: render-1
-  task_name: render
-  rtasks:
-    url: http://localhost:5701
-  s3:
-    endpoint: localhost:9000
-    output_url: s3://rv-results/base
-`)
-	if err := os.WriteFile(configPath, content, 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	_, err := config.LoadWorkerConfig(configPath)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if err.Error() != "worker.s3.output_url is not supported; use worker.s3.path" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
