@@ -58,6 +58,7 @@ func TestBuildBlenderRenderArgs_OptionalArgs(t *testing.T) {
 		ScriptPath:            "/tmp/scene.py",
 		Cwd:                   "/tmp",
 		Resolution:            [2]int{800, 600},
+		GPUBackend:            "optix",
 		TimeLimit:             &timeLimit,
 		MaxSamples:            &maxSamples,
 		MinSamples:            &minSamples,
@@ -68,6 +69,7 @@ func TestBuildBlenderRenderArgs_OptionalArgs(t *testing.T) {
 	got := buildBlenderRenderArgs(opts, "/tmp/lib", "/tmp/out/1", 3)
 
 	wantPairs := [][]string{
+		{"--gpu-backend", "optix"},
 		{"--time-limit", "2.5"},
 		{"--max-samples", "256"},
 		{"--min-samples", "8"},
@@ -106,6 +108,11 @@ func TestBuildBlenderRenderArgs_UnsetOptionalArgs(t *testing.T) {
 			t.Fatalf("did not expect %s in args: %v", forbidden, got)
 		}
 	}
+
+	gpuBackendIdx := slices.Index(got, "--gpu-backend")
+	if gpuBackendIdx < 0 || gpuBackendIdx+1 >= len(got) || got[gpuBackendIdx+1] != "auto" {
+		t.Fatalf("expected default auto --gpu-backend value in args: %v", got)
+	}
 }
 
 func TestValidateOptionalRenderOptions(t *testing.T) {
@@ -125,6 +132,19 @@ func TestValidateOptionalRenderOptions(t *testing.T) {
 		t.Fatal("expected error for invalid optional render options")
 	}
 	if err.Error() != "--min-samples must be <= --max-samples" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateOptionalRenderOptions_InvalidGPUBackend(t *testing.T) {
+	err := validateOptionalRenderOptions(RenderOptions{
+		GPUBackend: "invalid",
+	})
+
+	if err == nil {
+		t.Fatal("expected error for invalid gpu backend")
+	}
+	if err.Error() != "--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -157,6 +177,7 @@ func TestWriteDatasetMetadata(t *testing.T) {
 		ImageNum:   2,
 		Procs:      2,
 		Resolution: [2]int{800, 600},
+		GPUBackend: "cuda",
 		TimeLimit:  &timeLimit,
 		MaxSamples: &maxSamples,
 	}
@@ -180,6 +201,9 @@ func TestWriteDatasetMetadata(t *testing.T) {
 	}
 	if got.RenderParams.Number != 2 || got.RenderParams.Procs != 2 {
 		t.Fatalf("render params number/procs = %d/%d", got.RenderParams.Number, got.RenderParams.Procs)
+	}
+	if got.RenderParams.GPUBackend != "cuda" {
+		t.Fatalf("gpu_backend = %q", got.RenderParams.GPUBackend)
 	}
 	if got.RenderParams.TimeLimit == nil || *got.RenderParams.TimeLimit != 1.5 {
 		t.Fatalf("time_limit = %v", got.RenderParams.TimeLimit)

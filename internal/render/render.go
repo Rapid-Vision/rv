@@ -23,6 +23,7 @@ type RenderOptions struct {
 	Procs                 int
 	Resolution            [2]int
 	OutputDir             string
+	GPUBackend            string
 	TimeLimit             *float64
 	MaxSamples            *int
 	MinSamples            *int
@@ -45,11 +46,19 @@ type datasetRenderParms struct {
 	Cwd                   string   `json:"cwd"`
 	Number                int      `json:"number"`
 	Procs                 int      `json:"procs"`
+	GPUBackend            string   `json:"gpu_backend,omitempty"`
 	TimeLimit             *float64 `json:"time_limit,omitempty"`
 	MaxSamples            *int     `json:"max_samples,omitempty"`
 	MinSamples            *int     `json:"min_samples,omitempty"`
 	NoiseThresholdEnabled *bool    `json:"noise_threshold_enabled,omitempty"`
 	NoiseThreshold        *float64 `json:"noise_threshold,omitempty"`
+}
+
+func normalizedGPUBackend(value string) string {
+	if value == "" {
+		return "auto"
+	}
+	return strings.ToLower(value)
 }
 
 func Render(opts RenderOptions) (RenderResult, error) {
@@ -99,6 +108,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if resolution[0] <= 0 || resolution[1] <= 0 {
 		return RenderResult{}, errors.New("--resolution must be WIDTH,HEIGHT with positive integers")
 	}
+	opts.GPUBackend = normalizedGPUBackend(opts.GPUBackend)
 	if err := validateOptionalRenderOptions(opts); err != nil {
 		return RenderResult{}, err
 	}
@@ -167,6 +177,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 }
 
 func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string, part int) []string {
+	gpuBackend := normalizedGPUBackend(opts.GPUBackend)
 	args := []string{
 		filepath.Join(libPath, "template.blend"),
 		"--factory-startup",
@@ -180,6 +191,7 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--output", seqOutDir,
 		"--cwd", opts.Cwd,
+		"--gpu-backend", gpuBackend,
 	}
 
 	if opts.TimeLimit != nil {
@@ -202,6 +214,11 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 }
 
 func validateOptionalRenderOptions(opts RenderOptions) error {
+	switch normalizedGPUBackend(opts.GPUBackend) {
+	case "auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu":
+	default:
+		return errors.New("--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu")
+	}
 	if opts.TimeLimit != nil && *opts.TimeLimit <= 0 {
 		return errors.New("--time-limit must be > 0")
 	}
@@ -268,6 +285,7 @@ func writeDatasetMetadata(seqOutDir string, opts RenderOptions) error {
 			Cwd:                   opts.Cwd,
 			Number:                opts.ImageNum,
 			Procs:                 opts.Procs,
+			GPUBackend:            normalizedGPUBackend(opts.GPUBackend),
 			TimeLimit:             opts.TimeLimit,
 			MaxSamples:            opts.MaxSamples,
 			MinSamples:            opts.MinSamples,
