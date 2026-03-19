@@ -10,12 +10,13 @@ import (
 )
 
 var (
-	previewCwd       string
-	previewFiles     bool
-	previewOut       string
-	previewNoWindow  bool
-	previewRes       string
-	previewTimeLimit float64
+	previewCwd        string
+	previewFiles      bool
+	previewOut        string
+	previewNoWindow   bool
+	previewRes        string
+	previewGPUBackend string
+	previewTimeLimit  float64
 )
 
 var previewCmd = &cobra.Command{
@@ -33,6 +34,7 @@ func init() {
 	previewCmd.Flags().StringVar(&previewOut, "preview-out", "./preview_out", "Output directory for preview files")
 	previewCmd.Flags().BoolVar(&previewNoWindow, "no-window", false, "Run preview without opening Blender window (requires --preview-files)")
 	previewCmd.Flags().StringVar(&previewRes, "resolution", "640,640", "Output image resolution in WIDTH,HEIGHT format (for --preview-files)")
+	previewCmd.Flags().StringVar(&previewGPUBackend, "gpu-backend", "auto", "Cycles render device backend: auto, optix, cuda, hip, oneapi, metal, cpu")
 	previewCmd.Flags().Float64Var(&previewTimeLimit, "time-limit", 0, "Cycles rendering time limit in seconds (for --preview-files)")
 }
 
@@ -66,6 +68,7 @@ func runPreview(cmd *cobra.Command, args []string) {
 		PreviewOut:    previewOutAbs,
 		NoWindow:      previewNoWindow,
 		Resolution:    resolution,
+		GPUBackend:    previewGPUBackend,
 		TimeLimit:     timeLimit,
 	})
 }
