@@ -161,6 +161,12 @@ type RenderPaths struct {
 	OutputDir  string
 }
 
+type ExportPaths struct {
+	ScriptPath string
+	Cwd        string
+	OutputPath string
+}
+
 func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, error) {
 	if scriptPathArg == "" {
 		return RuntimePaths{}, errors.New("script path is required")
@@ -214,6 +220,28 @@ func ResolveRenderPaths(scriptPathArg string, outputArg string, cwdArg string) (
 		ScriptPath: runtimePaths.ScriptPath,
 		Cwd:        runtimePaths.Cwd,
 		OutputDir:  filepath.Clean(outputAbs),
+	}, nil
+}
+
+func ResolveExportPaths(scriptPathArg string, outputArg string, cwdArg string) (ExportPaths, error) {
+	runtimePaths, err := ResolveRuntimePaths(scriptPathArg, cwdArg)
+	if err != nil {
+		return ExportPaths{}, err
+	}
+
+	if outputArg == "" {
+		return ExportPaths{}, errors.New("output path is required")
+	}
+
+	outputAbs, err := filepath.Abs(outputArg)
+	if err != nil {
+		return ExportPaths{}, fmt.Errorf("resolve output: %w", err)
+	}
+
+	return ExportPaths{
+		ScriptPath: runtimePaths.ScriptPath,
+		Cwd:        runtimePaths.Cwd,
+		OutputPath: filepath.Clean(outputAbs),
 	}, nil
 }
 
