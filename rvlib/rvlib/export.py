@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--cwd", type=str, required=True)
     parser.add_argument("--freeze-physics", type=parse_bool, default=False)
+    parser.add_argument("--pack-resources", type=parse_bool, default=False)
     return parser.parse_args(args)
 
 
@@ -41,7 +42,7 @@ def parse_bool(raw):
         return True
     if value in ("false", "0", "no", "n", "off"):
         return False
-    raise ValueError("--freeze-physics must be true or false")
+    raise ValueError("expected boolean value")
 
 
 def load_scene_class(script_path):
@@ -166,6 +167,10 @@ def save_scene(output_path):
     bpy.ops.wm.save_as_mainfile(filepath=output_path, copy=False)
 
 
+def pack_resources():
+    bpy.ops.file.pack_all()
+
+
 def main():
     args = parse_args()
 
@@ -184,6 +189,8 @@ def main():
 
     if args.freeze_physics:
         freeze_rigidbody_simulation()
+    if args.pack_resources:
+        pack_resources()
 
     attach_scene_metadata(scene_instance, args.script, args.cwd)
     attach_object_metadata(scene_instance)

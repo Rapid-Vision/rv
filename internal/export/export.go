@@ -15,6 +15,7 @@ type Options struct {
 	Cwd           string
 	OutputPath    string
 	FreezePhysics bool
+	PackResources bool
 }
 
 func Export(opts Options) error {
@@ -71,6 +72,9 @@ func buildBlenderExportArgs(opts Options, libPath string) []string {
 	}
 	if opts.FreezePhysics {
 		args = append(args, "--freeze-physics", "true")
+	}
+	if opts.PackResources {
+		args = append(args, "--pack-resources", "true")
 	}
 	return args
 }

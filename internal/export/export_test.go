@@ -15,6 +15,7 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 			Cwd:           "/tmp/work",
 			OutputPath:    "/tmp/out/scene.blend",
 			FreezePhysics: true,
+			PackResources: true,
 		},
 		"/tmp/lib",
 	)
@@ -31,6 +32,7 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 		{"--output", "/tmp/out/scene.blend"},
 		{"--cwd", "/tmp/work"},
 		{"--freeze-physics", "true"},
+		{"--pack-resources", "true"},
 	}
 	for _, pair := range wantPairs {
 		idx := slices.Index(got, pair[0])
