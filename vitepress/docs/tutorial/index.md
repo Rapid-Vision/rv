@@ -31,26 +31,7 @@ go install github.com/Rapid-Vision/rv@latest
 
 <Step title="Create scene script">
 
-```python:line-numbers [scene.py]
-import rv
-
-class BasicScene(rv.Scene):
-    def generate(self):
-        self.get_world().set_params(sun_intensity=0.03)
-        cube = (
-            self.create_cube().set_location((1, 0, 0.5)).set_scale(0.5).set_tags("cube")
-        )
-        sphere = (
-            self.create_sphere()
-            .set_location((-1, 0, 1))
-            .set_shading("smooth")
-            .set_tags("sphere")
-        )
-        plane = self.create_plane(size=1000)
-        empty = self.create_empty().set_location((0, 0, 1))
-
-        cam = self.get_camera().set_location((7, 7, 3)).point_at(empty)
-```
+<<<@/snippets/1_basic_scene.py{python:line-numbers}
 
 </Step>
 
@@ -68,28 +49,8 @@ Don't close the preview window yet.
 <Step title="Randomize the scene">
 
 See how the preview changes on each file save.
-```python:line-numbers [scene.py]
-import rv
-from random import uniform # [!code ++]
 
-class BasicScene(rv.Scene):
-    def generate(self):
-        self.get_world().set_params(sun_intensity=0.03)
-        cube = (
-            self.create_cube().set_location((1, 0, 0.5)).set_scale(0.5).set_tags("cube")
-        )
-        cube.rotate_around_axis(rv.mathutils.Vector((0, 0, 1)), uniform(0, 360)) # [!code ++]
-        sphere = (
-            self.create_sphere()
-            .set_location((-1, 0, 1))
-            .set_shading("smooth")
-            .set_tags("sphere")
-        )
-        plane = self.create_plane(size=1000)
-        empty = self.create_empty().set_location((0, 0, 1))
-
-        cam = self.get_camera().set_location((7, 7, 3)).point_at(empty)
-```
+<<<@/snippets/2_randomized.py{python:line-numbers}
 
 </Step>
 
@@ -105,17 +66,8 @@ rv render scene.py
 <Step title="See the resulting dataset">
 
 Resulting dataset has following directory structure:
-```text
-out/
-└── 1/
-    └── 424702d4-b28e-4082-b5e5-5499f9a49065/
-        ├── _meta.json
-        ├── Image0001.png
-        ├── PreviewIndexOB0001.png
-        ├── IndexOB0001.png
-        ├── Alpha0001.png
-        └── Noisy Image0001.png
-```
+
+<<<@/snippets/3_files.txt{text}
 
 |                  Name                  | Description                                                                                                                                         |
 | :------------------------------------: | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -138,8 +90,3 @@ For more information view the [API reference](/api/).
 </Step>
 
 </Steps>
-
-## Related pages
-
-- [Build from source](/tutorial/github)
-- [API reference](/api/)
