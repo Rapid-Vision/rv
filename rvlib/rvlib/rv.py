@@ -2145,6 +2145,15 @@ class Object(_Serializable):
 
         self.tags = set()
         self.properties = dict()
+        exported_meta = _restore_rv_export_object_metadata(self.obj)
+        if isinstance(exported_meta.get("tags"), list):
+            self.tags = set(
+                tag for tag in exported_meta["tags"] if isinstance(tag, str)
+            )
+        if isinstance(exported_meta.get("properties"), dict):
+            self.properties = dict(exported_meta["properties"])
+        if isinstance(exported_meta.get("custom_meta"), dict):
+            self.custom_meta = dict(exported_meta["custom_meta"])
 
         self.index = None
         if register_object:
@@ -4051,6 +4060,27 @@ def _load_all_objects(path: str):
         data_to.objects = [name for name in data_from.objects]
 
     return data_to.objects
+
+
+def _read_json_property(id_data, key: str):
+    raw = id_data.get(key)
+    if raw is None or not isinstance(raw, str):
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _restore_rv_export_object_metadata(obj: bpy.types.Object) -> dict:
+    meta = _read_json_property(obj, "rv_object_json")
+    if isinstance(meta, dict):
+        return meta
+
+    tags = _read_json_property(obj, "rv_tags_json")
+    if tags is None:
+        return {}
+    return {"tags": tags}
 
 
 def _combine_arglist_set(args):
