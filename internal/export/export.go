@@ -11,9 +11,10 @@ import (
 )
 
 type Options struct {
-	ScriptPath string
-	Cwd        string
-	OutputPath string
+	ScriptPath    string
+	Cwd           string
+	OutputPath    string
+	FreezePhysics bool
 }
 
 func Export(opts Options) error {
@@ -56,7 +57,7 @@ func Export(opts Options) error {
 }
 
 func buildBlenderExportArgs(opts Options, libPath string) []string {
-	return []string{
+	args := []string{
 		filepath.Join(libPath, "template.blend"),
 		"--factory-startup",
 		"--background",
@@ -68,4 +69,8 @@ func buildBlenderExportArgs(opts Options, libPath string) []string {
 		"--output", opts.OutputPath,
 		"--cwd", opts.Cwd,
 	}
+	if opts.FreezePhysics {
+		args = append(args, "--freeze-physics", "true")
+	}
+	return args
 }

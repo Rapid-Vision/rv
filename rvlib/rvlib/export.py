@@ -29,7 +29,19 @@ def parse_args():
     parser.add_argument("--libpath", type=str, required=True)
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--cwd", type=str, required=True)
+    parser.add_argument("--freeze-physics", type=parse_bool, default=False)
     return parser.parse_args(args)
+
+
+def parse_bool(raw):
+    if isinstance(raw, bool):
+        return raw
+    value = str(raw).strip().lower()
+    if value in ("true", "1", "yes", "y", "on"):
+        return True
+    if value in ("false", "0", "no", "n", "off"):
+        return False
+    raise ValueError("--freeze-physics must be true or false")
 
 
 def load_scene_class(script_path):
@@ -78,6 +90,42 @@ def attach_scene_metadata(scene_instance, script_path, cwd):
     if generated_collection is not None:
         generated_collection["rv_export_version"] = EXPORT_SCHEMA_VERSION
         generated_collection["rv_generated_collection"] = True
+
+
+def freeze_rigidbody_simulation():
+    scene = bpy.context.scene
+    frozen = []
+
+    for obj in list(scene.objects):
+        if getattr(obj, "rigid_body", None) is None:
+            continue
+
+        matrix = obj.matrix_world.copy()
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.rigidbody.object_remove()
+        obj.matrix_world = matrix
+        obj["rv_physics_frozen"] = True
+        frozen.append(obj.name)
+
+    if scene.rigidbody_world is not None:
+        try:
+            bpy.ops.object.select_all(action="DESELECT")
+            bpy.ops.rigidbody.world_remove()
+        except Exception:
+            pass
+
+    scene["rv_physics_frozen"] = True
+    set_json_prop(
+        scene,
+        "rv_physics_freeze_json",
+        {
+            "frozen_objects": frozen,
+            "frame": int(scene.frame_current),
+            "method": "final_transform_snapshot",
+        },
+    )
 
 
 def attach_object_metadata(scene_instance):
@@ -133,6 +181,9 @@ def main():
     scene_instance = scene_class(output_dir=None)
     scene_instance.generate()
     scene_instance._post_gen()
+
+    if args.freeze_physics:
+        freeze_rigidbody_simulation()
 
     attach_scene_metadata(scene_instance, args.script, args.cwd)
     attach_object_metadata(scene_instance)

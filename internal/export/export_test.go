@@ -11,9 +11,10 @@ import (
 func TestBuildBlenderExportArgs(t *testing.T) {
 	got := buildBlenderExportArgs(
 		Options{
-			ScriptPath: "/tmp/scene.py",
-			Cwd:        "/tmp/work",
-			OutputPath: "/tmp/out/scene.blend",
+			ScriptPath:    "/tmp/scene.py",
+			Cwd:           "/tmp/work",
+			OutputPath:    "/tmp/out/scene.blend",
+			FreezePhysics: true,
 		},
 		"/tmp/lib",
 	)
@@ -29,6 +30,7 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 		{"--libpath", "/tmp/lib"},
 		{"--output", "/tmp/out/scene.blend"},
 		{"--cwd", "/tmp/work"},
+		{"--freeze-physics", "true"},
 	}
 	for _, pair := range wantPairs {
 		idx := slices.Index(got, pair[0])

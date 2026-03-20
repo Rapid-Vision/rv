@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	exportOutputPath string
-	exportCwd        string
+	exportOutputPath    string
+	exportCwd           string
+	exportFreezePhysics bool
 )
 
 var exportCmd = &cobra.Command{
@@ -25,6 +26,7 @@ func init() {
 
 	exportCmd.Flags().StringVarP(&exportOutputPath, "output", "o", "", "Output .blend file path")
 	exportCmd.Flags().StringVar(&exportCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
+	exportCmd.Flags().BoolVar(&exportFreezePhysics, "freeze-physics", false, "Simulate rigid-body physics to the end state and remove rigid-body simulation before saving")
 	_ = exportCmd.MarkFlagRequired("output")
 }
 
@@ -35,9 +37,10 @@ func runExport(_ *cobra.Command, args []string) {
 	}
 
 	if err := export.Export(export.Options{
-		ScriptPath: paths.ScriptPath,
-		Cwd:        paths.Cwd,
-		OutputPath: paths.OutputPath,
+		ScriptPath:    paths.ScriptPath,
+		Cwd:           paths.Cwd,
+		OutputPath:    paths.OutputPath,
+		FreezePhysics: exportFreezePhysics,
 	}); err != nil {
 		logs.Err.Fatalln("Export failed:", err)
 	}
