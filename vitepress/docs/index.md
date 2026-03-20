@@ -14,13 +14,16 @@ hero:
       link: /api
 
 features:
-  - icon: ⚡
+  - icon:
+      src: /assets/terminal.svg
     title: Excelent DX
     details: Simple API, Live Preview, Universal dataset format
-  - icon: 🎨
+  - icon:
+      src: /assets/camera.svg
     title: Photorealistic rendering
     details: Physically based rendering powered by Cycles engine
-  - icon: ⚙️
+  - icon: 
+      src: /assets/orbit.svg
     title: Physics simulations
     details: Simulate physics to create complex realistic scenes.
 

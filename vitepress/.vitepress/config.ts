@@ -7,7 +7,7 @@ export default defineConfig({
   head: [['link', { rel: 'icon', href: '/favicon.png' }]],
 
 
-  title: "RV Framework",
+  title: "RV",
   description: "Framework for procedural synthetic dataset generation",
   locales: {
     root: {
@@ -48,7 +48,7 @@ export default defineConfig({
       label: 'Русский',
       lang: 'ru',
       link: '/ru/',
-      title: 'RV Framework',
+      title: 'RV',
       description: 'Фреймворк для процедурной генерации синтетических датасетов',
       themeConfig: {
         nav: [
