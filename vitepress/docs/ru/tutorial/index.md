@@ -85,8 +85,3 @@ rv render scene.py
 </Step>
 
 </Steps>
-
-## Связанные страницы
-
-- [Сборка из исходников](/ru/tutorial/github)
-- [API reference](/api/)

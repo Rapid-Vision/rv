@@ -2,8 +2,8 @@
 layout: home
 
 hero:
-    name: RV Framework
-    tagline: High-quality synthetic dataset generation toolkit with automatic production-ready labels.
+    name: RV
+    tagline: A modern tool for creating high-quality synthetic datasets with automatic production-ready labels
 
     actions:
     - theme: brand

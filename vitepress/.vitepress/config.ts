@@ -4,6 +4,9 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   srcDir: "docs",
 
+  head: [['link', { rel: 'icon', href: '/favicon.png' }]],
+
+
   title: "RV Framework",
   description: "Framework for procedural synthetic dataset generation",
   locales: {
