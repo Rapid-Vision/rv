@@ -10,7 +10,7 @@ class BasicScene(rv.Scene):
         self.get_world().set_params(sun_intensity=0.1)
         rock_loader = self.load_object("./rock.blend", "Rock")
         rock = rock_loader.create_instance()
-        rock.set_property("geo_seed", random.uniform(0, 1000))
+        rock.set_modifier_input("seed1", random.uniform(0, 1000))
         rock.set_property(
             "highlight_color",
             [
