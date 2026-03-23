@@ -1152,6 +1152,7 @@ Wrapper around a Blender object with chainable transformation and metadata helpe
 | `scene` | `Scene` | Owning scene |
 | `tags` | `TagSet` | Object-level semantic tags |
 | `properties` | `dict` | Custom properties assigned to this object |
+| `modifier_parameters` | `list[dict[str, JSONSerializable]]` | Saved Geometry Nodes modifier parameters |
 | `index` | `int \| None` | Assigned object pass index |
 
 :::
@@ -1230,6 +1231,29 @@ def set_property(self, key: str, value: any)
 
 - **`key`** : `str` — Custom property key
 - **`value`** : `any` — Custom property value
+
+**Returns**: `Self`
+
+---
+---
+#### `set_modifier_input`
+
+Set an exposed Geometry Nodes modifier input.
+
+If `modifier_name` is omitted, `rv` searches for a unique Geometry Nodes
+modifier that exposes the requested input.
+
+**Signature**
+
+```python
+def set_modifier_input(self, input_name: str, value: any, modifier_name: str | None=None)
+```
+
+**Arguments**
+
+- **`input_name`** : `str` — Exposed modifier input name or identifier
+- **`value`** : `any` — Value assigned to the modifier input
+- **`modifier_name`** : `str | None` — Optional modifier name when disambiguation is needed
 
 **Returns**: `Self`
 

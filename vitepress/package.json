@@ -4,7 +4,6 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest",
     "vitepress": "^2.0.0-alpha.17",
     "vue": "^3.5.30"
   },

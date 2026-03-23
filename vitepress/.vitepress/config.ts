@@ -6,7 +6,6 @@ export default defineConfig({
 
   head: [['link', { rel: 'icon', href: '/favicon.png' }]],
 
-
   title: "RV",
   description: "Framework for procedural synthetic dataset generation",
   locales: {
@@ -86,6 +85,10 @@ export default defineConfig({
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     outline: [2, 4],
+
+    search: {
+      provider: "local",
+    },
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/Rapid-Vision/rv' }
