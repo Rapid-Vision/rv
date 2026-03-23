@@ -11,7 +11,7 @@ hero:
       link: /ru/tutorial/
     - theme: brand
       text: API Reference
-      link: /api/
+      link: /ru/api/
 
 features:
   - icon:

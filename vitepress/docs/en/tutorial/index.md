@@ -85,7 +85,7 @@ Resulting dataset has following directory structure:
 
 <Step title="Use rv for generating your next synthetic dataset">
 
-For more information view the [API reference](/api/).
+For more information view the [API reference](/en/api/).
 
 </Step>
 

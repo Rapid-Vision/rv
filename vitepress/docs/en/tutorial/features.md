@@ -209,4 +209,4 @@ In practice, many dataset scripts follow the same pattern:
 4. Add tags, semantic channels, and render passes.
 5. Render with `rv render` or save an intermediate scene with `rv export`.
 
-Start with the small examples in [`examples/`](/home/mishapankin/Work/RapidVision/rv/examples), then use the [API reference](/api/) when you need the full method signatures.
+Start with the small examples in [`examples/`](/home/mishapankin/Work/RapidVision/rv/examples), then use the [API reference](/en/api/) when you need the full method signatures.

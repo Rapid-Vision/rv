@@ -3,33 +3,37 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   srcDir: "docs",
+  ignoreDeadLinks: [/^\/home\//],
 
   head: [['link', { rel: 'icon', href: '/favicon.png' }]],
 
   title: "RV",
   description: "Framework for procedural synthetic dataset generation",
   locales: {
-    root: {
+    en: {
       label: 'English',
       lang: 'en',
+      link: '/en/',
       themeConfig: {
         nav: [
-          { text: 'Tutorial', link: '/tutorial/' },
-          { text: 'API', link: '/api/' }
+          { text: 'Home', link: '/en/' },
+          { text: 'Tutorial', link: '/en/tutorial/' },
+          { text: 'API', link: '/en/api/' }
         ],
         sidebar: {
-          '/': [
+          '/en/': [
             {
               text: 'Tutorial',
               items: [
-                { text: 'Getting Started', link: '/tutorial/' },
-                { text: 'Build from Source', link: '/tutorial/github' }
+                { text: 'Getting Started', link: '/en/tutorial/' },
+                { text: 'Feature Overview', link: '/en/tutorial/features' },
+                { text: 'Build from Source', link: '/en/tutorial/github' }
               ]
             },
             {
               text: 'Reference',
               items: [
-                { text: 'API', link: '/api/' }
+                { text: 'API', link: '/en/api/' }
               ]
             }
           ],
@@ -53,7 +57,7 @@ export default defineConfig({
         nav: [
           { text: 'Главная', link: '/ru/' },
           { text: 'Туториал', link: '/ru/tutorial/' },
-          { text: 'API', link: '/api/' }
+          { text: 'API', link: '/ru/api/' }
         ],
         sidebar: {
           '/ru/': [
@@ -67,7 +71,7 @@ export default defineConfig({
             {
               text: 'Справка',
               items: [
-                { text: 'API', link: '/api/' }
+                { text: 'API', link: '/ru/api/' }
               ]
             }
           ],

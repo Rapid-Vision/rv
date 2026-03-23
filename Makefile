@@ -4,7 +4,8 @@ rtasks:
 	rrpc client --lang go -o internal -f rtasks.rrpc
 
 docs:
-	uvx rdocgen -c rvlib/rvlib/rv.py -o vitepress/docs/api
+	uvx rdocgen -c rvlib/rvlib/rv.py -o vitepress/docs/en/api
+	cp vitepress/docs/en/api/index.md vitepress/docs/ru/api/index.md
 
 test: test-python-unit test-blender
 
