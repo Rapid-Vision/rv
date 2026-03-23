@@ -73,6 +73,7 @@ func Preview(opts Options) {
 
 	// Start Blender
 	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, libPath, port)...)
+	cmd.Env = utils.BlenderCommandEnv()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

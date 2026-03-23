@@ -47,6 +47,7 @@ func Export(opts Options) error {
 	}
 
 	cmd := exec.Command(blenderPath, buildBlenderExportArgs(opts, libPath)...)
+	cmd.Env = utils.BlenderCommandEnv()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

@@ -15,6 +15,15 @@ import (
 	"github.com/Rapid-Vision/rv/rvlib"
 )
 
+var blenderEnvBlockedKeys = map[string]struct{}{
+	"PYTHONHOME":          {},
+	"PYTHONPATH":          {},
+	"PYTHONSTARTUP":       {},
+	"PYTHONUSERBASE":      {},
+	"VIRTUAL_ENV":         {},
+	"__PYVENV_LAUNCHER__": {},
+}
+
 // get an available port
 func GetPort() (int, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -135,6 +144,52 @@ func WaitCmdBuff(buff []*exec.Cmd) <-chan error {
 		go func(c *exec.Cmd) { ch <- c.Wait() }(cmd)
 	}
 	return ch
+}
+
+func BlenderCommandEnv() []string {
+	env := os.Environ()
+	virtualEnv := filepath.Clean(os.Getenv("VIRTUAL_ENV"))
+	venvBinDir := ""
+	if virtualEnv != "" && virtualEnv != "." {
+		venvBinDir = filepath.Join(virtualEnv, "bin")
+		if runtime.GOOS == "windows" {
+			venvBinDir = filepath.Join(virtualEnv, "Scripts")
+		}
+	}
+
+	sanitized := make([]string, 0, len(env))
+	for _, entry := range env {
+		key, value, found := strings.Cut(entry, "=")
+		if !found {
+			continue
+		}
+		if _, blocked := blenderEnvBlockedKeys[key]; blocked {
+			continue
+		}
+		if key == "PATH" && venvBinDir != "" {
+			value = removePathEntry(value, venvBinDir)
+		}
+		sanitized = append(sanitized, key+"="+value)
+	}
+
+	return sanitized
+}
+
+func removePathEntry(rawPath string, target string) string {
+	if rawPath == "" || target == "" {
+		return rawPath
+	}
+
+	target = filepath.Clean(target)
+	parts := filepath.SplitList(rawPath)
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if filepath.Clean(part) == target {
+			continue
+		}
+		filtered = append(filtered, part)
+	}
+	return strings.Join(filtered, string(os.PathListSeparator))
 }
 
 func SplitTaskBetweenProcs(n int, p int, i int) int {

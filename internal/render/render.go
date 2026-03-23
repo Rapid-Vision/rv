@@ -125,6 +125,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 			blenderPath,
 			buildBlenderRenderArgs(opts, libPath, seqOutDir, part)...,
 		)
+		cmd.Env = utils.BlenderCommandEnv()
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
