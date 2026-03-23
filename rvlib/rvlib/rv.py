@@ -2232,6 +2232,7 @@ class Object(_Serializable):
     scene: Scene  # Owning scene
     tags: TagSet  # Object-level semantic tags
     properties: dict  # Custom properties assigned to this object
+    modifier_parameters: list[dict[str, JSONSerializable]]  # Saved Geometry Nodes modifier parameters
 
     index: int | None  # Assigned object pass index
 
@@ -2245,6 +2246,7 @@ class Object(_Serializable):
 
         self.tags = set()
         self.properties = dict()
+        self.modifier_parameters = []
         exported_meta = _restore_rv_export_object_metadata(self.obj)
         if isinstance(exported_meta.get("tags"), list):
             self.tags = set(
@@ -2252,6 +2254,9 @@ class Object(_Serializable):
             )
         if isinstance(exported_meta.get("properties"), dict):
             self.properties = dict(exported_meta["properties"])
+        self.modifier_parameters = _restore_modifier_parameters(
+            exported_meta.get("modifier_parameters")
+        )
         if isinstance(exported_meta.get("custom_meta"), dict):
             self.custom_meta = dict(exported_meta["custom_meta"])
 
@@ -2348,6 +2353,21 @@ class Object(_Serializable):
         )
         input_key = _resolve_modifier_input_key(modifier, input_name)
         modifier[input_key] = value
+        for parameter in self.modifier_parameters:
+            if (
+                parameter["modifier_name"] == modifier.name
+                and parameter["parameter_name"] == input_name
+            ):
+                parameter["value"] = value
+                break
+        else:
+            self.modifier_parameters.append(
+                {
+                    "modifier_name": modifier.name,
+                    "parameter_name": input_name,
+                    "value": value,
+                }
+            )
         _mark_node_tree(getattr(modifier, "node_group", None))
         return self
 
@@ -2673,6 +2693,7 @@ class Object(_Serializable):
                 "name": self.obj.name,
                 "tags": list(self.tags),
                 "properties": self.properties,
+                "modifier_parameters": self.modifier_parameters,
                 "materials": [
                     slot.material.name
                     for slot in self.obj.material_slots
@@ -4203,6 +4224,28 @@ def _restore_rv_export_object_metadata(obj: bpy.types.Object) -> dict:
     if tags is None:
         return {}
     return {"tags": tags}
+
+
+def _restore_modifier_parameters(raw) -> list[dict[str, JSONSerializable]]:
+    if not isinstance(raw, list):
+        return []
+
+    restored: list[dict[str, JSONSerializable]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        modifier_name = item.get("modifier_name")
+        parameter_name = item.get("parameter_name")
+        if not isinstance(modifier_name, str) or not isinstance(parameter_name, str):
+            continue
+        restored.append(
+            {
+                "modifier_name": modifier_name,
+                "parameter_name": parameter_name,
+                "value": item.get("value"),
+            }
+        )
+    return restored
 
 
 def _combine_arglist_set(args):
