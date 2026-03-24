@@ -122,3 +122,13 @@
   --vp-custom-block-tip-bg: var(--vp-c-brand-soft);
   --vp-custom-block-tip-code-bg: var(--vp-c-brand-soft);
 }
+
+.image_block {
+  display: grid; grid-template-columns: 1fr; gap: 1rem;
+}
+
+@media (min-width: 768px) {
+    .image_block {
+        grid-template-columns: 1fr 1fr !important;
+    }
+}

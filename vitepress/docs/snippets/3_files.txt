@@ -2,8 +2,8 @@ out/
 └── 1/
     └── 424702d4-b28e-4082-b5e5-5499f9a49065/
         ├── _meta.json
-        ├── Image0001.png
-        ├── PreviewIndexOB0001.png
-        ├── IndexOB0001.png
-        ├── Alpha0001.png
-        └── Noisy Image0001.png
+        ├── Image.png
+        ├── PreviewIndexOB.png
+        ├── IndexOB.png
+        ├── Alpha.png
+        └── Noisy Image.png

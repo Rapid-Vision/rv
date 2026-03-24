@@ -75,9 +75,9 @@ Resulting dataset has following directory structure:
 |                  `1`                   | Directory containing results of a single rendering run. Number increases sequentially                                                               |
 | `424702d4-b28e-4082-b5e5-5499f9a49065` | Directory with resulting image, labeling and additional render passes                                                                               |
 |              `_meta.json`              | Labeling information                                                                                                                                |
-|            `Image0001.png`             | Resulting image                                                                                                                                     |
-|        `PreviewIndexOB0001.png`        | Preview for the segmentation masks                                                                                                                  |
-|           `IndexOB0001.png`            | Segmentation masks. It is a 16-bit black and with image with each pixel corresponding to the `index` field of each object in the `_meta.json` file. |
+|            `Image.png`             | Resulting image                                                                                                                                     |
+|        `PreviewIndexOB.png`        | Preview for the segmentation masks                                                                                                                  |
+|           `IndexOB.png`            | Segmentation masks. It is a 16-bit black and with image with each pixel corresponding to the `index` field of each object in the `_meta.json` file. |
 |                 Other                  | Other rendering passes that can be useful for computer vision tasks and can be additionaly enabled by the `Scene.set_passes` method.                |
 
 </Step>
@@ -85,7 +85,7 @@ Resulting dataset has following directory structure:
 
 <Step title="Use rv for generating your next synthetic dataset">
 
-For more information view the [API reference](/en/api/).
+For more information view the [Features Overview](/en/tutorial/features) and [API reference](/en/api/).
 
 </Step>
 
