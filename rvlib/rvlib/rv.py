@@ -1138,7 +1138,7 @@ class Scene(ABC, _Serializable):
     ) -> "Scene":
         """
         Enable semantic shader channels to be exported as masks.
-        In Blender node graphs, write channel values to AOV outputs named `SEM_<channel>`.
+        In Blender node graphs, write channel values to AOV outputs named `<channel>`.
         """
         for channel in _combine_arglist_set(channels):
             self.semantic_channels.add(_normalize_semantic_channel(channel))
@@ -2026,7 +2026,7 @@ def _normalize_semantic_channel(channel: str) -> str:
 
 
 def _semantic_aov_name(channel: str) -> str:
-    return f"SEM_{_normalize_semantic_channel(channel)}"
+    return _normalize_semantic_channel(channel)
 
 
 class BasicMaterial(Material):
@@ -3330,7 +3330,7 @@ def _configure_semantic_aovs(layer, semantic_channels: SemanticChannelSet) -> No
 
     for aov in list(layer.aovs):
         aov_name = getattr(aov, "name", "")
-        if aov_name.startswith("SEM_"):
+        if _normalize_socket_name(aov_name) in semantic_channels:
             layer.aovs.remove(aov)
 
     for channel in sorted(semantic_channels):
@@ -3526,7 +3526,7 @@ def _configure_compositor(
         threshold.hide = True
         tree.links.new(socket, threshold.inputs[0])
 
-        channel = socket_name.removeprefix("SEM_")
+        channel = _normalize_semantic_channel(socket_name)
         mask_slot_name = f"Mask_{channel}"
         sem_input = _add_file_output_item(
             semantic_file_out_node,

@@ -10,8 +10,8 @@ and a material inside it named:
 
 The material must write semantic masks into shader AOV outputs named:
 
-- `SEM_rust`
-- `SEM_clean_metal`
+- `rust`
+- `clean_metal`
 
 `rv` will export them as:
 
@@ -23,15 +23,15 @@ The material must write semantic masks into shader AOV outputs named:
 1. Open Blender and create/select a material. Rename it to `RustyMetal`.
 2. Build your rust blending using shader nodes (any approach is fine).
 3. Create a scalar rust mask in the node tree (0 for clean metal, 1 for rust).
-4. Add node `Output AOV` and set its AOV name to `SEM_rust`.
+4. Add node `Output AOV` and set its AOV name to `rust`.
 5. Connect the rust mask to the AOV node input.
-6. Add another `Output AOV` node with AOV name `SEM_clean_metal`.
-7. Add a `Math` node set to `Subtract` with value `1 - rust_mask`, and connect that to `SEM_clean_metal`.
+6. Add another `Output AOV` node with AOV name `clean_metal`.
+7. Add a `Math` node set to `Subtract` with value `1 - rust_mask`, and connect that to `clean_metal`.
 8. Save the file as `examples/4_semantic_aov/rusty_metal.blend`.
 
 Notes:
 - You do not need to manually configure View Layer AOV passes for this workflow. `rv` registers configured semantic channels automatically during render.
-- Keep AOV names exactly `SEM_rust` and `SEM_clean_metal` to match the scene script.
+- Keep AOV names exactly `rust` and `clean_metal` to match the scene script.
 
 ## Run
 

@@ -145,10 +145,10 @@ For many synthetic scenes this is enough. If you need physically plausible final
 
 Object tags are useful for instance-level labeling, but many datasets also need masks for material regions such as rust, dirt, paint, or wear. `rv` supports this through Blender shader AOVs.
 
-On the Blender side, write your mask into an `AOV Output` node named `SEM_<channel>`:
+On the Blender side, write your mask into an `AOV Output` node named `<channel>`:
 
 ```text
-SEM_rust
+rust
 ```
 
 ![AO](/assets/aov_output.png)

@@ -392,7 +392,7 @@ def set_passes(self, *passes: tuple[RenderPass | list[RenderPass], ...])
 #### `enable_semantic_channels`
 
 Enable semantic shader channels to be exported as masks.
-In Blender node graphs, write channel values to AOV outputs named `SEM_<channel>`.
+In Blender node graphs, write channel values to AOV outputs named `<channel>`.
 
 **Signature**
 
