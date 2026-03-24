@@ -1,12 +1,15 @@
 package render
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
+	"strings"
 	"syscall"
 
 	"github.com/Rapid-Vision/rv/internal/logs"
@@ -20,6 +23,7 @@ type RenderOptions struct {
 	Procs                 int
 	Resolution            [2]int
 	OutputDir             string
+	GPUBackend            string
 	TimeLimit             *float64
 	MaxSamples            *int
 	MinSamples            *int
@@ -29,6 +33,32 @@ type RenderOptions struct {
 
 type RenderResult struct {
 	OutputDir string
+}
+
+type datasetMeta struct {
+	Resolution   [2]int             `json:"resolution"`
+	RenderParams datasetRenderParms `json:"render_params"`
+	SampleFiles  []string           `json:"sample_files"`
+}
+
+type datasetRenderParms struct {
+	ScriptPath            string   `json:"script_path"`
+	Cwd                   string   `json:"cwd"`
+	Number                int      `json:"number"`
+	Procs                 int      `json:"procs"`
+	GPUBackend            string   `json:"gpu_backend,omitempty"`
+	TimeLimit             *float64 `json:"time_limit,omitempty"`
+	MaxSamples            *int     `json:"max_samples,omitempty"`
+	MinSamples            *int     `json:"min_samples,omitempty"`
+	NoiseThresholdEnabled *bool    `json:"noise_threshold_enabled,omitempty"`
+	NoiseThreshold        *float64 `json:"noise_threshold,omitempty"`
+}
+
+func normalizedGPUBackend(value string) string {
+	if value == "" {
+		return "auto"
+	}
+	return strings.ToLower(value)
 }
 
 func Render(opts RenderOptions) (RenderResult, error) {
@@ -78,6 +108,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if resolution[0] <= 0 || resolution[1] <= 0 {
 		return RenderResult{}, errors.New("--resolution must be WIDTH,HEIGHT with positive integers")
 	}
+	opts.GPUBackend = normalizedGPUBackend(opts.GPUBackend)
 	if err := validateOptionalRenderOptions(opts); err != nil {
 		return RenderResult{}, err
 	}
@@ -94,6 +125,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 			blenderPath,
 			buildBlenderRenderArgs(opts, libPath, seqOutDir, part)...,
 		)
+		cmd.Env = utils.BlenderCommandEnv()
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
@@ -136,6 +168,9 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if renderErr != nil {
 		return RenderResult{}, renderErr
 	}
+	if err := writeDatasetMetadata(seqOutDir, opts); err != nil {
+		return RenderResult{}, fmt.Errorf("failed to write dataset metadata: %w", err)
+	}
 
 	return RenderResult{
 		OutputDir: seqOutDir,
@@ -143,6 +178,7 @@ func Render(opts RenderOptions) (RenderResult, error) {
 }
 
 func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string, part int) []string {
+	gpuBackend := normalizedGPUBackend(opts.GPUBackend)
 	args := []string{
 		filepath.Join(libPath, "template.blend"),
 		"--factory-startup",
@@ -156,6 +192,7 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--output", seqOutDir,
 		"--cwd", opts.Cwd,
+		"--gpu-backend", gpuBackend,
 	}
 
 	if opts.TimeLimit != nil {
@@ -178,6 +215,11 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 }
 
 func validateOptionalRenderOptions(opts RenderOptions) error {
+	switch normalizedGPUBackend(opts.GPUBackend) {
+	case "auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu":
+	default:
+		return errors.New("--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu")
+	}
 	if opts.TimeLimit != nil && *opts.TimeLimit <= 0 {
 		return errors.New("--time-limit must be > 0")
 	}
@@ -204,4 +246,86 @@ func validateOptionalRenderOptions(opts RenderOptions) error {
 		}
 	}
 	return nil
+}
+
+func writeDatasetMetadata(seqOutDir string, opts RenderOptions) error {
+	if err := os.MkdirAll(seqOutDir, os.ModePerm); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(seqOutDir)
+	if err != nil {
+		return err
+	}
+
+	samples := make([]string, 0)
+	sampleFiles := make([]string, 0)
+	haveSampleFiles := false
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		samplePath := filepath.Join(seqOutDir, entry.Name())
+		if !haveSampleFiles {
+			files, err := listFilesRecursive(samplePath)
+			if err != nil {
+				return err
+			}
+			sampleFiles = files
+			haveSampleFiles = true
+		}
+		samples = append(samples, entry.Name())
+	}
+	slices.SortFunc(samples, strings.Compare)
+
+	meta := datasetMeta{
+		Resolution: opts.Resolution,
+		RenderParams: datasetRenderParms{
+			ScriptPath:            opts.ScriptPath,
+			Cwd:                   opts.Cwd,
+			Number:                opts.ImageNum,
+			Procs:                 opts.Procs,
+			GPUBackend:            normalizedGPUBackend(opts.GPUBackend),
+			TimeLimit:             opts.TimeLimit,
+			MaxSamples:            opts.MaxSamples,
+			MinSamples:            opts.MinSamples,
+			NoiseThresholdEnabled: opts.NoiseThresholdEnabled,
+			NoiseThreshold:        opts.NoiseThreshold,
+		},
+		SampleFiles: sampleFiles,
+	}
+
+	f, err := os.Create(filepath.Join(seqOutDir, "_meta.json"))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "    ")
+	return enc.Encode(meta)
+}
+
+func listFilesRecursive(root string) ([]string, error) {
+	files := make([]string, 0)
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.Sort(files)
+	return files, nil
 }

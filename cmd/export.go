@@ -1,0 +1,50 @@
+package cmd
+
+import (
+	"github.com/Rapid-Vision/rv/internal/export"
+	"github.com/Rapid-Vision/rv/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/utils"
+	"github.com/spf13/cobra"
+)
+
+var (
+	exportOutputPath    string
+	exportCwd           string
+	exportFreezePhysics bool
+	exportPackResources bool
+)
+
+var exportCmd = &cobra.Command{
+	Use:   "export <script.py>",
+	Short: "Export a realized scene to a .blend file",
+	Long:  `Run the scene script once in headless Blender and save the resulting scene as a .blend file.`,
+	Args:  cobra.ExactArgs(1),
+	Run:   runExport,
+}
+
+func init() {
+	rootCmd.AddCommand(exportCmd)
+
+	exportCmd.Flags().StringVarP(&exportOutputPath, "output", "o", "", "Output .blend file path")
+	exportCmd.Flags().StringVar(&exportCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
+	exportCmd.Flags().BoolVar(&exportFreezePhysics, "freeze-physics", false, "Simulate rigid-body physics to the end state and remove rigid-body simulation before saving")
+	exportCmd.Flags().BoolVar(&exportPackResources, "pack-resources", false, "Pack external resources into the saved .blend file")
+	_ = exportCmd.MarkFlagRequired("output")
+}
+
+func runExport(_ *cobra.Command, args []string) {
+	paths, err := utils.ResolveExportPaths(args[0], exportOutputPath, exportCwd)
+	if err != nil {
+		logs.Err.Fatalln("Failed to resolve paths:", err)
+	}
+
+	if err := export.Export(export.Options{
+		ScriptPath:    paths.ScriptPath,
+		Cwd:           paths.Cwd,
+		OutputPath:    paths.OutputPath,
+		FreezePhysics: exportFreezePhysics,
+		PackResources: exportPackResources,
+	}); err != nil {
+		logs.Err.Fatalln("Export failed:", err)
+	}
+}

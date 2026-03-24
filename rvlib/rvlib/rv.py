@@ -4,38 +4,12 @@ Module for describing an `rv` scenes. To create a scene implement a class derriv
 - To preview scene use the `rv preview <scene.py>` command.
 - To render resulting dataset use the `rv render <scene.py>` command.
 
-### Scene example
-Here is a basic non-random scene with a cube and a sphere.
-To preview resulting segmentation masks see the `PreviewIndexOB0001.png` after rendering.
-```
-class BasicScene(rv.Scene):
-    def generate(self):
-        self.get_world().set_params(sun_intensity=0.03)
-        cube = (
-            self.create_cube().set_location((1, 0, 0.5)).set_scale(0.5).set_tags("cube")
-        )
-        sphere = (
-            self.create_sphere()
-            .set_location((-1, 0, 1))
-            .set_shading("smooth")
-            .set_tags("sphere")
-        )
-        plane = self.create_plane(size=1000)
-        empty = self.create_empty().set_location((0, 0, 1))
-        key_light = self.create_area_light(power=250).set_location((4, -4, 6)).point_at(
-            empty
-        )
-
-        cam = self.get_camera().set_location((7, 7, 3)).point_at(empty)
-```
-
-### Results
-| Image | Segmentation |
-| :-: | :-: |
-| ![resulting image](/examples/1_primitives/1_res.png) | ![resulting image](/examples/1_primitives/1_segs.png)|
+View https://rapid-vision.github.io/rv for documentation.
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+import numbers
 import typing
 from mathutils import Vector
 from typing import Literal, Union, Optional, TypeAlias
@@ -54,7 +28,7 @@ from enum import Enum
 from mathutils.bvhtree import BVHTree
 
 JSONSerializable: TypeAlias = Union[
-    str, int, float, bool, None, list["json.JSONType"], dict[str, "json.JSONType"]
+    str, int, float, bool, None, list["JSONSerializable"], dict[str, "JSONSerializable"]
 ]
 
 Resolution: TypeAlias = tuple[int, int]
@@ -71,10 +45,41 @@ CellCoords: TypeAlias = tuple[int, ...]
 RenderPassSet: TypeAlias = set["RenderPass"]
 TagSet: TypeAlias = set[str]
 SemanticChannelSet: TypeAlias = set[str]
-ObjectLoaderSource: TypeAlias = Union["ObjectLoader", list["ObjectLoader"]]
+ObjectLoaderSource: TypeAlias = Union[
+    "ObjectLoader", list["ObjectLoader"], tuple["ObjectLoader", ...]
+]
 ScatterValidationResult: TypeAlias = tuple[
     list["ObjectLoader"], float, float, float, float
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectStats:
+    """
+    Geometric inspection snapshot for an object or loader instance.
+    """
+
+    name: str
+    type: str
+    dimensions_world: Float3
+    dimensions_local: Float3
+    bounds_world: dict[str, Float3]
+    bounds_local: dict[str, Float3]
+    scale: Float3
+
+    def to_dict(self) -> dict[str, JSONSerializable]:
+        """
+        Convert to JSON-compatible dictionary for metadata serialization.
+        """
+        return {
+            "name": self.name,
+            "type": self.type,
+            "dimensions_world": self.dimensions_world,
+            "dimensions_local": self.dimensions_local,
+            "bounds_world": self.bounds_world,
+            "bounds_local": self.bounds_local,
+            "scale": self.scale,
+        }
 
 
 class RenderPass(Enum):
@@ -235,6 +240,134 @@ def _mark_object_tree(obj: bpy.types.Object) -> None:
             _mark_node_tree(node_group)
 
 
+def _normalize_modifier_input_name(name: str) -> str:
+    return "".join(ch.lower() for ch in name if ch.isalnum())
+
+
+def _iter_modifier_group_inputs(modifier):
+    node_group = getattr(modifier, "node_group", None)
+    if node_group is None:
+        return []
+
+    interface = getattr(node_group, "interface", None)
+    items_tree = getattr(interface, "items_tree", None)
+    if items_tree is not None:
+        return [
+            item
+            for item in items_tree
+            if getattr(item, "item_type", None) == "SOCKET"
+            and getattr(item, "in_out", None) == "INPUT"
+        ]
+
+    return list(getattr(node_group, "inputs", []))
+
+
+def _resolve_modifier_input_key(modifier, input_name: str) -> str:
+    sockets = list(_iter_modifier_group_inputs(modifier))
+    if not sockets:
+        raise ValueError(f"Modifier '{modifier.name}' has no exposed inputs.")
+
+    normalized_target = _normalize_modifier_input_name(input_name)
+    modifier_keys = set(modifier.keys())
+    matches: list[tuple[int, str, str]] = []
+
+    for index, socket in enumerate(sockets, start=1):
+        socket_name = str(getattr(socket, "name", ""))
+        socket_identifier = str(getattr(socket, "identifier", ""))
+        normalized_candidates = {
+            _normalize_modifier_input_name(socket_name),
+            _normalize_modifier_input_name(socket_identifier),
+        }
+        if normalized_target not in normalized_candidates:
+            continue
+
+        for candidate_key in (
+            socket_identifier,
+            f"Socket_{index}",
+            f"Input_{index}",
+        ):
+            if candidate_key and candidate_key in modifier_keys:
+                matches.append((index, socket_name, candidate_key))
+                break
+
+    if len(matches) == 1:
+        return matches[0][2]
+    if len(matches) > 1:
+        matched = ", ".join(
+            f"{socket_name} ({modifier.name})" for _, socket_name, _ in matches
+        )
+        raise ValueError(
+            f"Input '{input_name}' is ambiguous across exposed modifier sockets: {matched}"
+        )
+
+    available = ", ".join(
+        str(getattr(socket, "name", getattr(socket, "identifier", "")))
+        for socket in sockets
+    )
+    raise ValueError(
+        f"Modifier '{modifier.name}' has no input named '{input_name}'. "
+        f"Available inputs: [{available}]"
+    )
+
+
+def _resolve_nodes_modifier(
+    obj: bpy.types.Object,
+    input_name: str | None = None,
+    modifier_name: str | None = None,
+):
+    modifiers = list(getattr(obj, "modifiers", []))
+    if modifier_name is not None:
+        modifier = obj.modifiers.get(modifier_name)
+        if modifier is None:
+            available = ", ".join(mod.name for mod in modifiers)
+            raise ValueError(
+                f"Modifier '{modifier_name}' was not found on object '{obj.name}'. "
+                f"Available modifiers: [{available}]"
+            )
+        if getattr(modifier, "type", None) != "NODES":
+            raise ValueError(
+                f"Modifier '{modifier_name}' is not a Geometry Nodes modifier."
+            )
+        return modifier
+
+    nodes_modifiers = [
+        modifier for modifier in modifiers if getattr(modifier, "type", None) == "NODES"
+    ]
+    if not nodes_modifiers:
+        raise ValueError(f"Object '{obj.name}' has no Geometry Nodes modifiers.")
+    if len(nodes_modifiers) == 1:
+        return nodes_modifiers[0]
+    if input_name is None:
+        available = ", ".join(mod.name for mod in nodes_modifiers)
+        raise ValueError(
+            f"Object '{obj.name}' has multiple Geometry Nodes modifiers. "
+            f"Specify modifier_name. Available modifiers: [{available}]"
+        )
+
+    matches = []
+    for modifier in nodes_modifiers:
+        try:
+            _resolve_modifier_input_key(modifier, input_name)
+        except ValueError:
+            continue
+        matches.append(modifier)
+
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        available = ", ".join(mod.name for mod in matches)
+        raise ValueError(
+            f"Input '{input_name}' exists on multiple Geometry Nodes modifiers for "
+            f"object '{obj.name}'. Specify modifier_name. Matching modifiers: [{available}]"
+        )
+
+    available = ", ".join(mod.name for mod in nodes_modifiers)
+    raise ValueError(
+        f"No Geometry Nodes modifier on object '{obj.name}' exposes input "
+        f"'{input_name}'. Available modifiers: [{available}]"
+    )
+
+
 def _mark_world_tree(world) -> None:
     if world is None:
         return
@@ -310,7 +443,9 @@ def _purge_orphans() -> None:
         pass
 
 
-def begin_run(purge_orphans: bool = True) -> str:
+def begin_run(
+    purge_orphans: bool = True,  # Remove orphaned Blender datablocks after cleanup
+) -> str:
     """
     Start a new rv run by clearing previously generated data and returning a new run ID.
     """
@@ -322,7 +457,9 @@ def begin_run(purge_orphans: bool = True) -> str:
     return _ACTIVE_RUN_ID
 
 
-def end_run(purge_orphans: bool = False) -> None:
+def end_run(
+    purge_orphans: bool = False,  # Remove orphaned Blender datablocks on shutdown
+) -> None:
     """
     Finish the current rv run and optionally purge orphaned Blender datablocks.
     """
@@ -357,11 +494,15 @@ class _Serializable:
     def __init__(self):
         self.custom_meta = dict()
 
-    def set_custom_meta(self, **custom_meta: dict[str, JSONSerializable]) -> None:
+    def set_custom_meta(
+        self, **custom_meta: Union[JSONSerializable, ObjectStats]
+    ) -> None:
         """
         Set custom metainformation that may be helpful when using dataset later.
         """
         for key, value in custom_meta.items():
+            if isinstance(value, ObjectStats):
+                value = value.to_dict()
             self.custom_meta[key] = value
 
     def _get_meta(self) -> dict:
@@ -384,12 +525,33 @@ class Domain:
         self.data = data
         self.dimension = dimension
 
+    def inset(
+        self,
+        margin: float,  # Inset distance from the domain boundary
+    ) -> "Domain":
+        """
+        Return a new domain shrunk inward by `margin`.
+        """
+        margin = float(margin)
+        if margin < 0:
+            raise ValueError("margin must be >= 0.")
+
+        data = dict(self.data)
+        data["inset_margin"] = float(data.get("inset_margin", 0.0)) + margin
+        return Domain(self.kind, data, self.dimension)
+
+    def _effective_inset_margin(self) -> float:
+        return float(self.data.get("inset_margin", 0.0))
+
     @staticmethod
     def rect(
         center: Float2 = (0.0, 0.0),  # XY center of the rectangle
         size: Float2 = (10.0, 10.0),  # Rectangle width and depth
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
+        """
+        Build a rectangular 2D scatter domain.
+        """
         _ensure_positive_tuple(size, 2, "size")
         return Domain("rect", {"center": tuple(center), "size": tuple(size), "z": z}, 2)
 
@@ -399,6 +561,9 @@ class Domain:
         radii: Float2 = (5.0, 3.0),  # Ellipse radii along X and Y
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
+        """
+        Build an elliptical 2D scatter domain.
+        """
         _ensure_positive_tuple(radii, 2, "radii")
         return Domain(
             "ellipse", {"center": tuple(center), "radii": tuple(radii), "z": z}, 2
@@ -409,6 +574,9 @@ class Domain:
         points: Polygon2D,  # Polygon vertices in XY
         z: float = 0.0,  # Fixed Z plane for 2D scattering
     ) -> "Domain":
+        """
+        Build a convex 2D scatter domain from polygon vertices.
+        """
         if points is None or len(points) < 3:
             raise ValueError("polygon requires at least 3 points.")
         convex = _convex_hull_2d(points)
@@ -423,6 +591,9 @@ class Domain:
         center: Float3 = (0.0, 0.0, 0.0),  # 3D center
         size: Float3 = (10.0, 10.0, 10.0),  # Box side lengths
     ) -> "Domain":
+        """
+        Build an axis-aligned box scatter domain.
+        """
         _ensure_positive_tuple(size, 3, "size")
         return Domain("box", {"center": tuple(center), "size": tuple(size)}, 3)
 
@@ -433,6 +604,9 @@ class Domain:
         height: float = 10.0,  # Length along the selected axis
         axis: str = "Z",  # Longitudinal axis: X, Y, or Z
     ) -> "Domain":
+        """
+        Build a cylinder scatter domain aligned to X, Y, or Z.
+        """
         if radius <= 0:
             raise ValueError("radius must be > 0.")
         if height <= 0:
@@ -456,6 +630,9 @@ class Domain:
         center: Float3 = (0.0, 0.0, 0.0),  # Ellipsoid center
         radii: Float3 = (5.0, 3.0, 2.0),  # Radii along X, Y, Z
     ) -> "Domain":
+        """
+        Build an ellipsoid scatter domain.
+        """
         _ensure_positive_tuple(radii, 3, "radii")
         return Domain("ellipsoid", {"center": tuple(center), "radii": tuple(radii)}, 3)
 
@@ -464,6 +641,9 @@ class Domain:
         rv_obj: "Object",  # Source object to build the hull from
         project_2d: bool = False,  # If true, project hull to XY polygon
     ) -> "Domain":
+        """
+        Build a convex hull domain from an existing object.
+        """
         points = _get_object_world_vertices(rv_obj.obj)
         if len(points) < 3:
             raise ValueError("convex_hull requires an object with mesh geometry.")
@@ -492,14 +672,23 @@ class Domain:
         )
 
     def sample_point(self, rng: random.Random) -> mathutils.Vector:  # Random generator
+        """
+        Sample a random point inside this domain.
+        """
+        inset_margin = self._effective_inset_margin()
+
         if self.kind == "rect":
             cx, cy = self.data["center"]
             sx, sy = self.data["size"]
+            half_x = sx * 0.5 - inset_margin
+            half_y = sy * 0.5 - inset_margin
+            if half_x <= 0 or half_y <= 0:
+                raise ValueError("domain inset is too large to sample from rect.")
             z = self.data["z"]
             return Vector(
                 (
-                    rng.uniform(cx - sx * 0.5, cx + sx * 0.5),
-                    rng.uniform(cy - sy * 0.5, cy + sy * 0.5),
+                    rng.uniform(cx - half_x, cx + half_x),
+                    rng.uniform(cy - half_y, cy + half_y),
                     z,
                 )
             )
@@ -507,38 +696,57 @@ class Domain:
         if self.kind == "ellipse":
             cx, cy = self.data["center"]
             rx, ry = self.data["radii"]
+            rx_in = rx - inset_margin
+            ry_in = ry - inset_margin
+            if rx_in <= 0 or ry_in <= 0:
+                raise ValueError("domain inset is too large to sample from ellipse.")
             z = self.data["z"]
             theta = rng.uniform(0.0, 2.0 * math.pi)
             rr = math.sqrt(rng.random())
             return Vector(
-                (cx + rr * rx * math.cos(theta), cy + rr * ry * math.sin(theta), z)
+                (
+                    cx + rr * rx_in * math.cos(theta),
+                    cy + rr * ry_in * math.sin(theta),
+                    z,
+                )
             )
 
         if self.kind in {"polygon", "hull2d"}:
             points = self.data["points"]
             z = self.data["z"]
-            x, y = _sample_convex_polygon(points, rng)
-            return Vector((x, y, z))
+            for _ in range(512):
+                x, y = _sample_convex_polygon(points, rng)
+                p = Vector((x, y, z))
+                if self.contains_point(p, margin=0.0):
+                    return p
+            raise ValueError("domain inset is too large to sample from polygon/hull2d.")
 
         if self.kind == "box":
             cx, cy, cz = self.data["center"]
             sx, sy, sz = self.data["size"]
+            hx = sx * 0.5 - inset_margin
+            hy = sy * 0.5 - inset_margin
+            hz = sz * 0.5 - inset_margin
+            if hx <= 0 or hy <= 0 or hz <= 0:
+                raise ValueError("domain inset is too large to sample from box.")
             return Vector(
                 (
-                    rng.uniform(cx - sx * 0.5, cx + sx * 0.5),
-                    rng.uniform(cy - sy * 0.5, cy + sy * 0.5),
-                    rng.uniform(cz - sz * 0.5, cz + sz * 0.5),
+                    rng.uniform(cx - hx, cx + hx),
+                    rng.uniform(cy - hy, cy + hy),
+                    rng.uniform(cz - hz, cz + hz),
                 )
             )
 
         if self.kind == "cylinder":
             cx, cy, cz = self.data["center"]
-            radius = self.data["radius"]
-            height = self.data["height"]
+            radius = self.data["radius"] - inset_margin
+            half_h = self.data["height"] * 0.5 - inset_margin
+            if radius <= 0 or half_h <= 0:
+                raise ValueError("domain inset is too large to sample from cylinder.")
             axis = self.data["axis"]
             theta = rng.uniform(0.0, 2.0 * math.pi)
             rr = math.sqrt(rng.random()) * radius
-            h = rng.uniform(-height * 0.5, height * 0.5)
+            h = rng.uniform(-half_h, half_h)
             if axis == "X":
                 return Vector(
                     (cx + h, cy + rr * math.cos(theta), cz + rr * math.sin(theta))
@@ -554,13 +762,18 @@ class Domain:
         if self.kind == "ellipsoid":
             cx, cy, cz = self.data["center"]
             rx, ry, rz = self.data["radii"]
+            rx_in = rx - inset_margin
+            ry_in = ry - inset_margin
+            rz_in = rz - inset_margin
+            if rx_in <= 0 or ry_in <= 0 or rz_in <= 0:
+                raise ValueError("domain inset is too large to sample from ellipsoid.")
             direction = _random_unit_vector(rng)
             radial = rng.random() ** (1.0 / 3.0)
             return Vector(
                 (
-                    cx + direction.x * rx * radial,
-                    cy + direction.y * ry * radial,
-                    cz + direction.z * rz * radial,
+                    cx + direction.x * rx_in * radial,
+                    cy + direction.y * ry_in * radial,
+                    cz + direction.z * rz_in * radial,
                 )
             )
 
@@ -586,8 +799,12 @@ class Domain:
         point: mathutils.Vector,  # Candidate point in world coordinates
         margin: float = 0.0,  # Inset margin from boundary
     ) -> bool:
+        """
+        Check whether a world-space point is inside the domain.
+        """
         if margin < 0:
             raise ValueError("margin must be >= 0.")
+        margin = float(margin) + float(self.data.get("inset_margin", 0.0))
 
         if self.kind == "rect":
             cx, cy = self.data["center"]
@@ -677,20 +894,72 @@ class Domain:
 
         raise ValueError(f"Unsupported domain kind: {self.kind}")
 
+    def contains_object(
+        self,
+        obj: "Object",  # Object to validate against this domain
+        margin: float = 0.0,  # Additional inset margin
+        mode: Literal["aabb", "mesh"] = "mesh",  # Containment strategy
+    ) -> bool:
+        """
+        Check whether an object is fully contained within this domain.
+        """
+        if not isinstance(obj, Object):
+            raise TypeError("obj must be an instance of Object.")
+        if margin < 0:
+            raise ValueError("margin must be >= 0.")
+        if mode not in {"aabb", "mesh"}:
+            raise ValueError("mode must be one of: aabb, mesh.")
+
+        if mode == "aabb":
+            bounds = obj.get_bounds(space="world")
+            pmin = Vector(bounds["min"])
+            pmax = Vector(bounds["max"])
+            corners = [
+                Vector((x, y, z))
+                for x in (pmin.x, pmax.x)
+                for y in (pmin.y, pmax.y)
+                for z in (pmin.z, pmax.z)
+            ]
+            return all(self.contains_point(corner, margin=margin) for corner in corners)
+
+        points = _get_object_world_vertices(obj.obj)
+        if len(points) == 0:
+            bounds = obj.get_bounds(space="world")
+            pmin = Vector(bounds["min"])
+            pmax = Vector(bounds["max"])
+            points = [
+                Vector((x, y, z))
+                for x in (pmin.x, pmax.x)
+                for y in (pmin.y, pmax.y)
+                for z in (pmin.z, pmax.z)
+            ]
+        return all(self.contains_point(point, margin=margin) for point in points)
+
     def aabb(self) -> AABB:
+        """
+        Return the axis-aligned bounds of this domain.
+        """
+        inset_margin = self._effective_inset_margin()
+
         if self.kind == "rect":
             cx, cy = self.data["center"]
             sx, sy = self.data["size"]
+            half_x = max(0.0, sx * 0.5 - inset_margin)
+            half_y = max(0.0, sy * 0.5 - inset_margin)
             z = self.data["z"]
-            return Vector((cx - sx * 0.5, cy - sy * 0.5, z)), Vector(
-                (cx + sx * 0.5, cy + sy * 0.5, z)
+            return Vector((cx - half_x, cy - half_y, z)), Vector(
+                (cx + half_x, cy + half_y, z)
             )
 
         if self.kind == "ellipse":
             cx, cy = self.data["center"]
             rx, ry = self.data["radii"]
+            rx_in = max(0.0, rx - inset_margin)
+            ry_in = max(0.0, ry - inset_margin)
             z = self.data["z"]
-            return Vector((cx - rx, cy - ry, z)), Vector((cx + rx, cy + ry, z))
+            return Vector((cx - rx_in, cy - ry_in, z)), Vector(
+                (cx + rx_in, cy + ry_in, z)
+            )
 
         if self.kind in {"polygon", "hull2d"}:
             xs = [p[0] for p in self.data["points"]]
@@ -701,14 +970,17 @@ class Domain:
         if self.kind == "box":
             cx, cy, cz = self.data["center"]
             sx, sy, sz = self.data["size"]
-            return Vector((cx - sx * 0.5, cy - sy * 0.5, cz - sz * 0.5)), Vector(
-                (cx + sx * 0.5, cy + sy * 0.5, cz + sz * 0.5)
+            hx = max(0.0, sx * 0.5 - inset_margin)
+            hy = max(0.0, sy * 0.5 - inset_margin)
+            hz = max(0.0, sz * 0.5 - inset_margin)
+            return Vector((cx - hx, cy - hy, cz - hz)), Vector(
+                (cx + hx, cy + hy, cz + hz)
             )
 
         if self.kind == "cylinder":
             cx, cy, cz = self.data["center"]
-            r = self.data["radius"]
-            h = self.data["height"] * 0.5
+            r = max(0.0, self.data["radius"] - inset_margin)
+            h = max(0.0, self.data["height"] * 0.5 - inset_margin)
             axis = self.data["axis"]
             if axis == "X":
                 return Vector((cx - h, cy - r, cz - r)), Vector(
@@ -723,8 +995,11 @@ class Domain:
         if self.kind == "ellipsoid":
             cx, cy, cz = self.data["center"]
             rx, ry, rz = self.data["radii"]
-            return Vector((cx - rx, cy - ry, cz - rz)), Vector(
-                (cx + rx, cy + ry, cz + rz)
+            rx_in = max(0.0, rx - inset_margin)
+            ry_in = max(0.0, ry - inset_margin)
+            rz_in = max(0.0, rz - inset_margin)
+            return Vector((cx - rx_in, cy - ry_in, cz - rz_in)), Vector(
+                (cx + rx_in, cy + ry_in, cz + rz_in)
             )
 
         if self.kind == "hull3d":
@@ -845,7 +1120,10 @@ class Scene(ABC, _Serializable):
         self.time_limit = time_limit
         return self
 
-    def set_passes(self, *passes: tuple[RenderPass | list[RenderPass], ...]):
+    def set_passes(
+        self,
+        *passes: tuple[RenderPass | list[RenderPass], ...],  # Render passes to enable
+    ):
         """
         Set a list of render passes that will be saved when rendering.
         """
@@ -853,17 +1131,23 @@ class Scene(ABC, _Serializable):
         return self
 
     def enable_semantic_channels(
-        self, *channels: tuple[str | list[str], ...]
+        self,
+        *channels: tuple[
+            str | list[str], ...
+        ],  # Semantic channel names written via AOVs
     ) -> "Scene":
         """
         Enable semantic shader channels to be exported as masks.
-        In Blender node graphs, write channel values to AOV outputs named `SEM_<channel>`.
+        In Blender node graphs, write channel values to AOV outputs named `<channel>`.
         """
         for channel in _combine_arglist_set(channels):
             self.semantic_channels.add(_normalize_semantic_channel(channel))
         return self
 
-    def set_semantic_mask_threshold(self, threshold: float) -> "Scene":
+    def set_semantic_mask_threshold(
+        self,
+        threshold: float,  # Binary mask threshold in [0, 1]
+    ) -> "Scene":
         """
         Set threshold used when exporting binary semantic masks.
         """
@@ -872,7 +1156,10 @@ class Scene(ABC, _Serializable):
         self.semantic_mask_threshold = threshold
         return self
 
-    def create_empty(self, name: str = "Empty") -> "Object":
+    def create_empty(
+        self,
+        name: str = "Empty",  # Object name
+    ) -> "Object":
         """
         Create an empty object. May be useful to point camera at or for debugging during `preview` stage.
         """
@@ -884,10 +1171,10 @@ class Scene(ABC, _Serializable):
 
     def create_sphere(
         self,
-        name: str = "Sphere",
-        radius: float = 1.0,
-        segments: int = 32,
-        ring_count: int = 16,
+        name: str = "Sphere",  # Object name
+        radius: float = 1.0,  # Sphere radius
+        segments: int = 32,  # Horizontal segments
+        ring_count: int = 16,  # Vertical segments
     ) -> "Object":
         """
         Create a sphere primitive.
@@ -901,7 +1188,11 @@ class Scene(ABC, _Serializable):
         sphere.name = name
         return Object(sphere, self)
 
-    def create_cube(self, name: str = "Cube", size: float = 2.0) -> "Object":
+    def create_cube(
+        self,
+        name: str = "Cube",  # Object name
+        size: float = 2.0,  # Cube side size
+    ) -> "Object":
         """
         Create a cube primitive.
         """
@@ -914,8 +1205,8 @@ class Scene(ABC, _Serializable):
 
     def create_plane(
         self,
-        name: str = "Plane",
-        size: float = 2.0,
+        name: str = "Plane",  # Object name
+        size: float = 2.0,  # Plane side size
     ) -> "Object":
         """
         Create a plane primitive.
@@ -930,7 +1221,9 @@ class Scene(ABC, _Serializable):
         return Object(plane, self)
 
     def create_point_light(
-        self, name: str = "Point", power: float = 1000.0
+        self,
+        name: str = "Point",  # Light object name
+        power: float = 1000.0,  # Light power in Blender energy units
     ) -> "PointLight":
         """
         Create a point light.
@@ -941,7 +1234,11 @@ class Scene(ABC, _Serializable):
         _get_generated_collection().objects.link(light_obj)
         return PointLight(light_obj, self).set_power(power)
 
-    def create_sun_light(self, name: str = "Sun", power: float = 1.0) -> "SunLight":
+    def create_sun_light(
+        self,
+        name: str = "Sun",  # Light object name
+        power: float = 1.0,  # Light power in Blender energy units
+    ) -> "SunLight":
         """
         Create a sun light.
         """
@@ -952,7 +1249,9 @@ class Scene(ABC, _Serializable):
         return SunLight(light_obj, self).set_power(power)
 
     def create_area_light(
-        self, name: str = "Area", power: float = 100.0
+        self,
+        name: str = "Area",  # Light object name
+        power: float = 100.0,  # Light power in Blender energy units
     ) -> "AreaLight":
         """
         Create an area light.
@@ -964,7 +1263,9 @@ class Scene(ABC, _Serializable):
         return AreaLight(light_obj, self).set_power(power)
 
     def create_spot_light(
-        self, name: str = "Spot", power: float = 1000.0
+        self,
+        name: str = "Spot",  # Light object name
+        power: float = 1000.0,  # Light power in Blender energy units
     ) -> "SpotLight":
         """
         Create a spot light.
@@ -981,7 +1282,10 @@ class Scene(ABC, _Serializable):
         """
         return self.camera
 
-    def set_world(self, world: "World") -> "World":
+    def set_world(
+        self,
+        world: "World",  # World descriptor to apply to the scene
+    ) -> "World":
         """
         Set a new `World` representing environmental lighting.
         """
@@ -994,7 +1298,10 @@ class Scene(ABC, _Serializable):
         """
         return self.world
 
-    def set_tags(self, *tags) -> "Scene":
+    def set_tags(
+        self,
+        *tags,  # Scene-level tags
+    ) -> "Scene":
         """
         Set scene's global tags.
 
@@ -1003,7 +1310,10 @@ class Scene(ABC, _Serializable):
         self.tags = _combine_arglist_set(tags)
         return self
 
-    def add_tags(self, *tags) -> "Scene":
+    def add_tags(
+        self,
+        *tags,  # Tags to append to scene-level tags
+    ) -> "Scene":
         """
         Add tags to the scene.
 
@@ -1012,7 +1322,11 @@ class Scene(ABC, _Serializable):
         self.tags |= _combine_arglist_set(tags)
         return self
 
-    def load_object(self, blendfile: str, import_name: str = None) -> "ObjectLoader":
+    def load_object(
+        self,
+        blendfile: str,  # Path to source .blend file
+        import_name: str = None,  # Optional object name to import
+    ) -> "ObjectLoader":
         """
         Get a loader object to import from a blender file.
 
@@ -1041,7 +1355,9 @@ class Scene(ABC, _Serializable):
             )
 
     def load_objects(
-        self, blendfile: str, import_names: list[str] = None
+        self,
+        blendfile: str,  # Path to source .blend file
+        import_names: list[str] = None,  # Optional list of object names to import
     ) -> list["ObjectLoader"]:
         """
         Get a list of loader objects to import from a blender file.
@@ -1081,20 +1397,74 @@ class Scene(ABC, _Serializable):
 
         return res
 
-    def create_material(self, name: str = "Material") -> "BasicMaterial":
+    def create_material(
+        self,
+        name: str = "Material",  # Material name
+    ) -> "BasicMaterial":
         """
         Create a new basic (Principled BSDF) material.
         """
         return BasicMaterial(name=name)
 
     def import_material(
-        self, blendfile: str, material_name: str = None
+        self,
+        blendfile: str,  # Path to source .blend file
+        material_name: str = None,  # Material name to import (defaults to first)
     ) -> "ImportedMaterial":
         """
         Create an imported material descriptor from a .blend file.
         """
         path = str(pathlib.Path(blendfile).expanduser())
         return ImportedMaterial(filepath=path, material_name=material_name)
+
+    def inspect_object(
+        self,
+        loader_or_obj: Union["ObjectLoader", "Object"],  # Object or loader to inspect
+        applied_scale: bool = True,  # Include object scale in reported local dimensions
+    ) -> ObjectStats:
+        """
+        Inspect geometric stats for a loader/object without manual .blend inspection.
+        """
+        temp_obj = None
+        if isinstance(loader_or_obj, ObjectLoader):
+            temp_obj = loader_or_obj.create_instance(register_object=False)
+            obj = temp_obj
+        elif isinstance(loader_or_obj, Object):
+            obj = loader_or_obj
+        else:
+            raise TypeError("loader_or_obj must be ObjectLoader or Object.")
+
+        try:
+            dims_world = obj.get_dimensions(space="world")
+            dims_local = obj.get_dimensions(space="local")
+            if applied_scale:
+                dims_local_out = (
+                    dims_local[0] * float(obj.obj.scale.x),
+                    dims_local[1] * float(obj.obj.scale.y),
+                    dims_local[2] * float(obj.obj.scale.z),
+                )
+            else:
+                dims_local_out = dims_local
+
+            stats = ObjectStats(
+                name=str(obj.obj.name),
+                type=str(obj.obj.type),
+                dimensions_world=dims_world,
+                dimensions_local=dims_local_out,
+                bounds_world=obj.get_bounds(space="world"),
+                bounds_local=obj.get_bounds(space="local"),
+                scale=tuple(float(v) for v in obj.obj.scale),
+            )
+
+            inspected = self.custom_meta.get("inspected_objects", [])
+            if not isinstance(inspected, list):
+                inspected = [inspected]
+            inspected.append(stats.to_dict())
+            self.custom_meta["inspected_objects"] = inspected
+            return stats
+        finally:
+            if temp_obj is not None:
+                _remove_blender_object(temp_obj.obj)
 
     def scatter_by_sphere(
         self,
@@ -1477,6 +1847,20 @@ class ObjectLoader:
         self.obj = obj
         self.scene = scene
 
+    def set_source(
+        self,
+        source: "Object",  # Object used as instancing prototype
+    ) -> "ObjectLoader":
+        """
+        Rebind this loader to use an existing object as its instancing prototype.
+        """
+        if not isinstance(source, Object):
+            raise TypeError("source must be Object.")
+        if source.scene is not self.scene:
+            raise ValueError("source object must belong to the same scene.")
+        self.obj = source.obj
+        return self
+
     def create_instance(
         self,
         name: str = None,  # Instanced object name
@@ -1642,7 +2026,7 @@ def _normalize_semantic_channel(channel: str) -> str:
 
 
 def _semantic_aov_name(channel: str) -> str:
-    return f"SEM_{_normalize_semantic_channel(channel)}"
+    return _normalize_semantic_channel(channel)
 
 
 class BasicMaterial(Material):
@@ -1676,15 +2060,15 @@ class BasicMaterial(Material):
 
     def set_params(
         self,
-        base_color: OptionalColor = None,
-        roughness: float = None,
-        metallic: float = None,
-        specular: float = None,
-        emission_color: OptionalColor = None,
-        emission_strength: float = None,
-        alpha: float = None,
-        transmission: float = None,
-        ior: float = None,
+        base_color: OptionalColor = None,  # Base color (RGB/RGBA)
+        roughness: float = None,  # Surface roughness
+        metallic: float = None,  # Metallic factor
+        specular: float = None,  # Specular IOR level
+        emission_color: OptionalColor = None,  # Emission color (RGB/RGBA)
+        emission_strength: float = None,  # Emission intensity
+        alpha: float = None,  # Alpha/transparency
+        transmission: float = None,  # Transmission weight
+        ior: float = None,  # Index of refraction
     ):
         """
         Set Principled BSDF parameters used when building the material.
@@ -1720,7 +2104,11 @@ class BasicMaterial(Material):
             self.ior = ior
         return self
 
-    def set_property(self, key: str, value: any):
+    def set_property(
+        self,
+        key: str,  # Custom property key
+        value: any,  # Custom property value
+    ):
         """
         Set a custom Blender property on the generated material.
         """
@@ -1844,6 +2232,7 @@ class Object(_Serializable):
     scene: Scene  # Owning scene
     tags: TagSet  # Object-level semantic tags
     properties: dict  # Custom properties assigned to this object
+    modifier_parameters: list[dict[str, JSONSerializable]]  # Saved Geometry Nodes modifier parameters
 
     index: int | None  # Assigned object pass index
 
@@ -1857,6 +2246,19 @@ class Object(_Serializable):
 
         self.tags = set()
         self.properties = dict()
+        self.modifier_parameters = []
+        exported_meta = _restore_rv_export_object_metadata(self.obj)
+        if isinstance(exported_meta.get("tags"), list):
+            self.tags = set(
+                tag for tag in exported_meta["tags"] if isinstance(tag, str)
+            )
+        if isinstance(exported_meta.get("properties"), dict):
+            self.properties = dict(exported_meta["properties"])
+        self.modifier_parameters = _restore_modifier_parameters(
+            exported_meta.get("modifier_parameters")
+        )
+        if isinstance(exported_meta.get("custom_meta"), dict):
+            self.custom_meta = dict(exported_meta["custom_meta"])
 
         self.index = None
         if register_object:
@@ -1864,7 +2266,12 @@ class Object(_Serializable):
             self.obj.pass_index = self.index
         self.obj.rotation_mode = "QUATERNION"
 
-    def set_location(self, location: Union[mathutils.Vector, typing.Sequence[float]]):
+    def set_location(
+        self,
+        location: Union[
+            mathutils.Vector, typing.Sequence[float]
+        ],  # Object location in world coordinates
+    ):
         """
         Set the location of the object in 3D space.
         """
@@ -1877,7 +2284,10 @@ class Object(_Serializable):
 
         return self
 
-    def set_rotation(self, rotation: Union[mathutils.Euler, mathutils.Quaternion]):
+    def set_rotation(
+        self,
+        rotation: Union[mathutils.Euler, mathutils.Quaternion],  # Object rotation value
+    ):
         """
         Set the rotation of the object.
         """
@@ -1889,16 +2299,21 @@ class Object(_Serializable):
             raise TypeError()
         return self
 
-    def set_scale(self, scale: Union[mathutils.Vector, typing.Sequence[float], float]):
+    def set_scale(
+        self,
+        scale: Union[
+            mathutils.Vector, typing.Sequence[float], float, int
+        ],  # Uniform scalar or per-axis XYZ scale
+    ):
         """
         Set the scale of the object.
 
-        If `scale` is a single float, all axes are set to that value.
+        If `scale` is a single numeric value, all axes are set to that value.
         If `scale` is a sequence or Vector of length 3, each axis is set individually.
         """
         if isinstance(scale, mathutils.Vector):
             self.obj.scale = scale
-        elif isinstance(scale, float):
+        elif isinstance(scale, numbers.Real) and not isinstance(scale, bool):
             self.obj.scale = mathutils.Vector((scale, scale, scale))
         elif len(scale) == 3:
             self.obj.scale = mathutils.Vector(scale)
@@ -1907,7 +2322,11 @@ class Object(_Serializable):
 
         return self
 
-    def set_property(self, key: str, value: any):
+    def set_property(
+        self,
+        key: str,  # Custom property key
+        value: any,  # Custom property value
+    ):
         """
         Set a property of the object. Properties can be used inside object's material nodes.
         """
@@ -1915,7 +2334,48 @@ class Object(_Serializable):
         self.properties[key] = value
         return self
 
-    def set_material(self, material: "Material", slot: int = 0):
+    def set_modifier_input(
+        self,
+        input_name: str,  # Exposed modifier input name or identifier
+        value: any,  # Value assigned to the modifier input
+        modifier_name: (
+            str | None
+        ) = None,  # Optional modifier name when disambiguation is needed
+    ):
+        """
+        Set an exposed Geometry Nodes modifier input.
+
+        If `modifier_name` is omitted, `rv` searches for a unique Geometry Nodes
+        modifier that exposes the requested input.
+        """
+        modifier = _resolve_nodes_modifier(
+            self.obj, input_name=input_name, modifier_name=modifier_name
+        )
+        input_key = _resolve_modifier_input_key(modifier, input_name)
+        modifier[input_key] = value
+        for parameter in self.modifier_parameters:
+            if (
+                parameter["modifier_name"] == modifier.name
+                and parameter["parameter_name"] == input_name
+            ):
+                parameter["value"] = value
+                break
+        else:
+            self.modifier_parameters.append(
+                {
+                    "modifier_name": modifier.name,
+                    "parameter_name": input_name,
+                    "value": value,
+                }
+            )
+        _mark_node_tree(getattr(modifier, "node_group", None))
+        return self
+
+    def set_material(
+        self,
+        material: "Material",  # Material descriptor to assign
+        slot: int = 0,  # Material slot index
+    ):
         """
         Set object material in the given slot.
         """
@@ -1932,7 +2392,10 @@ class Object(_Serializable):
         _mark_material_tree(bpy_material)
         return self
 
-    def add_material(self, material: "Material"):
+    def add_material(
+        self,
+        material: "Material",  # Material descriptor to append
+    ):
         """
         Append material to object's material slots.
         """
@@ -1952,7 +2415,10 @@ class Object(_Serializable):
         self.obj.data.materials.clear()
         return self
 
-    def set_tags(self, *tags: str | list[str]):
+    def set_tags(
+        self,
+        *tags: str | list[str],  # Object-level tags
+    ):
         """
         Set object's tags.
 
@@ -1961,7 +2427,10 @@ class Object(_Serializable):
         self.tags = _combine_arglist_set(tags)
         return self
 
-    def add_tags(self, *tags: str | list[str]):
+    def add_tags(
+        self,
+        *tags: str | list[str],  # Tags to append to object-level tags
+    ):
         """
         Add tags to the object.
 
@@ -2004,7 +2473,10 @@ class Object(_Serializable):
         self.obj.select_set(True)
         bpy.context.view_layer.objects.active = self.obj
 
-    def set_shading(self, shading: Literal["flat", "smooth", "auto"]):
+    def set_shading(
+        self,
+        shading: Literal["flat", "smooth", "auto"],  # Target shading mode
+    ):
         """
         Set shading to flat, smooth, or auto.
         """
@@ -2021,21 +2493,30 @@ class Object(_Serializable):
 
         return self
 
-    def show_debug_axes(self, show=True):
+    def show_debug_axes(
+        self,
+        show=True,  # Toggle axis visibility in preview
+    ):
         """
         Show debug axes that can be seen in the `preview` mode.
         """
         self.obj.show_axis = show
         return self
 
-    def show_debug_name(self, show):
+    def show_debug_name(
+        self,
+        show,  # Toggle object-name visibility in preview
+    ):
         """
         Show object's name that can be seen in the `preview` mode.
         """
         self.obj.show_name = show
         return self
 
-    def hide(self, view: Literal["wireframe", "none"] = "wireframe"):
+    def hide(
+        self,
+        view: Literal["wireframe", "none"] = "wireframe",  # Preview visibility mode
+    ):
         """
         Hide object from render output while controlling preview visibility.
         """
@@ -2060,6 +2541,150 @@ class Object(_Serializable):
             raise ValueError("view must be one of: wireframe, none.")
         return self
 
+    def get_dimensions(
+        self,
+        space: Literal["world", "local"] = "world",  # Coordinate space for dimensions
+    ) -> Float3:
+        """
+        Get object dimensions (axis-aligned extents) in world or local space.
+        """
+        if space == "world":
+            dims = self.obj.dimensions
+            return (float(dims.x), float(dims.y), float(dims.z))
+        if space != "local":
+            raise ValueError("space must be one of: world, local.")
+
+        points = _get_object_local_vertices(self.obj)
+        if len(points) == 0:
+            points = [Vector(corner) for corner in getattr(self.obj, "bound_box", [])]
+        if len(points) == 0:
+            dims = self.obj.dimensions
+            sx, sy, sz = self.obj.scale
+            if abs(sx) < 1e-9 or abs(sy) < 1e-9 or abs(sz) < 1e-9:
+                return (float(dims.x), float(dims.y), float(dims.z))
+            return (float(dims.x / sx), float(dims.y / sy), float(dims.z / sz))
+
+        pmin, pmax = _aabb_from_points(points)
+        size = pmax - pmin
+        return (float(size.x), float(size.y), float(size.z))
+
+    def inspect(
+        self,
+        applied_scale: bool = True,  # Include object scale in local dimensions
+    ) -> ObjectStats:
+        """
+        Inspect geometric stats for this object.
+        """
+        return self.scene.inspect_object(self, applied_scale=applied_scale)
+
+    def get_bounds(
+        self,
+        space: Literal["world", "local"] = "world",  # Coordinate space for bounds
+    ) -> dict[str, Float3]:
+        """
+        Get axis-aligned bounds in world or local space.
+        """
+        if space == "world":
+            points = _get_object_world_vertices(self.obj)
+            if len(points) == 0:
+                points = [
+                    self.obj.matrix_world @ Vector(corner)
+                    for corner in getattr(self.obj, "bound_box", [])
+                ]
+        elif space == "local":
+            points = _get_object_local_vertices(self.obj)
+            if len(points) == 0:
+                points = [
+                    Vector(corner) for corner in getattr(self.obj, "bound_box", [])
+                ]
+        else:
+            raise ValueError("space must be one of: world, local.")
+
+        if len(points) == 0:
+            origin = Vector((0.0, 0.0, 0.0))
+            return {
+                "min": tuple(origin),
+                "max": tuple(origin),
+                "center": tuple(origin),
+                "size": tuple(origin),
+            }
+
+        pmin, pmax = _aabb_from_points(points)
+        center = (pmin + pmax) * 0.5
+        size = pmax - pmin
+        return {
+            "min": (float(pmin.x), float(pmin.y), float(pmin.z)),
+            "max": (float(pmax.x), float(pmax.y), float(pmax.z)),
+            "center": (float(center.x), float(center.y), float(center.z)),
+            "size": (float(size.x), float(size.y), float(size.z)),
+        }
+
+    def add_rigidbody(
+        self,
+        mode: Literal[
+            "box", "sphere", "hull", "mesh", "capsule", "cylinder", "cone"
+        ] = "hull",  # Collision shape
+        body_type: Literal["ACTIVE", "PASSIVE"] = "ACTIVE",  # Rigid body type
+        mass: float = 1.0,  # Body mass
+        friction: float = 0.5,  # Surface friction
+        restitution: float = 0.0,  # Bounciness
+        linear_damping: float = 0.04,  # Linear damping factor
+        angular_damping: float = 0.1,  # Angular damping factor
+    ) -> "Object":
+        """
+        Add or update rigid-body settings for this object.
+        """
+        shape_map = {
+            "box": "BOX",
+            "sphere": "SPHERE",
+            "hull": "CONVEX_HULL",
+            "mesh": "MESH",
+            "capsule": "CAPSULE",
+            "cylinder": "CYLINDER",
+            "cone": "CONE",
+        }
+        if mode not in shape_map:
+            raise ValueError(
+                "mode must be one of: box, sphere, hull, mesh, capsule, cylinder, cone."
+            )
+        if self.obj.type != "MESH":
+            raise TypeError("Rigid body is supported only for mesh objects.")
+        _ensure_rigidbody_world()
+        self._select_for_shading_ops()
+        if self.obj.rigid_body is None:
+            bpy.ops.rigidbody.object_add(type=body_type)
+
+        rb = self.obj.rigid_body
+        rb.type = body_type
+        rb.collision_shape = shape_map[mode]
+        rb.mass = max(float(mass), 1e-6)
+        rb.friction = float(friction)
+        rb.restitution = float(restitution)
+        rb.linear_damping = float(linear_damping)
+        rb.angular_damping = float(angular_damping)
+        if hasattr(rb, "use_margin"):
+            rb.use_margin = True
+        if hasattr(rb, "collision_margin"):
+            rb.collision_margin = max(0.0, min(self.get_dimensions("world")) * 0.01)
+        return self
+
+    def remove_rigidbody(
+        self,
+        keep_transform: bool = True,  # Preserve world transform after removal
+    ) -> "Object":
+        """
+        Remove rigid body from this object if present.
+        """
+        if self.obj.rigid_body is None:
+            return self
+
+        matrix = self.obj.matrix_world.copy()
+        self._select_for_shading_ops()
+        bpy.ops.rigidbody.object_remove()
+        if keep_transform:
+            self.obj.matrix_world = matrix
+        return self
+
     def _get_meta(self) -> dict:
         res = super()._get_meta()
         res.update(
@@ -2068,6 +2693,7 @@ class Object(_Serializable):
                 "name": self.obj.name,
                 "tags": list(self.tags),
                 "properties": self.properties,
+                "modifier_parameters": self.modifier_parameters,
                 "materials": [
                     slot.material.name
                     for slot in self.obj.material_slots
@@ -2130,7 +2756,7 @@ class Light(Object):
 
     def set_color(
         self,
-        color: Color,
+        color: Color,  # RGB/RGBA light color
     ) -> "Light":
         """
         Set light RGB color. Alpha (if provided) is ignored.
@@ -2141,7 +2767,10 @@ class Light(Object):
         self.light_data.color = rgb[:3]
         return self
 
-    def set_power(self, power: float) -> "Light":
+    def set_power(
+        self,
+        power: float,  # Light power in Blender energy units
+    ) -> "Light":
         """
         Set light power in Blender `energy` units.
         """
@@ -2150,21 +2779,30 @@ class Light(Object):
         self.light_data.energy = power
         return self
 
-    def set_cast_shadow(self, enabled: bool = True) -> "Light":
+    def set_cast_shadow(
+        self,
+        enabled: bool = True,  # Shadow-casting toggle
+    ) -> "Light":
         """
         Enable or disable shadow casting.
         """
         self.light_data.use_shadow = enabled
         return self
 
-    def set_specular_factor(self, factor: float) -> "Light":
+    def set_specular_factor(
+        self,
+        factor: float,  # Specular contribution factor
+    ) -> "Light":
         """
         Set the light contribution to specular highlights.
         """
         self.light_data.specular_factor = factor
         return self
 
-    def set_softness(self, value: float) -> "Light":
+    def set_softness(
+        self,
+        value: float,  # Softness parameter
+    ) -> "Light":
         """
         Set softness parameter mapped to the current light type.
         """
@@ -2210,7 +2848,10 @@ class PointLight(Light):
     Point light with radius control.
     """
 
-    def set_radius(self, radius: float) -> "PointLight":
+    def set_radius(
+        self,
+        radius: float,  # Radius/soft size
+    ) -> "PointLight":
         """
         Set point light radius.
         """
@@ -2228,7 +2869,10 @@ class SunLight(Light):
     Directional sun light with angular size control.
     """
 
-    def set_angle(self, angle_radians: float) -> "SunLight":
+    def set_angle(
+        self,
+        angle_radians: float,  # Angular sun size in radians
+    ) -> "SunLight":
         """
         Set sun angular size in radians.
         """
@@ -2247,7 +2891,8 @@ class AreaLight(Light):
     """
 
     def set_shape(
-        self, shape: Literal["SQUARE", "RECTANGLE", "DISK", "ELLIPSE"]
+        self,
+        shape: Literal["SQUARE", "RECTANGLE", "DISK", "ELLIPSE"],  # Area-light shape
     ) -> "AreaLight":
         """
         Set area light shape.
@@ -2260,7 +2905,10 @@ class AreaLight(Light):
         self.light_data.shape = shape
         return self
 
-    def set_size(self, size: float) -> "AreaLight":
+    def set_size(
+        self,
+        size: float,  # Primary size
+    ) -> "AreaLight":
         """
         Set primary area light size.
         """
@@ -2269,7 +2917,11 @@ class AreaLight(Light):
         self.light_data.size = size
         return self
 
-    def set_size_xy(self, size_x: float, size_y: float) -> "AreaLight":
+    def set_size_xy(
+        self,
+        size_x: float,  # Size along X
+        size_y: float,  # Size along Y
+    ) -> "AreaLight":
         """
         Set area light X and Y sizes.
         """
@@ -2294,7 +2946,10 @@ class SpotLight(Light):
     Spot light with cone and blend controls.
     """
 
-    def set_spot_size(self, angle_radians: float) -> "SpotLight":
+    def set_spot_size(
+        self,
+        angle_radians: float,  # Cone angle in radians
+    ) -> "SpotLight":
         """
         Set spotlight cone angle in radians.
         """
@@ -2303,7 +2958,10 @@ class SpotLight(Light):
         self.light_data.spot_size = angle_radians
         return self
 
-    def set_blend(self, blend: float) -> "SpotLight":
+    def set_blend(
+        self,
+        blend: float,  # Edge softness in [0, 1]
+    ) -> "SpotLight":
         """
         Set spotlight edge softness in the [0, 1] range.
         """
@@ -2312,7 +2970,10 @@ class SpotLight(Light):
         self.light_data.spot_blend = blend
         return self
 
-    def set_show_cone(self, show: bool = True) -> "SpotLight":
+    def set_show_cone(
+        self,
+        show: bool = True,  # Viewport cone visibility
+    ) -> "SpotLight":
         """
         Show or hide the spotlight cone in viewport.
         """
@@ -2561,8 +3222,8 @@ class HDRIWorld(World):
     def set_params(
         self,
         hdri_path: str = None,  # Path to the `.exr` file
-        strength: float = None,  #
-        rotation_z: float = None,
+        strength: float = None,  # Environment intensity multiplier
+        rotation_z: float = None,  # Rotation around world Z axis
     ):
         """
         Set HDRI source and environment lighting parameters.
@@ -2669,7 +3330,7 @@ def _configure_semantic_aovs(layer, semantic_channels: SemanticChannelSet) -> No
 
     for aov in list(layer.aovs):
         aov_name = getattr(aov, "name", "")
-        if aov_name.startswith("SEM_"):
+        if _normalize_socket_name(aov_name) in semantic_channels:
             layer.aovs.remove(aov)
 
     for channel in sorted(semantic_channels):
@@ -2710,7 +3371,7 @@ def _configure_compositor(
     )
 
     index_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
-    index_file_out_node.location = (2 * dx, -350)
+    index_file_out_node.location = (2 * dx + 40, -350)
     _reset_file_output_node(index_file_out_node, output_dir)
     _configure_file_output_node_format(
         index_file_out_node,
@@ -2720,10 +3381,30 @@ def _configure_compositor(
     )
 
     semantic_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
-    semantic_file_out_node.location = (2 * dx, -700)
+    semantic_file_out_node.location = (2 * dx + 80, -700)
     _reset_file_output_node(semantic_file_out_node, output_dir)
     _configure_file_output_node_format(
         semantic_file_out_node,
+        file_format="PNG",
+        color_mode="BW",
+        color_depth="16",
+    )
+
+    depth_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
+    depth_file_out_node.location = (2 * dx + 120, -1050)
+    _reset_file_output_node(depth_file_out_node, output_dir)
+    _configure_file_output_node_format(
+        depth_file_out_node,
+        file_format="OPEN_EXR",
+        color_mode="BW",
+        color_depth="32",
+    )
+
+    depth_preview_file_out_node = tree.nodes.new(type="CompositorNodeOutputFile")
+    depth_preview_file_out_node.location = (2 * dx + 160, -1250)
+    _reset_file_output_node(depth_preview_file_out_node, output_dir)
+    _configure_file_output_node_format(
+        depth_preview_file_out_node,
         file_format="PNG",
         color_mode="BW",
         color_depth="16",
@@ -2738,6 +3419,7 @@ def _configure_compositor(
         _normalize_socket_name(_semantic_aov_name(channel))
         for channel in (semantic_channels or set())
     }
+    depth_preview_connected = False
 
     for output in render_layers.outputs:
         if output in index_sockets:
@@ -2746,6 +3428,40 @@ def _configure_compositor(
         normalized_name = _normalize_socket_name(output.name)
         if normalized_name in semantic_names:
             semantic_outputs[output.name] = output
+            continue
+
+        # Store raw depth in float EXR to avoid clamping (PNG clips values > 1.0).
+        if normalized_name in {"depth", "z"}:
+            depth_slot_name = output.name
+            depth_input = _add_file_output_item(
+                depth_file_out_node, depth_slot_name, output
+            )
+            _configure_file_output_item(
+                depth_file_out_node,
+                depth_slot_name,
+                file_path=depth_slot_name,
+            )
+            tree.links.new(output, depth_input)
+
+            if not depth_preview_connected:
+                normalize_node = tree.nodes.new(type="CompositorNodeNormalize")
+                normalize_node.location = (dx, -1200)
+                normalize_node.hide = True
+                tree.links.new(output, normalize_node.inputs[0])
+
+                preview_slot_name = "DepthPreview"
+                preview_input = _add_file_output_item(
+                    depth_preview_file_out_node,
+                    preview_slot_name,
+                    normalize_node.outputs[0],
+                )
+                _configure_file_output_item(
+                    depth_preview_file_out_node,
+                    preview_slot_name,
+                    file_path=preview_slot_name,
+                )
+                tree.links.new(normalize_node.outputs[0], preview_input)
+                depth_preview_connected = True
             continue
 
         slot_name = output.name
@@ -2810,7 +3526,7 @@ def _configure_compositor(
         threshold.hide = True
         tree.links.new(socket, threshold.inputs[0])
 
-        channel = socket_name.removeprefix("SEM_")
+        channel = _normalize_semantic_channel(socket_name)
         mask_slot_name = f"Mask_{channel}"
         sem_input = _add_file_output_item(
             semantic_file_out_node,
@@ -3026,12 +3742,14 @@ def _validate_scatter_common(
     loaders: list[ObjectLoader]
     if isinstance(source, ObjectLoader):
         loaders = [source]
-    elif isinstance(source, list) and len(source) > 0:
+    elif isinstance(source, (list, tuple)) and len(source) > 0:
         if not all(isinstance(loader, ObjectLoader) for loader in source):
-            raise TypeError("source list must contain only ObjectLoader instances.")
-        loaders = source
+            raise TypeError("source sequence must contain only ObjectLoader instances.")
+        loaders = list(source)
     else:
-        raise TypeError("source must be ObjectLoader or non-empty list[ObjectLoader].")
+        raise TypeError(
+            "source must be ObjectLoader or non-empty sequence[ObjectLoader]."
+        )
 
     for loader in loaders:
         if getattr(loader.obj, "data", None) is None:
@@ -3103,6 +3821,75 @@ def _remove_blender_object(obj: bpy.types.Object) -> None:
         bpy.data.objects.remove(obj, do_unlink=True)
     except Exception:
         pass
+
+
+def _ensure_rigidbody_world() -> None:
+    scene = bpy.context.scene
+    if scene.rigidbody_world is None:
+        bpy.ops.rigidbody.world_add()
+
+
+def _configure_rigidbody_world(
+    settle_frames: int, substeps: int, time_scale: float
+) -> tuple[int, int]:
+    _ensure_rigidbody_world()
+    scene = bpy.context.scene
+    rbw = scene.rigidbody_world
+    if rbw is None:
+        raise RuntimeError("Failed to initialize rigid body world.")
+
+    start_frame = int(scene.frame_start)
+    frame_count = max(1, int(settle_frames))
+    end_frame = start_frame + frame_count - 1
+    scene.frame_set(start_frame)
+    if hasattr(scene, "sync_mode"):
+        scene.sync_mode = "NONE"
+    if hasattr(rbw, "time_scale"):
+        rbw.time_scale = float(time_scale)
+    if hasattr(rbw, "substeps_per_frame"):
+        rbw.substeps_per_frame = max(1, int(substeps))
+    if hasattr(rbw, "solver_iterations"):
+        rbw.solver_iterations = max(1, int(substeps) * 2)
+
+    cache = getattr(rbw, "point_cache", None)
+    if cache is not None:
+        cache.frame_start = start_frame
+        cache.frame_end = end_frame
+    return start_frame, end_frame
+
+
+def _simulate_rigidbody(
+    settle_frames: int, substeps: int, time_scale: float
+) -> tuple[int, int]:
+    start_frame, end_frame = _configure_rigidbody_world(
+        settle_frames=settle_frames, substeps=substeps, time_scale=time_scale
+    )
+    for frame in range(start_frame, end_frame + 1):
+        bpy.context.scene.frame_set(frame)
+    return start_frame, end_frame
+
+
+def simulate_physics(
+    frames: int = 20,  # Number of simulation frames
+    substeps: int = 10,  # Substeps per frame
+    time_scale: float = 1.0,  # Physics time scale
+) -> None:
+    """
+    Simulate current Blender rigid-body world for a fixed number of frames.
+
+    Users are expected to explicitly add rigid bodies via `Object.add_rigidbody(...)`
+    and then call `rv.simulate_physics(...)` at chosen points in scene generation.
+    """
+    if frames <= 0:
+        raise ValueError("frames must be > 0.")
+    if substeps <= 0:
+        raise ValueError("substeps must be > 0.")
+    if time_scale <= 0:
+        raise ValueError("time_scale must be > 0.")
+
+    _simulate_rigidbody(
+        settle_frames=int(frames), substeps=int(substeps), time_scale=float(time_scale)
+    )
 
 
 def _estimate_loader_radius(loader: "ObjectLoader", dimension: int) -> float:
@@ -3251,6 +4038,20 @@ def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
     mesh = obj_eval.to_mesh()
     try:
         return [obj_eval.matrix_world @ v.co for v in mesh.vertices]
+    finally:
+        obj_eval.to_mesh_clear()
+
+
+def _get_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
+    if obj is None:
+        return []
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    if obj_eval.type != "MESH":
+        return []
+    mesh = obj_eval.to_mesh()
+    try:
+        return [Vector(v.co) for v in mesh.vertices]
     finally:
         obj_eval.to_mesh_clear()
 
@@ -3404,10 +4205,53 @@ def _load_all_objects(path: str):
     return data_to.objects
 
 
+def _read_json_property(id_data, key: str):
+    raw = id_data.get(key)
+    if raw is None or not isinstance(raw, str):
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _restore_rv_export_object_metadata(obj: bpy.types.Object) -> dict:
+    meta = _read_json_property(obj, "rv_object_json")
+    if isinstance(meta, dict):
+        return meta
+
+    tags = _read_json_property(obj, "rv_tags_json")
+    if tags is None:
+        return {}
+    return {"tags": tags}
+
+
+def _restore_modifier_parameters(raw) -> list[dict[str, JSONSerializable]]:
+    if not isinstance(raw, list):
+        return []
+
+    restored: list[dict[str, JSONSerializable]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        modifier_name = item.get("modifier_name")
+        parameter_name = item.get("parameter_name")
+        if not isinstance(modifier_name, str) or not isinstance(parameter_name, str):
+            continue
+        restored.append(
+            {
+                "modifier_name": modifier_name,
+                "parameter_name": parameter_name,
+                "value": item.get("value"),
+            }
+        )
+    return restored
+
+
 def _combine_arglist_set(args):
     result = set()
     for p in args:
-        if isinstance(p, list):
+        if isinstance(p, (list, tuple, set, frozenset)):
             result = result.union(set(p))
         else:
             result.add(p)

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/Rapid-Vision/rv/internal/logs"
@@ -22,7 +23,15 @@ type Options struct {
 	PreviewOut    string
 	NoWindow      bool
 	Resolution    [2]int
+	GPUBackend    string
 	TimeLimit     *float64
+}
+
+func normalizedGPUBackend(value string) string {
+	if value == "" {
+		return "auto"
+	}
+	return strings.ToLower(value)
 }
 
 func Preview(opts Options) {
@@ -64,6 +73,7 @@ func Preview(opts Options) {
 
 	// Start Blender
 	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, libPath, port)...)
+	cmd.Env = utils.BlenderCommandEnv()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -115,6 +125,11 @@ func validateOptions(opts Options) error {
 	if opts.Resolution[0] <= 0 || opts.Resolution[1] <= 0 {
 		return errors.New("--resolution must be WIDTH,HEIGHT with positive integers")
 	}
+	switch normalizedGPUBackend(opts.GPUBackend) {
+	case "auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu":
+	default:
+		return errors.New("--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu")
+	}
 	if opts.TimeLimit != nil && *opts.TimeLimit <= 0 {
 		return errors.New("--time-limit must be > 0")
 	}
@@ -122,6 +137,7 @@ func validateOptions(opts Options) error {
 }
 
 func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, libPath string, port int) []string {
+	gpuBackend := normalizedGPUBackend(opts.GPUBackend)
 	args := []string{
 		filepath.Join(libPath, "template.blend"),
 		"--factory-startup",
@@ -142,6 +158,7 @@ func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, lib
 		"--preview-files", fmt.Sprintf("%t", opts.PreviewFiles),
 		"--no-window", fmt.Sprintf("%t", opts.NoWindow),
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
+		"--gpu-backend", gpuBackend,
 	)
 
 	if opts.PreviewFiles {

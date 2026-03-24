@@ -22,6 +22,8 @@ class MyScene(rv.Scene):
         pass
 """
 
+VALID_GPU_BACKENDS = ("auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu")
+
 
 def parse_args():
     args = []
@@ -37,6 +39,7 @@ def parse_args():
     parser.add_argument("--preview-out", type=str, default=None)
     parser.add_argument("--no-window", type=parse_bool, default=False)
     parser.add_argument("--resolution", type=str, default="640,640")
+    parser.add_argument("--gpu-backend", type=str, default="auto")
     parser.add_argument("--time-limit", type=float, default=None)
 
     return parser.parse_args(args)
@@ -62,6 +65,117 @@ def parse_resolution(raw):
     if width <= 0 or height <= 0:
         raise ValueError("--resolution width and height must be > 0")
     return (width, height)
+
+
+def iter_cycles_devices(preferences):
+    devices = getattr(preferences, "devices", None)
+    if devices:
+        return list(devices)
+
+    get_devices = getattr(preferences, "get_devices", None)
+    if callable(get_devices):
+        groups = get_devices() or []
+        flattened = []
+        for group in groups:
+            if group:
+                flattened.extend(group)
+        return flattened
+
+    return []
+
+
+def configure_cycles_backend(requested_backend):
+    scene = bpy.context.scene
+    scene.cycles.device = "GPU"
+
+    try:
+        preferences = bpy.context.preferences.addons["cycles"].preferences
+    except KeyError as exc:
+        raise RuntimeError("Cycles add-on preferences are unavailable") from exc
+
+    refresh_devices = getattr(preferences, "refresh_devices", None)
+    if callable(refresh_devices):
+        refresh_devices()
+
+    requested = requested_backend.strip().lower()
+    if requested not in VALID_GPU_BACKENDS:
+        raise ValueError(
+            "--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu"
+        )
+
+    available_types = {device.type for device in iter_cycles_devices(preferences)}
+    if requested == "auto":
+        for backend in ("OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"):
+            if backend in available_types:
+                requested = backend.lower()
+                break
+        else:
+            requested = "cpu"
+
+    if requested == "cpu":
+        scene.cycles.device = "CPU"
+        return "CPU"
+
+    selected_type = requested.upper()
+    if selected_type not in available_types:
+        available = sorted(available_types) or ["CPU"]
+        raise RuntimeError(
+            f"Requested GPU backend {selected_type} is unavailable. "
+            f"Available device types: {', '.join(available)}"
+        )
+
+    preferences.compute_device_type = selected_type
+    if callable(refresh_devices):
+        refresh_devices()
+
+    enabled_gpu = False
+    for device in iter_cycles_devices(preferences):
+        is_matching_gpu = device.type == selected_type
+        if hasattr(device, "use"):
+            device.use = is_matching_gpu
+        if is_matching_gpu:
+            enabled_gpu = True
+
+    if not enabled_gpu:
+        raise RuntimeError(f"Requested GPU backend {selected_type} found no enabled devices")
+
+    scene.cycles.device = "GPU"
+    return selected_type
+
+
+def print_cycles_device_info():
+    scene = bpy.context.scene
+    print(f"[rv] engine={scene.render.engine}")
+    print(f"[rv] cycles_device={scene.cycles.device}")
+
+    try:
+        preferences = bpy.context.preferences.addons["cycles"].preferences
+    except KeyError:
+        print("[rv] cycles_preferences=unavailable")
+        return
+
+    refresh_devices = getattr(preferences, "refresh_devices", None)
+    if callable(refresh_devices):
+        refresh_devices()
+
+    print(
+        f"[rv] compute_device_type={getattr(preferences, 'compute_device_type', None)}"
+    )
+
+    devices = iter_cycles_devices(preferences)
+    if not devices:
+        print("[rv] devices=[]")
+        return
+
+    serialized_devices = [
+        {
+            "name": device.name,
+            "type": device.type,
+            "use": getattr(device, "use", None),
+        }
+        for device in devices
+    ]
+    print(f"[rv] devices={serialized_devices}")
 
 
 def register_quit():
@@ -129,6 +243,7 @@ def run_script(
     preview_files=False,
     preview_out=None,
     resolution=(640, 640),
+    gpu_backend="auto",
     time_limit=None,
 ):
     spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
@@ -164,6 +279,9 @@ def run_script(
     try:
         instance.generate()
         instance._post_gen()
+        selected_backend = configure_cycles_backend(gpu_backend)
+        print(f"[rv] selected_gpu_backend={selected_backend}")
+        print_cycles_device_info()
         if preview_files:
             instance._render()
     finally:
@@ -195,6 +313,7 @@ def preview_tick():
             preview_files=ARGS.preview_files,
             preview_out=ARGS.preview_out,
             resolution=RESOLUTION,
+            gpu_backend=ARGS.gpu_backend,
             time_limit=ARGS.time_limit,
         )
     except Exception:

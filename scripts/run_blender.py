@@ -13,6 +13,16 @@ import subprocess
 import sys
 
 
+_BLOCKED_ENV_KEYS = {
+    "PYTHONHOME",
+    "PYTHONPATH",
+    "PYTHONSTARTUP",
+    "PYTHONUSERBASE",
+    "VIRTUAL_ENV",
+    "__PYVENV_LAUNCHER__",
+}
+
+
 def _resolve_blender_path() -> str:
     env_path = os.environ.get("BLENDER_PATH", "")
     if env_path and os.path.exists(env_path):
@@ -35,6 +45,37 @@ def _resolve_blender_path() -> str:
     raise FileNotFoundError("blender executable not found")
 
 
+def _remove_path_entry(raw_path: str, target: str) -> str:
+    if not raw_path or not target:
+        return raw_path
+
+    normalized_target = os.path.normpath(target)
+    filtered = [
+        entry
+        for entry in raw_path.split(os.pathsep)
+        if os.path.normpath(entry) != normalized_target
+    ]
+    return os.pathsep.join(filtered)
+
+
+def _sanitized_blender_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    if env is None:
+        env = os.environ
+
+    sanitized = {
+        key: value for key, value in env.items() if key not in _BLOCKED_ENV_KEYS
+    }
+
+    virtual_env = env.get("VIRTUAL_ENV", "").strip()
+    if virtual_env and "PATH" in sanitized:
+        venv_bin = os.path.join(virtual_env, "bin")
+        if platform.system().lower() == "windows":
+            venv_bin = os.path.join(virtual_env, "Scripts")
+        sanitized["PATH"] = _remove_path_entry(sanitized["PATH"], venv_bin)
+
+    return sanitized
+
+
 def main(argv: list[str]) -> int:
     if len(argv) == 0:
         print(
@@ -45,7 +86,7 @@ def main(argv: list[str]) -> int:
 
     blender = _resolve_blender_path()
     cmd = [blender, *argv]
-    proc = subprocess.run(cmd)
+    proc = subprocess.run(cmd, env=_sanitized_blender_env())
     return proc.returncode
 
 

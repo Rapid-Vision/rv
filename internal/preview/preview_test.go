@@ -52,6 +52,14 @@ func TestValidateOptions(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid gpu backend",
+			opts: Options{
+				Resolution: [2]int{640, 640},
+				GPUBackend: "invalid",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -71,6 +79,7 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 		PreviewOut:   "/tmp/preview_out",
 		NoWindow:     true,
 		Resolution:   [2]int{1280, 720},
+		GPUBackend:   "optix",
 		TimeLimit:    floatPtr(2.5),
 	}
 	args := buildBlenderPreviewArgs(opts, "/work/scene.py", "/work", libPath, 12345)
@@ -96,6 +105,8 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 	assertContains(t, args, "/tmp/preview_out")
 	assertContains(t, args, "--resolution")
 	assertContains(t, args, "1280,720")
+	assertContains(t, args, "--gpu-backend")
+	assertContains(t, args, "optix")
 	assertContains(t, args, "--time-limit")
 	assertContains(t, args, "2.5")
 }
@@ -110,6 +121,8 @@ func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	)
 	assertNotContains(t, args, "--background")
 	assertNotContains(t, args, "--preview-out")
+	assertContains(t, args, "--gpu-backend")
+	assertContains(t, args, "auto")
 }
 
 func floatPtr(v float64) *float64 {

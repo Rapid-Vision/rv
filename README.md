@@ -1,10 +1,13 @@
-# Rapid Vision
+# `rv`
 
-- [Website](https://rapid-vision.ru)
-- [Tutorial](https://rapid-vision.ru/docs/tutorial)
-- [API Reference](https://rapid-vision.ru/docs/api)
+- [Company website](https://rapid-vision.ru)
+- [Tutorial](https://rapid-vision.github.io/rv/en/tutorial)
+- [Features overview](https://rapid-vision.github.io/rv/en/tutorial/features)
+- [API Reference](https://rapid-vision.github.io/rv/en/api)
 
-**Rapid Vision (`rv`)** is a lightweight toolset for generating labeled synthetic image datasets with just a few lines of code.
+**`rv`** is a lightweight toolset for generating labeled synthetic image datasets with just a few lines of code.
+
+![Showcase](assets/showcase.png)
 
 ## Advantages
 1. Photorealistic results using [Cycles](https://www.blender.org/features/rendering/#cycles) rendering engine
@@ -119,7 +122,7 @@ rv render scene.py
 ![Resulting segmentation](examples/1_primitives/1_segs.png)
 
 ## Use `rv` for generating your next synthetic dataset
-For more information view the [API reference](/docs/api).
+For more information view [Features overview](https://rapid-vision.github.io/rv/en/tutorial/features) and [API Reference](https://rapid-vision.github.io/rv/en/api).
 
 ## Testing
 

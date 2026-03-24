@@ -15,6 +15,15 @@ import (
 	"github.com/Rapid-Vision/rv/rvlib"
 )
 
+var blenderEnvBlockedKeys = map[string]struct{}{
+	"PYTHONHOME":          {},
+	"PYTHONPATH":          {},
+	"PYTHONSTARTUP":       {},
+	"PYTHONUSERBASE":      {},
+	"VIRTUAL_ENV":         {},
+	"__PYVENV_LAUNCHER__": {},
+}
+
 // get an available port
 func GetPort() (int, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -137,6 +146,52 @@ func WaitCmdBuff(buff []*exec.Cmd) <-chan error {
 	return ch
 }
 
+func BlenderCommandEnv() []string {
+	env := os.Environ()
+	virtualEnv := filepath.Clean(os.Getenv("VIRTUAL_ENV"))
+	venvBinDir := ""
+	if virtualEnv != "" && virtualEnv != "." {
+		venvBinDir = filepath.Join(virtualEnv, "bin")
+		if runtime.GOOS == "windows" {
+			venvBinDir = filepath.Join(virtualEnv, "Scripts")
+		}
+	}
+
+	sanitized := make([]string, 0, len(env))
+	for _, entry := range env {
+		key, value, found := strings.Cut(entry, "=")
+		if !found {
+			continue
+		}
+		if _, blocked := blenderEnvBlockedKeys[key]; blocked {
+			continue
+		}
+		if key == "PATH" && venvBinDir != "" {
+			value = removePathEntry(value, venvBinDir)
+		}
+		sanitized = append(sanitized, key+"="+value)
+	}
+
+	return sanitized
+}
+
+func removePathEntry(rawPath string, target string) string {
+	if rawPath == "" || target == "" {
+		return rawPath
+	}
+
+	target = filepath.Clean(target)
+	parts := filepath.SplitList(rawPath)
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if filepath.Clean(part) == target {
+			continue
+		}
+		filtered = append(filtered, part)
+	}
+	return strings.Join(filtered, string(os.PathListSeparator))
+}
+
 func SplitTaskBetweenProcs(n int, p int, i int) int {
 	if n <= 0 || i < 0 || i >= p {
 		return 0
@@ -159,6 +214,12 @@ type RenderPaths struct {
 	ScriptPath string
 	Cwd        string
 	OutputDir  string
+}
+
+type ExportPaths struct {
+	ScriptPath string
+	Cwd        string
+	OutputPath string
 }
 
 func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, error) {
@@ -214,6 +275,28 @@ func ResolveRenderPaths(scriptPathArg string, outputArg string, cwdArg string) (
 		ScriptPath: runtimePaths.ScriptPath,
 		Cwd:        runtimePaths.Cwd,
 		OutputDir:  filepath.Clean(outputAbs),
+	}, nil
+}
+
+func ResolveExportPaths(scriptPathArg string, outputArg string, cwdArg string) (ExportPaths, error) {
+	runtimePaths, err := ResolveRuntimePaths(scriptPathArg, cwdArg)
+	if err != nil {
+		return ExportPaths{}, err
+	}
+
+	if outputArg == "" {
+		return ExportPaths{}, errors.New("output path is required")
+	}
+
+	outputAbs, err := filepath.Abs(outputArg)
+	if err != nil {
+		return ExportPaths{}, fmt.Errorf("resolve output: %w", err)
+	}
+
+	return ExportPaths{
+		ScriptPath: runtimePaths.ScriptPath,
+		Cwd:        runtimePaths.Cwd,
+		OutputPath: filepath.Clean(outputAbs),
 	}, nil
 }
 

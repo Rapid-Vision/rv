@@ -1,0 +1,20 @@
+{
+  "name": "vitepress",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "vitepress": "2.0.0-alpha.17",
+    "vue": "^3.5.30"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "docs:dev": "vitepress dev",
+    "docs:build": "vitepress build",
+    "docs:preview": "vitepress preview",
+    "docs:publish": "pnpm run docs:build && gh-pages -d .vitepress/dist --nojekyll"
+  }
+}

@@ -7,8 +7,8 @@ class RustySemanticScene(rv.Scene):
 
         # This material must exist in ./rusty_metal.blend.
         # Its node graph should output semantic masks to AOV names:
-        # - SEM_rust
-        # - SEM_clean_metal
+        # - rust
+        # - clean_metal
         rusty_material = self.import_material("./rusty_metal.blend", "RustyMetal")
 
         panel = (

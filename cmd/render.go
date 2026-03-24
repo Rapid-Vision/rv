@@ -17,6 +17,7 @@ var (
 	renderResolution            string
 	renderOutputDir             string
 	renderCwd                   string
+	renderGPUBackend            string
 	renderTimeLimit             float64
 	renderMaxSamples            int
 	renderMinSamples            int
@@ -38,6 +39,7 @@ func init() {
 	renderCmd.Flags().IntVarP(&renderImageNum, "number", "n", 1, "Number of total images generated")
 	renderCmd.Flags().IntVarP(&renderProcs, "procs", "p", 1, "Maximum number of spawned Blender processes")
 	renderCmd.Flags().StringVar(&renderResolution, "resolution", "640,640", "Output image resolution in WIDTH,HEIGHT format")
+	renderCmd.Flags().StringVar(&renderGPUBackend, "gpu-backend", "auto", "Cycles render device backend: auto, optix, cuda, hip, oneapi, metal, cpu")
 	renderCmd.Flags().Float64Var(&renderTimeLimit, "time-limit", 0, "Cycles rendering time limit in seconds")
 	renderCmd.Flags().IntVar(&renderMaxSamples, "max-samples", 0, "Cycles maximum render samples")
 	renderCmd.Flags().IntVar(&renderMinSamples, "min-samples", 0, "Cycles minimum adaptive render samples")
@@ -65,6 +67,7 @@ func runRender(cmd *cobra.Command, args []string) {
 		Procs:      renderProcs,
 		Resolution: resolution,
 		OutputDir:  paths.OutputDir,
+		GPUBackend: renderGPUBackend,
 	}
 	applyOptionalRenderFlags(cmd, &opts)
 

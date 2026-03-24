@@ -14,6 +14,7 @@ import (
 type WorkerConfig struct {
 	WorkerName string `mapstructure:"worker_name"`
 	TaskName   string `mapstructure:"task_name"`
+	Zip        bool   `mapstructure:"zip"`
 	Renderer   struct {
 		MaxProcs int `mapstructure:"max_procs"`
 	} `mapstructure:"renderer"`
@@ -30,7 +31,6 @@ type WorkerConfig struct {
 	} `mapstructure:"directories"`
 	S3 struct {
 		Endpoint     string `mapstructure:"endpoint"`
-		OutputURL    string `mapstructure:"output_url"`
 		Path         string `mapstructure:"path"`
 		Region       string `mapstructure:"region"`
 		Secure       bool   `mapstructure:"secure"`
@@ -54,6 +54,7 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	v.SetDefault("worker.rtasks.poll_interval", "2s")
 	v.SetDefault("worker.rtasks.heartbeat_interval", "10s")
 	v.SetDefault("worker.renderer.max_procs", 1)
+	v.SetDefault("worker.zip", false)
 	v.SetDefault("worker.directories.output", "./out")
 	v.SetDefault("worker.directories.cleanup_policy", "keep")
 	v.SetDefault("worker.s3.endpoint", "s3.amazonaws.com")
@@ -71,6 +72,7 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	cfg := WorkerConfig{
 		WorkerName: strings.TrimSpace(v.GetString("worker.worker_name")),
 		TaskName:   strings.TrimSpace(v.GetString("worker.task_name")),
+		Zip:        v.GetBool("worker.zip"),
 	}
 	cfg.RTasks.URL = strings.TrimSpace(v.GetString("worker.rtasks.url"))
 	cfg.RTasks.Token = strings.TrimSpace(v.GetString("worker.rtasks.token"))
@@ -83,7 +85,6 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	cfg.Directories.CleanupPolicy = strings.TrimSpace(v.GetString("worker.directories.cleanup_policy"))
 
 	cfg.S3.Endpoint = strings.TrimSpace(v.GetString("worker.s3.endpoint"))
-	cfg.S3.OutputURL = strings.TrimSpace(v.GetString("worker.s3.output_url"))
 	cfg.S3.Path = strings.TrimSpace(v.GetString("worker.s3.path"))
 	cfg.S3.Region = strings.TrimSpace(v.GetString("worker.s3.region"))
 	cfg.S3.Secure = v.GetBool("worker.s3.secure")
@@ -95,19 +96,8 @@ func LoadWorkerConfig(configPath string) (WorkerConfig, error) {
 	return cfg, nil
 }
 
-func ResolveWorkerS3BaseURL(outputURL string, s3Path string) (string, error) {
-	outputURL = strings.TrimSpace(outputURL)
+func ResolveWorkerS3BaseURL(s3Path string) (string, error) {
 	s3Path = strings.TrimSpace(s3Path)
-
-	if outputURL != "" && s3Path != "" {
-		return "", errors.New("set only one of worker.s3.output_url or worker.s3.path")
-	}
-	if outputURL != "" {
-		if _, err := assets.ParseS3URL(outputURL); err != nil {
-			return "", fmt.Errorf("worker.s3.output_url is invalid: %w", err)
-		}
-		return outputURL, nil
-	}
 	if s3Path == "" {
 		return "", nil
 	}
