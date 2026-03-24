@@ -80,7 +80,7 @@ rv render scene.py
 
 <Step title="Используйте rv для генерации вашего следующего синтетического датасета">
 
-Подробнее смотрите в [API reference](/ru/api/).
+Подробнее смотрите в [обзоре возможностей](/ru/tutorial/features) и [API reference](/ru/api/).
 
 </Step>
 

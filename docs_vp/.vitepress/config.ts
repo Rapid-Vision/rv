@@ -66,6 +66,7 @@ export default defineConfig({
               text: 'Туториал',
               items: [
                 { text: 'Быстрый старт', link: '/ru/tutorial/' },
+                { text: 'Обзор возможностей', link: '/ru/tutorial/features' },
                 { text: 'Сборка из исходников', link: '/ru/tutorial/github' }
               ]
             },
