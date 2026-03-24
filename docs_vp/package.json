@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "vitepress": "^2.0.0-alpha.17",
+    "vitepress": "2.0.0-alpha.17",
     "vue": "^3.5.30"
   },
   "peerDependencies": {
