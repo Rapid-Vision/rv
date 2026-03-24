@@ -4,7 +4,7 @@ Module for describing an `rv` scenes. To create a scene implement a class derriv
 - To preview scene use the `rv preview <scene.py>` command.
 - To render resulting dataset use the `rv render <scene.py>` command.
 
-View https://rv.rapid-vision.ru/ for documentation.
+View https://rapid-vision.github.io/rv for documentation.
 """
 
 from abc import ABC, abstractmethod

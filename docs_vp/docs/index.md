@@ -4,14 +4,14 @@ title: Redirecting...
 head:
   - - meta
     - http-equiv: refresh
-      content: 0; url=/en/
+      content: 0; url=/rv/en/
 ---
 
 <script setup>
 import { onMounted } from 'vue'
 
 onMounted(() => {
-  window.location.replace('/en/')
+  window.location.replace('/rv/en/')
 })
 </script>
 
