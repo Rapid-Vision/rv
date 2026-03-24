@@ -12,6 +12,41 @@ At the core of `rv` is a `Scene` class. You create objects, materials, lights, a
 
 This keeps scene generation compact while still giving you access to Blender-native behavior. See [`examples/1_primitives/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/1_primitives/scene.py).
 
+## View live-preview
+
+`rv preview` watches your scene script, reloads it on change, and gives you a fast iteration loop before running a full render.
+
+The default mode opens a Blender window:
+
+```bash
+rv preview examples/1_primitives/scene.py
+```
+
+Use this when you want the normal interactive Blender view while editing geometry, materials, lighting, or camera placement.
+
+If you want rendered preview outputs written to disk on every change, enable preview files:
+
+```bash
+rv preview examples/1_primitives/scene.py --preview-files
+```
+
+This combined mode does both: it keeps the Blender window open and also writes a single preview sample into `./preview_out` by default. You can change the output folder with `--preview-out`, set the image size with `--resolution WIDTH,HEIGHT`, and limit render time with `--time-limit`.
+
+For a headless workflow, add `--no-window` together with `--preview-files`:
+
+```bash
+rv preview examples/1_primitives/scene.py --preview-files --no-window
+```
+
+This mode does not open Blender. Instead, it continuously refreshes the preview files on disk, which is useful for remote environments or when you only want image outputs.
+
+**TLDR;** Live-view workflows are:
+
+1. Default: Blender window only.
+2. Headless: `--preview-files --no-window`.
+3. Combined: `--preview-files` for Blender window plus rendered preview files on disk.
+
+
 ## Import reusable assets from `.blend` files
 
 When geometry is more complex than a few primitives, design it in Blender and import from Python. `rv` loads named objects from a `.blend` file and returns an `ObjectLoader`:
