@@ -10,7 +10,7 @@ hero:
       text: Туториал
       link: /ru/tutorial/
     - theme: brand
-      text: API Reference
+      text: Документация API
       link: /ru/api/
 
 features:

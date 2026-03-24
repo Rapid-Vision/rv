@@ -78,7 +78,10 @@ export default defineConfig({
             }
           ],
         },
-        outline: [2, 4],
+        outline: {
+          level: [2, 4],
+          label: "На этой странице"
+        },
         socialLinks: [
           { icon: 'github', link: 'https://github.com/Rapid-Vision/rv' }
         ],
