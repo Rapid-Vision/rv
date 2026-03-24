@@ -12,7 +12,10 @@ At the core of `rv` is a `Scene` class. You create objects, materials, lights, a
 
 This keeps scene generation compact while still giving you access to Blender-native behavior. See [`examples/1_primitives/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/1_primitives/scene.py).
 
-## View live-preview
+### IDE support
+Use `rv python install` command to add `rv` to the current active python virtual environement. This will add code completion for `rv` into your IDE of choice. It is recommended to create an empty virtual environment from scartch. It will not be used in the runtime, it is meant for IDE support only.
+
+## Live preview
 
 `rv preview` watches your scene script, reloads it on change, and gives you a fast iteration loop before running a full render.
 
