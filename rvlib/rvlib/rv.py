@@ -2624,6 +2624,9 @@ class Object(_Serializable):
         mode: Literal[
             "box", "sphere", "hull", "mesh", "capsule", "cylinder", "cone"
         ] = "hull",  # Collision shape
+        mesh_source: Literal[
+            "BASE", "DEFORM", "FINAL"
+        ] = "FINAL",  # Source mesh for collision evaluation
         body_type: Literal["ACTIVE", "PASSIVE"] = "ACTIVE",  # Rigid body type
         mass: float = 1.0,  # Body mass
         friction: float = 0.5,  # Surface friction
@@ -2647,6 +2650,8 @@ class Object(_Serializable):
             raise ValueError(
                 "mode must be one of: box, sphere, hull, mesh, capsule, cylinder, cone."
             )
+        if mesh_source not in {"BASE", "DEFORM", "FINAL"}:
+            raise ValueError("mesh_source must be one of: BASE, DEFORM, FINAL.")
         if self.obj.type != "MESH":
             raise TypeError("Rigid body is supported only for mesh objects.")
         _ensure_rigidbody_world()
@@ -2657,6 +2662,8 @@ class Object(_Serializable):
         rb = self.obj.rigid_body
         rb.type = body_type
         rb.collision_shape = shape_map[mode]
+        if hasattr(rb, "mesh_source"):
+            rb.mesh_source = mesh_source
         rb.mass = max(float(mass), 1e-6)
         rb.friction = float(friction)
         rb.restitution = float(restitution)
