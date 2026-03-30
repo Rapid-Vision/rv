@@ -2447,7 +2447,10 @@ class Object(_Serializable):
         """
         Orients the current object to point at another object, with an optional rotation around the direction vector.
         """
-        direction = rv_obj.obj.location - self.obj.location
+        bpy.context.view_layer.update()
+        direction = _get_object_world_location(rv_obj.obj) - _get_object_world_location(
+            self.obj
+        )
         rot_quat = direction.to_track_quat("-Z", "Y")
         if angle != 0.0:
             axis = direction.normalized()
@@ -4047,6 +4050,14 @@ def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
         return [obj_eval.matrix_world @ v.co for v in mesh.vertices]
     finally:
         obj_eval.to_mesh_clear()
+
+
+def _get_object_world_location(obj: bpy.types.Object) -> Vector:
+    if obj is None:
+        return Vector((0.0, 0.0, 0.0))
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    return obj_eval.matrix_world.translation.copy()
 
 
 def _get_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
