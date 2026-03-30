@@ -46,10 +46,13 @@ RenderPassSet: TypeAlias = set["RenderPass"]
 TagSet: TypeAlias = set[str]
 SemanticChannelSet: TypeAlias = set[str]
 ObjectLoaderSource: TypeAlias = Union[
-    "ObjectLoader", list["ObjectLoader"], tuple["ObjectLoader", ...]
+    "ObjectLoader",
+    "HierarchyLoader",
+    list[Union["ObjectLoader", "HierarchyLoader"]],
+    tuple[Union["ObjectLoader", "HierarchyLoader"], ...],
 ]
 ScatterValidationResult: TypeAlias = tuple[
-    list["ObjectLoader"], float, float, float, float
+    list[Union["ObjectLoader", "HierarchyLoader"]], float, float, float, float
 ]
 
 
@@ -238,6 +241,188 @@ def _mark_object_tree(obj: bpy.types.Object) -> None:
         node_group = getattr(modifier, "node_group", None)
         if node_group is not None:
             _mark_node_tree(node_group)
+
+
+_HIERARCHY_ROOT_PROP = "rv_hierarchy_root"
+_OBJECT_REFERENCE_ATTRS = (
+    "object",
+    "target",
+    "mirror_object",
+    "offset_object",
+    "origin",
+    "start_cap",
+    "end_cap",
+    "texture_coords_object",
+)
+
+
+def _object_ptr(obj: bpy.types.Object | None) -> int | None:
+    if obj is None:
+        return None
+    try:
+        return int(obj.as_pointer())
+    except Exception:
+        return None
+
+
+def _is_hierarchy_root(obj: bpy.types.Object | None) -> bool:
+    return bool(obj is not None and obj.get(_HIERARCHY_ROOT_PROP))
+
+
+def _iter_hierarchy_objects(obj: bpy.types.Object | None) -> list[bpy.types.Object]:
+    if obj is None:
+        return []
+    if not _is_hierarchy_root(obj):
+        return [obj]
+    return [obj] + list(getattr(obj, "children_recursive", []))
+
+
+def _iter_linked_object_references(obj: bpy.types.Object) -> list[bpy.types.Object]:
+    refs: list[bpy.types.Object] = []
+    for modifier in getattr(obj, "modifiers", []):
+        for attr in _OBJECT_REFERENCE_ATTRS:
+            target = getattr(modifier, attr, None)
+            if isinstance(target, bpy.types.Object):
+                refs.append(target)
+    for constraint in getattr(obj, "constraints", []):
+        target = getattr(constraint, "target", None)
+        if isinstance(target, bpy.types.Object):
+            refs.append(target)
+    return refs
+
+
+def _collect_hierarchy_members(
+    root: bpy.types.Object, candidates: list[bpy.types.Object]
+) -> list[bpy.types.Object]:
+    allowed = {
+        ptr: candidate
+        for candidate in candidates
+        if (ptr := _object_ptr(candidate)) is not None
+    }
+    root_ptr = _object_ptr(root)
+    if root_ptr not in allowed:
+        raise ValueError("Hierarchy root must belong to the imported object set.")
+
+    children_by_parent: dict[int, list[bpy.types.Object]] = {}
+    for candidate in candidates:
+        parent_ptr = _object_ptr(getattr(candidate, "parent", None))
+        if parent_ptr is None or parent_ptr not in allowed:
+            continue
+        if parent_ptr not in children_by_parent:
+            children_by_parent[parent_ptr] = []
+        children_by_parent[parent_ptr].append(candidate)
+
+    seen: set[int] = set()
+    order: list[bpy.types.Object] = []
+    queue = [root]
+
+    while len(queue) > 0:
+        current = queue.pop(0)
+        current_ptr = _object_ptr(current)
+        if current_ptr is None or current_ptr in seen or current_ptr not in allowed:
+            continue
+        seen.add(current_ptr)
+        order.append(current)
+
+        for child in children_by_parent.get(current_ptr, []):
+            child_ptr = _object_ptr(child)
+            if child_ptr in allowed and child_ptr not in seen:
+                queue.append(child)
+
+        for ref in _iter_linked_object_references(current):
+            ref_ptr = _object_ptr(ref)
+            if ref_ptr in allowed and ref_ptr not in seen:
+                queue.append(ref)
+
+    return order
+
+
+def _remap_object_references(id_data, clone_map: dict[int, bpy.types.Object]) -> None:
+    for attr in _OBJECT_REFERENCE_ATTRS:
+        if not hasattr(id_data, attr):
+            continue
+        target = getattr(id_data, attr, None)
+        target_ptr = _object_ptr(target)
+        if target_ptr in clone_map:
+            try:
+                setattr(id_data, attr, clone_map[target_ptr])
+            except Exception:
+                pass
+
+
+def _mark_hierarchy_members(members: list[bpy.types.Object]) -> None:
+    for member in members:
+        _mark_object_tree(member)
+
+
+def _has_renderable_geometry(obj: bpy.types.Object | None) -> bool:
+    for member in _iter_hierarchy_objects(obj):
+        if getattr(member, "data", None) is not None:
+            return True
+    return False
+
+
+def _default_hierarchy_roots(
+    objects: list[bpy.types.Object],
+) -> list[bpy.types.Object]:
+    object_ptrs = {
+        ptr for obj in objects if (ptr := _object_ptr(obj)) is not None
+    }
+    roots = [
+        obj
+        for obj in objects
+        if _object_ptr(getattr(obj, "parent", None)) not in object_ptrs
+    ]
+    if len(roots) > 0:
+        return roots
+    return list(objects[:1])
+
+
+def _matches_object_name(candidate: str, requested: str) -> bool:
+    if candidate == requested:
+        return True
+    prefix = f"{requested}."
+    suffix = candidate[len(prefix) :]
+    return candidate.startswith(prefix) and suffix.isdigit()
+
+
+def _duplicate_hierarchy_members(
+    members: list[bpy.types.Object],
+) -> tuple[bpy.types.Object, list[bpy.types.Object]]:
+    if len(members) == 0:
+        raise ValueError("Cannot duplicate an empty hierarchy.")
+
+    clone_map: dict[int, bpy.types.Object] = {}
+    ordered_clones: list[bpy.types.Object] = []
+    generated = _get_generated_collection()
+
+    for src in members:
+        clone = src.copy()
+        clone.parent = None
+        clone[_HIERARCHY_ROOT_PROP] = False
+        clone_map[_object_ptr(src)] = clone
+        ordered_clones.append(clone)
+        _mark_object_tree(clone)
+        generated.objects.link(clone)
+
+    for src in members:
+        src_ptr = _object_ptr(src)
+        clone = clone_map[src_ptr]
+
+        parent_ptr = _object_ptr(getattr(src, "parent", None))
+        if parent_ptr in clone_map:
+            clone.parent = clone_map[parent_ptr]
+            clone.matrix_parent_inverse = src.matrix_parent_inverse.copy()
+
+        for modifier in getattr(clone, "modifiers", []):
+            _remap_object_references(modifier, clone_map)
+
+        for constraint in getattr(clone, "constraints", []):
+            _remap_object_references(constraint, clone_map)
+
+    root_clone = ordered_clones[0]
+    root_clone[_HIERARCHY_ROOT_PROP] = True
+    return root_clone, ordered_clones
 
 
 def _normalize_modifier_input_name(name: str) -> str:
@@ -1397,6 +1582,78 @@ class Scene(ABC, _Serializable):
 
         return res
 
+    def load_hierarchy(
+        self,
+        blendfile: str,  # Path to source .blend file
+        root_name: str = None,  # Optional hierarchy root object name
+    ) -> "HierarchyLoader":
+        """
+        Load a hierarchy rooted at a Blender object and return an instancing loader.
+
+        This is intended for authored assets such as rigs, empties with child meshes,
+        or object graphs that depend on internal object references.
+        """
+        path = str(pathlib.Path(blendfile).expanduser())
+        objects = _load_all_objects(path)
+        if len(objects) == 0:
+            raise ValueError(f"No objects found in '{path}'.")
+
+        if root_name is None:
+            root = _default_hierarchy_roots(objects)[0]
+        else:
+            root = None
+            for obj in objects:
+                if obj.name == root_name:
+                    root = obj
+                    break
+            if root is None:
+                available = ", ".join(obj.name for obj in objects)
+                raise ValueError(
+                    f"Hierarchy root '{root_name}' was not found in '{path}'. "
+                    f"Available objects: [{available}]"
+                )
+
+        members = _collect_hierarchy_members(root, objects)
+        _mark_hierarchy_members(members)
+        return HierarchyLoader(root=root, members=members, scene=self)
+
+    def load_hierarchies(
+        self,
+        blendfile: str,  # Path to source .blend file
+        root_names: list[str] = None,  # Optional list of hierarchy roots to import
+    ) -> list["HierarchyLoader"]:
+        """
+        Load multiple hierarchy loaders from a .blend file.
+
+        If `root_names` is omitted, top-level imported objects are treated as roots.
+        """
+        path = str(pathlib.Path(blendfile).expanduser())
+        objects = _load_all_objects(path)
+        if len(objects) == 0:
+            return []
+
+        if root_names is None:
+            roots = _default_hierarchy_roots(objects)
+        else:
+            wanted = set(root_names)
+            roots = [obj for obj in objects if obj.name in wanted]
+            found = {obj.name for obj in roots}
+            missing = wanted - found
+            if missing:
+                available = ", ".join(obj.name for obj in objects)
+                missing_sorted = ", ".join(sorted(missing))
+                raise ValueError(
+                    f"Hierarchy roots [{missing_sorted}] were not found in '{path}'. "
+                    f"Available objects: [{available}]"
+                )
+
+        res: list[HierarchyLoader] = []
+        for root in roots:
+            members = _collect_hierarchy_members(root, objects)
+            _mark_hierarchy_members(members)
+            res.append(HierarchyLoader(root=root, members=members, scene=self))
+        return res
+
     def create_material(
         self,
         name: str = "Material",  # Material name
@@ -1419,20 +1676,24 @@ class Scene(ABC, _Serializable):
 
     def inspect_object(
         self,
-        loader_or_obj: Union["ObjectLoader", "Object"],  # Object or loader to inspect
+        loader_or_obj: Union[
+            "ObjectLoader", "HierarchyLoader", "Object"
+        ],  # Object or loader to inspect
         applied_scale: bool = True,  # Include object scale in reported local dimensions
     ) -> ObjectStats:
         """
         Inspect geometric stats for a loader/object without manual .blend inspection.
         """
         temp_obj = None
-        if isinstance(loader_or_obj, ObjectLoader):
+        if isinstance(loader_or_obj, (ObjectLoader, HierarchyLoader)):
             temp_obj = loader_or_obj.create_instance(register_object=False)
             obj = temp_obj
         elif isinstance(loader_or_obj, Object):
             obj = loader_or_obj
         else:
-            raise TypeError("loader_or_obj must be ObjectLoader or Object.")
+            raise TypeError(
+                "loader_or_obj must be ObjectLoader, HierarchyLoader, or Object."
+            )
 
         try:
             dims_world = obj.get_dimensions(space="world")
@@ -1879,6 +2140,43 @@ class ObjectLoader:
         return Object(res, self.scene, register_object=register_object)
 
 
+class HierarchyLoader:
+    """
+    Helper for creating hierarchy instances from a loaded Blender object tree.
+    """
+
+    def __init__(
+        self,
+        root: bpy.types.Object,
+        members: list[bpy.types.Object],
+        scene: "Scene",
+    ) -> None:
+        self.obj = root
+        self.root = root
+        self.members = list(members)
+        self.scene = scene
+
+    def create_instance(
+        self,
+        name: str = None,  # Instanced root-object name
+        register_object: bool = True,  # Register hierarchy as one scene object
+    ) -> "Object":
+        """
+        Create a hierarchy instance and return its root object wrapper.
+        """
+        root_clone, members = _duplicate_hierarchy_members(self.members)
+
+        if name is not None:
+            root_clone.name = name
+
+        instance = Object(root_clone, self.scene, register_object=register_object)
+        if register_object and instance.index is not None:
+            for member in members:
+                member.pass_index = instance.index
+
+        return instance
+
+
 class ParametricSource:
     """
     Source wrapper for parameterized scattering.
@@ -2266,6 +2564,32 @@ class Object(_Serializable):
             self.obj.pass_index = self.index
         self.obj.rotation_mode = "QUATERNION"
 
+    def get_children(
+        self,
+        recursive: bool = False,  # Include all descendants instead of direct children
+    ) -> list["Object"]:
+        """
+        Return child object wrappers without registering them as new scene objects.
+        """
+        if recursive:
+            children = list(getattr(self.obj, "children_recursive", []))
+        else:
+            children = list(getattr(self.obj, "children", []))
+        return [Object(child, self.scene, register_object=False) for child in children]
+
+    def find_child(
+        self,
+        name: str,  # Child object name to search for
+        recursive: bool = True,  # Search all descendants
+    ) -> Optional["Object"]:
+        """
+        Find a child/descendant by name.
+        """
+        for child in self.get_children(recursive=recursive):
+            if _matches_object_name(child.obj.name, name):
+                return child
+        return None
+
     def set_location(
         self,
         location: Union[
@@ -2549,14 +2873,12 @@ class Object(_Serializable):
         Get object dimensions (axis-aligned extents) in world or local space.
         """
         if space == "world":
-            dims = self.obj.dimensions
-            return (float(dims.x), float(dims.y), float(dims.z))
+            bounds = self.get_bounds(space="world")
+            return bounds["size"]
         if space != "local":
             raise ValueError("space must be one of: world, local.")
 
-        points = _get_object_local_vertices(self.obj)
-        if len(points) == 0:
-            points = [Vector(corner) for corner in getattr(self.obj, "bound_box", [])]
+        points = _get_object_local_points(self.obj)
         if len(points) == 0:
             dims = self.obj.dimensions
             sx, sy, sz = self.obj.scale
@@ -2585,18 +2907,9 @@ class Object(_Serializable):
         Get axis-aligned bounds in world or local space.
         """
         if space == "world":
-            points = _get_object_world_vertices(self.obj)
-            if len(points) == 0:
-                points = [
-                    self.obj.matrix_world @ Vector(corner)
-                    for corner in getattr(self.obj, "bound_box", [])
-                ]
+            points = _get_object_world_points(self.obj)
         elif space == "local":
-            points = _get_object_local_vertices(self.obj)
-            if len(points) == 0:
-                points = [
-                    Vector(corner) for corner in getattr(self.obj, "bound_box", [])
-                ]
+            points = _get_object_local_points(self.obj)
         else:
             raise ValueError("space must be one of: world, local.")
 
@@ -3739,20 +4052,24 @@ def _validate_scatter_common(
     if yaw_min > yaw_max:
         raise ValueError("yaw_range must satisfy min <= max.")
 
-    loaders: list[ObjectLoader]
-    if isinstance(source, ObjectLoader):
+    loaders: list[ObjectLoader | HierarchyLoader]
+    if isinstance(source, (ObjectLoader, HierarchyLoader)):
         loaders = [source]
     elif isinstance(source, (list, tuple)) and len(source) > 0:
-        if not all(isinstance(loader, ObjectLoader) for loader in source):
-            raise TypeError("source sequence must contain only ObjectLoader instances.")
+        if not all(
+            isinstance(loader, (ObjectLoader, HierarchyLoader)) for loader in source
+        ):
+            raise TypeError(
+                "source sequence must contain only ObjectLoader or HierarchyLoader instances."
+            )
         loaders = list(source)
     else:
         raise TypeError(
-            "source must be ObjectLoader or non-empty sequence[ObjectLoader]."
+            "source must be ObjectLoader, HierarchyLoader, or a non-empty sequence of them."
         )
 
     for loader in loaders:
-        if getattr(loader.obj, "data", None) is None:
+        if not _has_renderable_geometry(loader.obj):
             raise ValueError("source object must have geometry data.")
 
     return loaders, scale_min, scale_max, yaw_min, yaw_max
@@ -3817,10 +4134,11 @@ def _overlaps_by_radius(
 def _remove_blender_object(obj: bpy.types.Object) -> None:
     if obj is None:
         return
-    try:
-        bpy.data.objects.remove(obj, do_unlink=True)
-    except Exception:
-        pass
+    for member in reversed(_iter_hierarchy_objects(obj)):
+        try:
+            bpy.data.objects.remove(member, do_unlink=True)
+        except Exception:
+            pass
 
 
 def _ensure_rigidbody_world() -> None:
@@ -4028,7 +4346,7 @@ def _aabb_from_points(points: list[Vector]) -> AABB:
     return Vector((min(xs), min(ys), min(zs))), Vector((max(xs), max(ys), max(zs)))
 
 
-def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
+def _get_single_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
     if obj is None:
         return []
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -4042,7 +4360,7 @@ def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
         obj_eval.to_mesh_clear()
 
 
-def _get_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
+def _get_single_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
     if obj is None:
         return []
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -4054,6 +4372,57 @@ def _get_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
         return [Vector(v.co) for v in mesh.vertices]
     finally:
         obj_eval.to_mesh_clear()
+
+
+def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
+    points: list[Vector] = []
+    for member in _iter_hierarchy_objects(obj):
+        points.extend(_get_single_object_world_vertices(member))
+    return points
+
+
+def _get_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
+    if obj is None:
+        return []
+
+    if not _is_hierarchy_root(obj):
+        return _get_single_object_local_vertices(obj)
+
+    root_inv = obj.matrix_world.inverted()
+    points: list[Vector] = []
+    for member in _iter_hierarchy_objects(obj):
+        member_points = _get_single_object_world_vertices(member)
+        points.extend(root_inv @ point for point in member_points)
+    return points
+
+
+def _get_object_world_points(obj: bpy.types.Object) -> list[Vector]:
+    points = _get_object_world_vertices(obj)
+    if len(points) > 0:
+        return points
+
+    for member in _iter_hierarchy_objects(obj):
+        corners = [member.matrix_world @ Vector(corner) for corner in member.bound_box]
+        points.extend(corners)
+    return points
+
+
+def _get_object_local_points(obj: bpy.types.Object) -> list[Vector]:
+    points = _get_object_local_vertices(obj)
+    if len(points) > 0:
+        return points
+
+    if obj is None:
+        return []
+
+    if not _is_hierarchy_root(obj):
+        return [Vector(corner) for corner in getattr(obj, "bound_box", [])]
+
+    root_inv = obj.matrix_world.inverted()
+    for member in _iter_hierarchy_objects(obj):
+        for corner in getattr(member, "bound_box", []):
+            points.append(root_inv @ (member.matrix_world @ Vector(corner)))
+    return points
 
 
 def _convex_hull_planes(points: list[Vector]) -> list[Float4]:
@@ -4108,12 +4477,7 @@ def _object_world_radius(obj: bpy.types.Object, dimension: int) -> float:
     if obj is None:
         return 0.0
 
-    points = _get_object_world_vertices(obj)
-    if len(points) == 0:
-        corners = []
-        for corner in getattr(obj, "bound_box", []):
-            corners.append(obj.matrix_world @ Vector(corner))
-        points = corners
+    points = _get_object_world_points(obj)
     if len(points) == 0:
         dims = getattr(obj, "dimensions", Vector((1.0, 1.0, 1.0)))
         if dimension == 2:
@@ -4130,23 +4494,47 @@ def _build_bvh_from_object(
     obj: bpy.types.Object,
     transform: mathutils.Matrix | None = None,
 ) -> BVHTree | None:
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    obj_eval = obj.evaluated_get(depsgraph)
-    if obj_eval.type != "MESH":
+    if obj is None:
         return None
-    mesh = obj_eval.to_mesh()
-    bm = bmesh.new()
-    try:
-        bm.from_mesh(mesh)
-        if transform is None:
-            transform = obj_eval.matrix_world.copy()
-        bmesh.ops.transform(bm, matrix=transform, verts=bm.verts)
-        if len(bm.faces) == 0:
-            return None
-        return BVHTree.FromBMesh(bm, epsilon=0.0)
-    finally:
-        bm.free()
-        obj_eval.to_mesh_clear()
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    root_eval = obj.evaluated_get(depsgraph)
+    root_world = root_eval.matrix_world.copy()
+    root_inv = root_world.inverted()
+
+    vertices: list[Vector] = []
+    polygons: list[tuple[int, int, int]] = []
+
+    for member in _iter_hierarchy_objects(obj):
+        obj_eval = member.evaluated_get(depsgraph)
+        if obj_eval.type != "MESH":
+            continue
+
+        mesh = obj_eval.to_mesh()
+        try:
+            mesh.calc_loop_triangles()
+            if len(mesh.loop_triangles) == 0:
+                continue
+
+            if transform is None:
+                member_transform = obj_eval.matrix_world.copy()
+            elif _is_hierarchy_root(obj):
+                member_transform = transform @ (root_inv @ obj_eval.matrix_world)
+            else:
+                member_transform = transform
+
+            base_index = len(vertices)
+            vertices.extend(member_transform @ vertex.co for vertex in mesh.vertices)
+            polygons.extend(
+                tuple(base_index + idx for idx in triangle.vertices)
+                for triangle in mesh.loop_triangles
+            )
+        finally:
+            obj_eval.to_mesh_clear()
+
+    if len(polygons) == 0:
+        return None
+    return BVHTree.FromPolygons(vertices, polygons, all_triangles=True)
 
 
 def _mesh_overlaps_any(

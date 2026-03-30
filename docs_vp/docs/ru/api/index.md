@@ -719,6 +719,48 @@ def load_objects(self, blendfile: str, import_names: list[str]=None) -> list['Ob
 
 ---
 ---
+#### `load_hierarchy`
+
+Load a hierarchy rooted at a Blender object and return a hierarchy-aware loader.
+
+Use this for rigs, empties with child meshes, and imported assets that must preserve parent-child relationships when instantiated.
+
+**Signature**
+
+```python
+def load_hierarchy(self, blendfile: str, root_name: str=None) -> 'HierarchyLoader'
+```
+
+**Arguments**
+
+- **`blendfile`** : `str` — Path to source `.blend` file
+- **`root_name`** : `str` — Optional hierarchy root object name
+
+**Returns**: `'HierarchyLoader'`
+
+---
+---
+#### `load_hierarchies`
+
+Load multiple hierarchy-aware loaders from a `.blend` file.
+
+If `root_names` is omitted, top-level imported objects are treated as hierarchy roots.
+
+**Signature**
+
+```python
+def load_hierarchies(self, blendfile: str, root_names: list[str]=None) -> list['HierarchyLoader']
+```
+
+**Arguments**
+
+- **`blendfile`** : `str` — Path to source `.blend` file
+- **`root_names`** : `list[str]` — Optional list of hierarchy root object names
+
+**Returns**: `list['HierarchyLoader']`
+
+---
+---
 #### `create_material`
 
 Create a new basic (Principled BSDF) material.

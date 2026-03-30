@@ -61,6 +61,13 @@ rock = rock_loader.create_instance()
 
 This is the recommended workflow for artist-made assets, procedural Blender setups, and scenes you want to reuse across multiple dataset scripts. See [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py).
 
+For hierarchical assets such as rigs or empties with child meshes, use `load_hierarchy(...)` instead so instancing preserves the full object tree:
+
+```python
+character_loader = self.load_hierarchy("./characters.blend", root_name="HeroRig")
+character = character_loader.create_instance()
+```
+
 ## Drive Blender node setups with object properties
 
 Synthetic data usually needs variability. In `rv`, the preferred way to expose that variability is to keep procedural logic in Blender and drive it from Python using object properties.

@@ -60,6 +60,13 @@ rock = rock_loader.create_instance()
 
 См. [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py).
 
+Для иерархических ассетов, например ригов или пустышек с дочерними мешами, используйте `load_hierarchy(...)`, чтобы инстанс сохранял все дерево объектов:
+
+```python
+character_loader = self.load_hierarchy("./characters.blend", root_name="HeroRig")
+character = character_loader.create_instance()
+```
+
 ## Управление нодами
 
 Синтетическим датасетам обычно нужна вариативность. В `rv` предпочтительный способ задать такую вариативность состоит в том, чтобы оставить процедурную логику внутри Blender, а управлять ею из Python через параметры объектов и модификаторов.

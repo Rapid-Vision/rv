@@ -8,7 +8,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:     "rv",
-	Short:   "A lightweight tool for generating labeled synthetic image datasets with just a few commands.",
+	Short:   "A lightweight tool for generating labeled synthetic image datasets.",
 	Version: "0.2.0",
 }
 

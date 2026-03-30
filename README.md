@@ -5,7 +5,7 @@
 - [Features overview](https://rapid-vision.github.io/rv/en/tutorial/features)
 - [API Reference](https://rapid-vision.github.io/rv/en/api)
 
-**`rv`** is a lightweight toolset for generating labeled synthetic image datasets with just a few lines of code.
+**`rv`** is a lightweight toolset for generating labeled synthetic image datasets.
 
 ![Showcase](assets/showcase.png)
 
