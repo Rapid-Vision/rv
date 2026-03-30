@@ -52,6 +52,9 @@ func Install(opts InstallOptions) (InstallResult, error) {
 	if err := os.WriteFile(installedPath, rvSource, 0o644); err != nil {
 		return InstallResult{}, fmt.Errorf("write rv package: %w", err)
 	}
+	if err := os.WriteFile(filepath.Join(packageDir, "py.typed"), nil, 0o644); err != nil {
+		return InstallResult{}, fmt.Errorf("write typing marker: %w", err)
+	}
 
 	return InstallResult{
 		PythonPath:      pythonPath,
