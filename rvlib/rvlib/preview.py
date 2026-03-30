@@ -238,6 +238,22 @@ def replace_preview_output(staging_dir, preview_out):
     _cleanup_empty_dirs(preview_out)
 
 
+def reset_preview_scene_state():
+    scene = bpy.context.scene
+    scene.frame_set(int(scene.frame_start))
+    bpy.context.view_layer.update()
+
+    if scene.rigidbody_world is not None:
+        try:
+            bpy.ops.object.select_all(action="DESELECT")
+            bpy.ops.rigidbody.world_remove()
+        except Exception:
+            pass
+
+    scene.frame_set(int(scene.frame_start))
+    bpy.context.view_layer.update()
+
+
 def run_script(
     script_path,
     preview_files=False,
@@ -261,6 +277,7 @@ def run_script(
         print(CLASS_COUNT_ERROR_MESSAGE)
         return
 
+    reset_preview_scene_state()
     rv.begin_run(purge_orphans=True)
     if preview_files:
         os.makedirs(preview_out, exist_ok=True)
