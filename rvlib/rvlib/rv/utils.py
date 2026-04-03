@@ -1,3 +1,5 @@
+import importlib.util
+import inspect
 import uuid
 
 import bpy
@@ -26,6 +28,15 @@ from .types import (
 _RV_OWNED_KEY = "_rv_owned"
 _RV_RUN_ID_KEY = "_rv_run_id"
 _ACTIVE_RUN_ID = None
+_INTERNAL_CLASS_COUNT_ERROR_MESSAGE = """ERROR: exactly one class derived from rv.Scene must be defined.
+Example usage:
+
+import rv
+class MyScene(rv.Scene):
+    def generate(self):
+        pass
+"""
+_INTERNAL_VALID_GPU_BACKENDS = ("auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu")
 
 
 def _mark_owned(obj: bpy.types.ID) -> None:
@@ -194,6 +205,157 @@ def _purge_orphans() -> None:
 def _require_blender_attr(target, attr: str, feature: str) -> None:
     if not hasattr(target, attr):
         raise RuntimeError(f"Blender does not support {feature}.")
+
+def _internal_parse_resolution(raw, arg_name: str = "--resolution") -> Resolution:
+    parts = [part.strip() for part in raw.split(",")]
+    if len(parts) != 2:
+        raise ValueError(f"{arg_name} must be WIDTH,HEIGHT")
+    width = int(parts[0])
+    height = int(parts[1])
+    if width <= 0 or height <= 0:
+        raise ValueError(f"{arg_name} width and height must be > 0")
+    return (width, height)
+
+
+def _internal_load_scene_class(script_path: str):
+    spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
+    module = importlib.util.module_from_spec(spec)
+    if spec.loader is None:
+        raise RuntimeError(f"Failed to load scene script: {script_path}")
+    spec.loader.exec_module(module)
+
+    import rv
+
+    scene_classes = []
+    for _, obj in inspect.getmembers(module, inspect.isclass):
+        if issubclass(obj, rv.Scene) and obj is not rv.Scene:
+            scene_classes.append(obj)
+
+    if len(scene_classes) != 1:
+        raise RuntimeError(_INTERNAL_CLASS_COUNT_ERROR_MESSAGE.strip())
+
+    return scene_classes[0]
+
+
+def _internal_iter_cycles_devices(preferences):
+    devices = getattr(preferences, "devices", None)
+    if devices:
+        return list(devices)
+
+    get_devices = getattr(preferences, "get_devices", None)
+    if callable(get_devices):
+        groups = get_devices() or []
+        flattened = []
+        for group in groups:
+            if group:
+                flattened.extend(group)
+        return flattened
+
+    return []
+
+
+def _internal_configure_cycles_backend(requested_backend: str) -> str:
+    scene = bpy.context.scene
+    scene.cycles.device = "GPU"
+
+    try:
+        preferences = bpy.context.preferences.addons["cycles"].preferences
+    except KeyError as exc:
+        raise RuntimeError("Cycles add-on preferences are unavailable") from exc
+
+    refresh_devices = getattr(preferences, "refresh_devices", None)
+    if callable(refresh_devices):
+        refresh_devices()
+
+    requested = requested_backend.strip().lower()
+    if requested not in _INTERNAL_VALID_GPU_BACKENDS:
+        raise ValueError(
+            "--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu"
+        )
+
+    available_types = {
+        device.type for device in _internal_iter_cycles_devices(preferences)
+    }
+    if requested == "auto":
+        for backend in ("OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"):
+            if backend in available_types:
+                requested = backend.lower()
+                break
+        else:
+            requested = "cpu"
+
+    if requested == "cpu":
+        scene.cycles.device = "CPU"
+        return "CPU"
+
+    selected_type = requested.upper()
+    if selected_type not in available_types:
+        available = sorted(available_types) or ["CPU"]
+        raise RuntimeError(
+            f"Requested GPU backend {selected_type} is unavailable. "
+            f"Available device types: {', '.join(available)}"
+        )
+
+    preferences.compute_device_type = selected_type
+    if callable(refresh_devices):
+        refresh_devices()
+
+    enabled_gpu = False
+    for device in _internal_iter_cycles_devices(preferences):
+        is_matching_gpu = device.type == selected_type
+        if hasattr(device, "use"):
+            device.use = is_matching_gpu
+        if is_matching_gpu:
+            enabled_gpu = True
+
+    if not enabled_gpu:
+        raise RuntimeError(f"Requested GPU backend {selected_type} found no enabled devices")
+
+    scene.cycles.device = "GPU"
+    return selected_type
+
+
+def _internal_print_cycles_device_info() -> None:
+    scene = bpy.context.scene
+    print(f"[rv] engine={scene.render.engine}")
+    print(f"[rv] cycles_device={scene.cycles.device}")
+
+    try:
+        preferences = bpy.context.preferences.addons["cycles"].preferences
+    except KeyError:
+        print("[rv] cycles_preferences=unavailable")
+        return
+
+    refresh_devices = getattr(preferences, "refresh_devices", None)
+    if callable(refresh_devices):
+        refresh_devices()
+
+    print(
+        f"[rv] compute_device_type={getattr(preferences, 'compute_device_type', None)}"
+    )
+
+    devices = _internal_iter_cycles_devices(preferences)
+    if not devices:
+        print("[rv] devices=[]")
+        return
+
+    serialized_devices = [
+        {
+            "name": device.name,
+            "type": device.type,
+            "use": getattr(device, "use", None),
+        }
+        for device in devices
+    ]
+    print(f"[rv] devices={serialized_devices}")
+
+
+def _internal_set_time_limit(scene_instance, time_limit: float | None) -> None:
+    if time_limit is None:
+        return
+    if time_limit <= 0:
+        raise ValueError("--time-limit must be > 0")
+    scene_instance.time_limit = time_limit
 
 
 def _internal_begin_run(purge_orphans: bool = True) -> str:

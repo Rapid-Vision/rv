@@ -155,14 +155,16 @@ func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, lib
 		"--script", scriptPath,
 		"--libpath", libPath,
 		"--cwd", cwdAbs,
-		"--preview-files", fmt.Sprintf("%t", opts.PreviewFiles),
-		"--no-window", fmt.Sprintf("%t", opts.NoWindow),
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--gpu-backend", gpuBackend,
 	)
 
 	if opts.PreviewFiles {
+		args = append(args, "--preview-files")
 		args = append(args, "--preview-out", opts.PreviewOut)
+	}
+	if opts.NoWindow {
+		args = append(args, "--no-window")
 	}
 	if opts.TimeLimit != nil {
 		args = append(args, "--time-limit", fmt.Sprintf("%g", *opts.TimeLimit))

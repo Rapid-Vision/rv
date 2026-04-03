@@ -73,7 +73,6 @@ func TestBuildBlenderRenderArgs_OptionalArgs(t *testing.T) {
 		{"--time-limit", "2.5"},
 		{"--max-samples", "256"},
 		{"--min-samples", "8"},
-		{"--noise-threshold-enabled", "true"},
 		{"--noise-threshold", "0.02"},
 	}
 	for _, pair := range wantPairs {
@@ -81,6 +80,9 @@ func TestBuildBlenderRenderArgs_OptionalArgs(t *testing.T) {
 		if idx < 0 || idx+1 >= len(got) || got[idx+1] != pair[1] {
 			t.Fatalf("missing %s %s in args: %v", pair[0], pair[1], got)
 		}
+	}
+	if !slices.Contains(got, "--noise-threshold-enabled") {
+		t.Fatalf("missing --noise-threshold-enabled in args: %v", got)
 	}
 }
 

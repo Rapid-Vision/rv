@@ -1,6 +1,4 @@
 import argparse
-import importlib.util
-import inspect
 import json
 import os
 import sys
@@ -8,15 +6,6 @@ import sys
 import bpy
 
 EXPORT_SCHEMA_VERSION = 1
-
-CLASS_COUNT_ERROR_MESSAGE = """ERROR: exactly one class derived from rv.Scene must be defined.
-Example usage:
-
-import rv
-class MyScene(rv.Scene):
-    def generate(self):
-        pass
-"""
 
 
 def parse_args():
@@ -29,38 +18,9 @@ def parse_args():
     parser.add_argument("--libpath", type=str, required=True)
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--cwd", type=str, required=True)
-    parser.add_argument("--freeze-physics", type=parse_bool, default=False)
-    parser.add_argument("--pack-resources", type=parse_bool, default=False)
+    parser.add_argument("--freeze-physics", action="store_true")
+    parser.add_argument("--pack-resources", action="store_true")
     return parser.parse_args(args)
-
-
-def parse_bool(raw):
-    if isinstance(raw, bool):
-        return raw
-    value = str(raw).strip().lower()
-    if value in ("true", "1", "yes", "y", "on"):
-        return True
-    if value in ("false", "0", "no", "n", "off"):
-        return False
-    raise ValueError("expected boolean value")
-
-
-def load_scene_class(script_path):
-    spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    import rv
-
-    scene_classes = []
-    for _, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, rv.Scene) and obj is not rv.Scene:
-            scene_classes.append(obj)
-
-    if len(scene_classes) != 1:
-        raise RuntimeError(CLASS_COUNT_ERROR_MESSAGE.strip())
-
-    return scene_classes[0]
 
 
 def set_json_prop(id_data, key, value):
@@ -178,10 +138,9 @@ def main():
     sys.path.insert(0, args.cwd)
     os.chdir(args.cwd)
 
-    scene_class = load_scene_class(args.script)
-
     import rv
 
+    scene_class = rv._internal_load_scene_class(args.script)
     rv._internal_begin_run(purge_orphans=True)
     scene_instance = scene_class(output_dir=None)
     scene_instance.generate()

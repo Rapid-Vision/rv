@@ -31,13 +31,16 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 		{"--libpath", "/tmp/lib"},
 		{"--output", "/tmp/out/scene.blend"},
 		{"--cwd", "/tmp/work"},
-		{"--freeze-physics", "true"},
-		{"--pack-resources", "true"},
 	}
 	for _, pair := range wantPairs {
 		idx := slices.Index(got, pair[0])
 		if idx < 0 || idx+1 >= len(got) || got[idx+1] != pair[1] {
 			t.Fatalf("missing %s %s in args: %v", pair[0], pair[1], got)
+		}
+	}
+	for _, flag := range []string{"--freeze-physics", "--pack-resources"} {
+		if !slices.Contains(got, flag) {
+			t.Fatalf("missing %s in args: %v", flag, got)
 		}
 	}
 }

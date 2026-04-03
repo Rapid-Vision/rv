@@ -135,7 +135,13 @@ from .types import (
 from .utils import (
     _get_generated_collection,
     _internal_begin_run,
+    _internal_configure_cycles_backend,
     _internal_end_run,
+    _internal_iter_cycles_devices,
+    _internal_load_scene_class,
+    _internal_parse_resolution,
+    _internal_print_cycles_device_info,
+    _internal_set_time_limit,
     _is_owned,
     _mark_material_tree,
     _mark_node_tree,

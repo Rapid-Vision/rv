@@ -99,7 +99,6 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 	assertContains(t, args, "--cwd")
 	assertContains(t, args, "/work")
 	assertContains(t, args, "--preview-files")
-	assertContains(t, args, "true")
 	assertContains(t, args, "--no-window")
 	assertContains(t, args, "--preview-out")
 	assertContains(t, args, "/tmp/preview_out")
@@ -121,6 +120,8 @@ func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	)
 	assertNotContains(t, args, "--background")
 	assertNotContains(t, args, "--preview-out")
+	assertNotContains(t, args, "--preview-files")
+	assertNotContains(t, args, "--no-window")
 	assertContains(t, args, "--gpu-backend")
 	assertContains(t, args, "auto")
 }

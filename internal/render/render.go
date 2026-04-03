@@ -205,7 +205,11 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		args = append(args, "--min-samples", fmt.Sprintf("%d", *opts.MinSamples))
 	}
 	if opts.NoiseThresholdEnabled != nil {
-		args = append(args, "--noise-threshold-enabled", fmt.Sprintf("%t", *opts.NoiseThresholdEnabled))
+		if *opts.NoiseThresholdEnabled {
+			args = append(args, "--noise-threshold-enabled")
+		} else {
+			args = append(args, "--no-noise-threshold-enabled")
+		}
 	}
 	if opts.NoiseThreshold != nil {
 		args = append(args, "--noise-threshold", fmt.Sprintf("%g", *opts.NoiseThreshold))

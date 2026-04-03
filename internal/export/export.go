@@ -72,10 +72,10 @@ func buildBlenderExportArgs(opts Options, libPath string) []string {
 		"--cwd", opts.Cwd,
 	}
 	if opts.FreezePhysics {
-		args = append(args, "--freeze-physics", "true")
+		args = append(args, "--freeze-physics")
 	}
 	if opts.PackResources {
-		args = append(args, "--pack-resources", "true")
+		args = append(args, "--pack-resources")
 	}
 	return args
 }

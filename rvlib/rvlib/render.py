@@ -1,20 +1,7 @@
-import importlib.util
-import inspect
 import os
 import sys
 import argparse
 import bpy
-
-CLASS_COUNT_ERROR_MESSAGE = """ERROR: exactly one class derived from rv.Scene must be defined.
-Example usage:
-
-import rv
-class MyScene(rv.Scene):
-    def generate(self):
-        pass
-"""
-
-VALID_GPU_BACKENDS = ("auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu")
 
 
 def parse_args():
@@ -32,144 +19,15 @@ def parse_args():
     parser.add_argument("--time-limit", type=float, default=None)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--min-samples", type=int, default=None)
-    parser.add_argument("--noise-threshold-enabled", type=parse_bool, default=None)
+    parser.add_argument(
+        "--noise-threshold-enabled",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
     parser.add_argument("--noise-threshold", type=float, default=None)
     parser.add_argument("--cwd", type=str)
 
     return parser.parse_args(args)
-
-
-def parse_bool(raw):
-    if isinstance(raw, bool):
-        return raw
-    value = str(raw).strip().lower()
-    if value in ("true", "1", "yes", "y", "on"):
-        return True
-    if value in ("false", "0", "no", "n", "off"):
-        return False
-    raise ValueError("--noise-threshold-enabled must be true or false")
-
-
-def parse_resolution(raw):
-    parts = [part.strip() for part in raw.split(",")]
-    if len(parts) != 2:
-        raise ValueError("--resolution must be WIDTH,HEIGHT")
-    width = int(parts[0])
-    height = int(parts[1])
-    if width <= 0 or height <= 0:
-        raise ValueError("--resolution width and height must be > 0")
-    return (width, height)
-
-
-def iter_cycles_devices(preferences):
-    devices = getattr(preferences, "devices", None)
-    if devices:
-        return list(devices)
-
-    get_devices = getattr(preferences, "get_devices", None)
-    if callable(get_devices):
-        groups = get_devices() or []
-        flattened = []
-        for group in groups:
-            if group:
-                flattened.extend(group)
-        return flattened
-
-    return []
-
-
-def configure_cycles_backend(requested_backend):
-    scene = bpy.context.scene
-    scene.cycles.device = "GPU"
-
-    try:
-        preferences = bpy.context.preferences.addons["cycles"].preferences
-    except KeyError as exc:
-        raise RuntimeError("Cycles add-on preferences are unavailable") from exc
-
-    refresh_devices = getattr(preferences, "refresh_devices", None)
-    if callable(refresh_devices):
-        refresh_devices()
-
-    requested = requested_backend.strip().lower()
-    if requested not in VALID_GPU_BACKENDS:
-        raise ValueError(
-            "--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu"
-        )
-
-    available_types = {device.type for device in iter_cycles_devices(preferences)}
-    if requested == "auto":
-        for backend in ("OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"):
-            if backend in available_types:
-                requested = backend.lower()
-                break
-        else:
-            requested = "cpu"
-
-    if requested == "cpu":
-        scene.cycles.device = "CPU"
-        return "CPU"
-
-    selected_type = requested.upper()
-    if selected_type not in available_types:
-        available = sorted(available_types) or ["CPU"]
-        raise RuntimeError(
-            f"Requested GPU backend {selected_type} is unavailable. "
-            f"Available device types: {', '.join(available)}"
-        )
-
-    preferences.compute_device_type = selected_type
-    if callable(refresh_devices):
-        refresh_devices()
-
-    enabled_gpu = False
-    for device in iter_cycles_devices(preferences):
-        is_matching_gpu = device.type == selected_type
-        if hasattr(device, "use"):
-            device.use = is_matching_gpu
-        if is_matching_gpu:
-            enabled_gpu = True
-
-    if not enabled_gpu:
-        raise RuntimeError(f"Requested GPU backend {selected_type} found no enabled devices")
-
-    scene.cycles.device = "GPU"
-    return selected_type
-
-
-def print_cycles_device_info():
-    scene = bpy.context.scene
-    print(f"[rv] engine={scene.render.engine}")
-    print(f"[rv] cycles_device={scene.cycles.device}")
-
-    try:
-        preferences = bpy.context.preferences.addons["cycles"].preferences
-    except KeyError:
-        print("[rv] cycles_preferences=unavailable")
-        return
-
-    refresh_devices = getattr(preferences, "refresh_devices", None)
-    if callable(refresh_devices):
-        refresh_devices()
-
-    print(
-        f"[rv] compute_device_type={getattr(preferences, 'compute_device_type', None)}"
-    )
-
-    devices = iter_cycles_devices(preferences)
-    if not devices:
-        print("[rv] devices=[]")
-        return
-
-    serialized_devices = [
-        {
-            "name": device.name,
-            "type": device.type,
-            "use": getattr(device, "use", None),
-        }
-        for device in devices
-    ]
-    print(f"[rv] devices={serialized_devices}")
 
 
 def apply_cycles_overrides(
@@ -228,28 +86,15 @@ def run_script(
     noise_threshold_enabled,
     noise_threshold,
 ):
-    spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
     import rv
 
-    scene_classes = []
-    for _, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, rv.Scene) and obj is not rv.Scene:
-            scene_classes.append(obj)
-
-    if len(scene_classes) != 1:
-        raise RuntimeError(CLASS_COUNT_ERROR_MESSAGE.strip())
+    scene_class = rv._internal_load_scene_class(script_path)
 
     def execute_run():
         rv._internal_begin_run(purge_orphans=True)
-        instance = scene_classes[0](output_dir)
+        instance = scene_class(output_dir)
         instance.resolution = resolution
-        if time_limit is not None:
-            if time_limit <= 0:
-                raise ValueError("--time-limit must be > 0")
-            instance.time_limit = time_limit
+        rv._internal_set_time_limit(instance, time_limit)
         instance.generate()
         instance._internal_post_gen()
         apply_cycles_overrides(
@@ -258,9 +103,9 @@ def run_script(
             noise_threshold_enabled=noise_threshold_enabled,
             noise_threshold=noise_threshold,
         )
-        selected_backend = configure_cycles_backend(gpu_backend)
+        selected_backend = rv._internal_configure_cycles_backend(gpu_backend)
         print(f"[rv] selected_gpu_backend={selected_backend}")
-        print_cycles_device_info()
+        rv._internal_print_cycles_device_info()
         instance._internal_render()
         instance._internal_save_metadata("_meta.json")
         rv._internal_end_run(purge_orphans=False)
@@ -269,10 +114,13 @@ def run_script(
 
 
 ARGS = parse_args()
-RESOLUTION = parse_resolution(ARGS.resolution)
 
 sys.path.append(ARGS.libpath)
 os.chdir(ARGS.cwd)
+
+import rv
+
+RESOLUTION = rv._internal_parse_resolution(ARGS.resolution)
 
 for i in range(ARGS.number):
     run_script(
