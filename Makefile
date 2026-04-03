@@ -4,7 +4,7 @@ rtasks:
 	rrpc client --lang go -o internal -f rtasks.rrpc
 
 docs:
-	uvx rdocgen -c rvlib/rvlib/rv.py -o docs_vp/docs/en/api
+	uvx rdocgen -c rvlib/rvlib/rv/__init__.py -o docs_vp/docs/en/api
 	cp docs_vp/docs/en/api/index.md docs_vp/docs/ru/api/index.md
 
 test: test-python-unit test-blender

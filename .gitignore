@@ -9,7 +9,7 @@
 *.dylib
 
 # Tooling binaries
-rv
+/rv
 
 # Test binary, built with `go test -c`
 *.test

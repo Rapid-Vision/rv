@@ -1,0 +1,305 @@
+import bmesh
+import bpy
+import math
+import mathutils
+import random
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+
+from .types import AABB, Float2, Float4, Polygon2D
+
+
+def _cross_2d(o, a, b) -> float:
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _convex_hull_2d(points: Polygon2D) -> Polygon2D:
+    pts = sorted(set((float(p[0]), float(p[1])) for p in points))
+    if len(pts) <= 1:
+        return pts
+    lower = []
+    for p in pts:
+        while len(lower) >= 2 and _cross_2d(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and _cross_2d(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def _polygon_signed_area(points: Polygon2D) -> float:
+    area = 0.0
+    for i in range(len(points)):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % len(points)]
+        area += x1 * y2 - x2 * y1
+    return area * 0.5
+
+
+def _sample_convex_polygon(points: Polygon2D, rng: random.Random) -> Float2:
+    p0 = points[0]
+    tris = []
+    total_area = 0.0
+    for i in range(1, len(points) - 1):
+        p1 = points[i]
+        p2 = points[i + 1]
+        area = abs(_cross_2d(p0, p1, p2))
+        if area > 1e-12:
+            tris.append((p0, p1, p2, area))
+            total_area += area
+    if total_area <= 0:
+        raise ValueError("polygon is degenerate.")
+
+    choice = rng.uniform(0.0, total_area)
+    accum = 0.0
+    selected = tris[-1]
+    for tri in tris:
+        accum += tri[3]
+        if choice <= accum:
+            selected = tri
+            break
+
+    a, b, c, _ = selected
+    r1 = math.sqrt(rng.random())
+    r2 = rng.random()
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+    x = (1 - r1) * ax + r1 * ((1 - r2) * bx + r2 * cx)
+    y = (1 - r1) * ay + r1 * ((1 - r2) * by + r2 * cy)
+    return (x, y)
+
+
+def _point_in_convex_polygon(point: Float2, points) -> bool:
+    sign = 0
+    for i in range(len(points)):
+        a = points[i]
+        b = points[(i + 1) % len(points)]
+        cross = _cross_2d(a, b, point)
+        if abs(cross) <= 1e-10:
+            continue
+        current_sign = 1 if cross > 0 else -1
+        if sign == 0:
+            sign = current_sign
+        elif sign != current_sign:
+            return False
+    return True
+
+
+def _distance_point_segment_2d(point, a, b) -> float:
+    px, py = point
+    ax, ay = a
+    bx, by = b
+    abx, aby = bx - ax, by - ay
+    apx, apy = px - ax, py - ay
+    denom = abx * abx + aby * aby
+    if denom <= 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, (apx * abx + apy * aby) / denom))
+    cx = ax + t * abx
+    cy = ay + t * aby
+    return math.hypot(px - cx, py - cy)
+
+
+def _distance_to_polygon_edges(point: Float2, points) -> float:
+    best = float("inf")
+    for i in range(len(points)):
+        best = min(
+            best,
+            _distance_point_segment_2d(point, points[i], points[(i + 1) % len(points)]),
+        )
+    return best
+
+
+def _random_unit_vector(rng: random.Random) -> Vector:
+    z = rng.uniform(-1.0, 1.0)
+    theta = rng.uniform(0.0, 2.0 * math.pi)
+    t = math.sqrt(max(0.0, 1.0 - z * z))
+    return Vector((t * math.cos(theta), t * math.sin(theta), z))
+
+
+def _points_centroid(points: list[Vector]) -> Vector:
+    if len(points) == 0:
+        return Vector((0.0, 0.0, 0.0))
+    total = Vector((0.0, 0.0, 0.0))
+    for p in points:
+        total += p
+    return total / len(points)
+
+
+def _aabb_from_points(points: list[Vector]) -> AABB:
+    xs = [p.x for p in points]
+    ys = [p.y for p in points]
+    zs = [p.z for p in points]
+    return Vector((min(xs), min(ys), min(zs))), Vector((max(xs), max(ys), max(zs)))
+
+
+def _get_object_world_vertices(obj: bpy.types.Object) -> list[Vector]:
+    if obj is None:
+        return []
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    if obj_eval.type != "MESH":
+        return []
+    mesh = obj_eval.to_mesh()
+    try:
+        return [obj_eval.matrix_world @ v.co for v in mesh.vertices]
+    finally:
+        obj_eval.to_mesh_clear()
+
+
+def _get_object_world_location(obj: bpy.types.Object) -> Vector:
+    if obj is None:
+        return Vector((0.0, 0.0, 0.0))
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    return obj_eval.matrix_world.translation.copy()
+
+
+def _get_object_local_vertices(obj: bpy.types.Object) -> list[Vector]:
+    if obj is None:
+        return []
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    if obj_eval.type != "MESH":
+        return []
+    mesh = obj_eval.to_mesh()
+    try:
+        return [Vector(v.co) for v in mesh.vertices]
+    finally:
+        obj_eval.to_mesh_clear()
+
+
+def _convex_hull_planes(points: list[Vector]) -> list[Float4]:
+    bm = bmesh.new()
+    for p in points:
+        bm.verts.new(p)
+    bm.verts.ensure_lookup_table()
+    if len(bm.verts) < 4:
+        bm.free()
+        return []
+
+    hull = bmesh.ops.convex_hull(bm, input=list(bm.verts))
+    if len(hull.get("geom", [])) == 0:
+        bm.free()
+        return []
+
+    bm.normal_update()
+    centroid = _points_centroid(points)
+    planes = []
+    for face in bm.faces:
+        n = Vector(face.normal)
+        p = Vector(face.verts[0].co)
+        d = -n.dot(p)
+        if n.dot(centroid) + d > 0:
+            n = -n
+            d = -d
+        planes.append((n.x, n.y, n.z, d))
+    bm.free()
+    return planes
+
+
+def _sample_rotation_quaternion(
+    rng: random.Random,
+    domain_dimension: int,
+    rotation_mode: str,
+    yaw_min: float,
+    yaw_max: float,
+) -> mathutils.Quaternion:
+    if rotation_mode == "yaw" or domain_dimension == 2:
+        yaw_deg = rng.uniform(yaw_min, yaw_max)
+        return mathutils.Euler((0.0, 0.0, math.radians(yaw_deg))).to_quaternion()
+
+    u1, u2, u3 = rng.random(), rng.random(), rng.random()
+    qx = math.sqrt(1.0 - u1) * math.sin(2.0 * math.pi * u2)
+    qy = math.sqrt(1.0 - u1) * math.cos(2.0 * math.pi * u2)
+    qz = math.sqrt(u1) * math.sin(2.0 * math.pi * u3)
+    qw = math.sqrt(u1) * math.cos(2.0 * math.pi * u3)
+    return mathutils.Quaternion((qw, qx, qy, qz))
+
+
+def _object_world_radius(obj: bpy.types.Object, dimension: int) -> float:
+    if obj is None:
+        return 0.0
+
+    points = _get_object_world_vertices(obj)
+    if len(points) == 0:
+        corners = []
+        for corner in getattr(obj, "bound_box", []):
+            corners.append(obj.matrix_world @ Vector(corner))
+        points = corners
+    if len(points) == 0:
+        dims = getattr(obj, "dimensions", Vector((1.0, 1.0, 1.0)))
+        if dimension == 2:
+            return 0.5 * math.hypot(dims.x, dims.y)
+        return 0.5 * math.sqrt(dims.x * dims.x + dims.y * dims.y + dims.z * dims.z)
+
+    center = obj.matrix_world.translation
+    if dimension == 2:
+        return max(math.hypot(p.x - center.x, p.y - center.y) for p in points)
+    return max((p - center).length for p in points)
+
+
+def _build_bvh_from_object(
+    obj: bpy.types.Object,
+    transform: mathutils.Matrix | None = None,
+) -> BVHTree | None:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    obj_eval = obj.evaluated_get(depsgraph)
+    if obj_eval.type != "MESH":
+        return None
+    mesh = obj_eval.to_mesh()
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        if transform is None:
+            transform = obj_eval.matrix_world.copy()
+        bmesh.ops.transform(bm, matrix=transform, verts=bm.verts)
+        if len(bm.faces) == 0:
+            return None
+        return BVHTree.FromBMesh(bm, epsilon=0.0)
+    finally:
+        bm.free()
+        obj_eval.to_mesh_clear()
+
+
+def _mesh_overlaps_any(
+    source_obj: bpy.types.Object,
+    location: Vector,
+    rotation: mathutils.Quaternion,
+    scale: float,
+    others: list[bpy.types.Object],
+) -> bool:
+    transform = (
+        mathutils.Matrix.Translation(location)
+        @ rotation.to_matrix().to_4x4()
+        @ mathutils.Matrix.Diagonal((scale, scale, scale, 1.0))
+    )
+    candidate_bvh = _build_bvh_from_object(source_obj, transform=transform)
+    if candidate_bvh is None:
+        return False
+    for other in others:
+        other_bvh = _build_bvh_from_object(other)
+        if other_bvh is None:
+            continue
+        if len(candidate_bvh.overlap(other_bvh)) > 0:
+            return True
+    return False
+
+
+def _mesh_object_overlaps_any(
+    candidate: bpy.types.Object, others: list[bpy.types.Object]
+) -> bool:
+    candidate_bvh = _build_bvh_from_object(candidate)
+    if candidate_bvh is None:
+        return False
+    for other in others:
+        other_bvh = _build_bvh_from_object(other)
+        if other_bvh is None:
+            continue
+        if len(candidate_bvh.overlap(other_bvh)) > 0:
+            return True
+    return False
