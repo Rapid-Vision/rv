@@ -121,6 +121,24 @@ def polygon(points, z: float=0.0) -> 'Domain'
 
 ---
 ---
+###### `convex_polygon`
+
+**Signature**
+
+```python
+@staticmethod
+def convex_polygon(points, z: float=0.0) -> 'Domain'
+```
+
+**Arguments**
+
+- **`points`**
+- **`z`** : `float`
+
+**Returns**: `'Domain'`
+
+---
+---
 ###### `box`
 
 **Signature**
@@ -172,6 +190,40 @@ def ellipsoid(center: Float3=(0.0, 0.0, 0.0), radii: Float3=(5.0, 3.0, 2.0)) -> 
 
 - **`center`** : `Float3`
 - **`radii`** : `Float3`
+
+**Returns**: `'Domain'`
+
+---
+---
+###### `convex_hull_2d`
+
+**Signature**
+
+```python
+@staticmethod
+def convex_hull_2d(rv_obj: Object) -> 'Domain'
+```
+
+**Arguments**
+
+- **`rv_obj`** : `Object`
+
+**Returns**: `'Domain'`
+
+---
+---
+###### `convex_hull_3d`
+
+**Signature**
+
+```python
+@staticmethod
+def convex_hull_3d(rv_obj: Object) -> 'Domain'
+```
+
+**Arguments**
+
+- **`rv_obj`** : `Object`
 
 **Returns**: `'Domain'`
 

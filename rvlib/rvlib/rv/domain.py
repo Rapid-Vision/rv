@@ -1,5 +1,6 @@
 import math
 import random
+import warnings
 from mathutils import Vector
 from typing import Literal
 
@@ -11,11 +12,12 @@ from .geometry import (
     _convex_hull_planes,
     _distance_to_polygon_edges,
     _get_object_world_vertices,
-    _point_in_convex_polygon,
+    _is_convex_polygon,
+    _point_in_polygon,
     _points_centroid,
-    _polygon_signed_area,
+    _prepare_polygon_2d,
     _random_unit_vector,
-    _sample_convex_polygon,
+    _sample_polygon,
 )
 from .object import Object
 from .scatter import _ensure_positive_tuple
@@ -72,14 +74,17 @@ class Domain:
 
     @staticmethod
     def polygon(points, z: float = 0.0) -> "Domain":
-        if points is None or len(points) < 3:
+        if points is None:
             raise ValueError("polygon requires at least 3 points.")
-        convex = _convex_hull_2d(points)
-        if len(convex) < 3:
-            raise ValueError("polygon is degenerate.")
-        if _polygon_signed_area(convex) <= 0:
-            convex = list(reversed(convex))
-        return Domain("polygon", {"points": convex, "z": z}, 2)
+        polygon_points, triangles = _prepare_polygon_2d(points)
+        return Domain("polygon", {"points": polygon_points, "triangles": triangles, "z": z}, 2)
+
+    @staticmethod
+    def convex_polygon(points, z: float = 0.0) -> "Domain":
+        polygon = Domain.polygon(points, z=z)
+        if not _is_convex_polygon(polygon.data["points"]):
+            raise ValueError("convex_polygon requires convex input.")
+        return Domain("hull2d", dict(polygon.data), 2)
 
     @staticmethod
     def box(
@@ -123,19 +128,22 @@ class Domain:
         return Domain("ellipsoid", {"center": tuple(center), "radii": tuple(radii)}, 3)
 
     @staticmethod
-    def convex_hull(rv_obj: Object, project_2d: bool = False) -> "Domain":
+    def convex_hull_2d(rv_obj: Object) -> "Domain":
         points = _get_object_world_vertices(rv_obj.obj)
         if len(points) < 3:
             raise ValueError("convex_hull requires an object with mesh geometry.")
-        if project_2d:
-            hull = _convex_hull_2d([(p.x, p.y) for p in points])
-            if len(hull) < 3:
-                raise ValueError("2D projected convex hull is degenerate.")
-            if _polygon_signed_area(hull) <= 0:
-                hull = list(reversed(hull))
-            z = float(rv_obj.obj.location.z)
-            return Domain("hull2d", {"points": hull, "z": z}, 2)
+        hull = _convex_hull_2d([(p.x, p.y) for p in points])
+        if len(hull) < 3:
+            raise ValueError("2D projected convex hull is degenerate.")
+        polygon_points, triangles = _prepare_polygon_2d(hull)
+        z = float(rv_obj.obj.location.z)
+        return Domain("hull2d", {"points": polygon_points, "triangles": triangles, "z": z}, 2)
 
+    @staticmethod
+    def convex_hull_3d(rv_obj: Object) -> "Domain":
+        points = _get_object_world_vertices(rv_obj.obj)
+        if len(points) < 3:
+            raise ValueError("convex_hull requires an object with mesh geometry.")
         planes = _convex_hull_planes(points)
         if len(planes) < 4:
             raise ValueError("3D convex hull is degenerate.")
@@ -150,6 +158,18 @@ class Domain:
             },
             3,
         )
+
+    @staticmethod
+    def convex_hull(rv_obj: Object, project_2d: bool = False) -> "Domain":
+        warnings.warn(
+            "Domain.convex_hull(..., project_2d=...) is deprecated; use "
+            "Domain.convex_hull_2d(...) or Domain.convex_hull_3d(...).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if project_2d:
+            return Domain.convex_hull_2d(rv_obj)
+        return Domain.convex_hull_3d(rv_obj)
 
     def sample_point(self, rng: random.Random) -> mathutils.Vector:
         inset_margin = self._effective_inset_margin()
@@ -179,7 +199,7 @@ class Domain:
             points = self.data["points"]
             z = self.data["z"]
             for _ in range(512):
-                x, y = _sample_convex_polygon(points, rng)
+                x, y = _sample_polygon(self.data["triangles"], rng)
                 p = Vector((x, y, z))
                 if self.contains_point(p, margin=0.0):
                     return p
@@ -277,7 +297,7 @@ class Domain:
             if abs(point.z - self.data["z"]) > 1e-6:
                 return False
             pt = (point.x, point.y)
-            if not _point_in_convex_polygon(pt, self.data["points"]):
+            if not _point_in_polygon(pt, self.data["points"]):
                 return False
             if margin <= 0:
                 return True

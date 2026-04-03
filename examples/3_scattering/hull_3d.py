@@ -15,7 +15,7 @@ class HullScatterScene(rv.Scene):
             .set_scale((1.2, 0.8, 0.6))
             .hide(view="wireframe")
         )
-        domain = rv.Domain.convex_hull(container, project_2d=False)
+        domain = rv.Domain.convex_hull_3d(container)
 
         source_cube = self.create_cube(name="ScatterSourceCube", size=1.0).set_location(
             (0, 0, -1000)

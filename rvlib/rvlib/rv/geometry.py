@@ -3,6 +3,7 @@ import bpy
 import math
 import mathutils
 import random
+from itertools import combinations
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
@@ -37,6 +38,17 @@ def _polygon_signed_area(points: Polygon2D) -> float:
         x2, y2 = points[(i + 1) % len(points)]
         area += x1 * y2 - x2 * y1
     return area * 0.5
+
+
+def _normalize_polygon_2d(points: Polygon2D) -> Polygon2D:
+    normalized = []
+    for point in points:
+        current = (float(point[0]), float(point[1]))
+        if len(normalized) == 0 or current != normalized[-1]:
+            normalized.append(current)
+    if len(normalized) > 1 and normalized[0] == normalized[-1]:
+        normalized.pop()
+    return normalized
 
 
 def _sample_convex_polygon(points: Polygon2D, rng: random.Random) -> Float2:
@@ -89,6 +101,32 @@ def _point_in_convex_polygon(point: Float2, points) -> bool:
     return True
 
 
+def _point_on_segment_2d(point: Float2, a: Float2, b: Float2, eps: float = 1e-10) -> bool:
+    cross = _cross_2d(a, b, point)
+    if abs(cross) > eps:
+        return False
+    min_x = min(a[0], b[0]) - eps
+    max_x = max(a[0], b[0]) + eps
+    min_y = min(a[1], b[1]) - eps
+    max_y = max(a[1], b[1]) + eps
+    return min_x <= point[0] <= max_x and min_y <= point[1] <= max_y
+
+
+def _point_in_polygon(point: Float2, points: Polygon2D) -> bool:
+    inside = False
+    for i in range(len(points)):
+        a = points[i]
+        b = points[(i + 1) % len(points)]
+        if _point_on_segment_2d(point, a, b):
+            return True
+        if (a[1] > point[1]) == (b[1] > point[1]):
+            continue
+        x_intersection = a[0] + (point[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+        if x_intersection >= point[0] - 1e-10:
+            inside = not inside
+    return inside
+
+
 def _distance_point_segment_2d(point, a, b) -> float:
     px, py = point
     ax, ay = a
@@ -112,6 +150,151 @@ def _distance_to_polygon_edges(point: Float2, points) -> float:
             _distance_point_segment_2d(point, points[i], points[(i + 1) % len(points)]),
         )
     return best
+
+
+def _orientation(a: Float2, b: Float2, c: Float2, eps: float = 1e-10) -> int:
+    cross = _cross_2d(a, b, c)
+    if cross > eps:
+        return 1
+    if cross < -eps:
+        return -1
+    return 0
+
+
+def _segments_intersect_2d(a1: Float2, a2: Float2, b1: Float2, b2: Float2) -> bool:
+    o1 = _orientation(a1, a2, b1)
+    o2 = _orientation(a1, a2, b2)
+    o3 = _orientation(b1, b2, a1)
+    o4 = _orientation(b1, b2, a2)
+
+    if o1 != o2 and o3 != o4:
+        return True
+    if o1 == 0 and _point_on_segment_2d(b1, a1, a2):
+        return True
+    if o2 == 0 and _point_on_segment_2d(b2, a1, a2):
+        return True
+    if o3 == 0 and _point_on_segment_2d(a1, b1, b2):
+        return True
+    if o4 == 0 and _point_on_segment_2d(a2, b1, b2):
+        return True
+    return False
+
+
+def _is_simple_polygon(points: Polygon2D) -> bool:
+    edges = [(i, (i + 1) % len(points)) for i in range(len(points))]
+    for (i1, j1), (i2, j2) in combinations(edges, 2):
+        if len({i1, j1, i2, j2}) < 4:
+            continue
+        if _segments_intersect_2d(points[i1], points[j1], points[i2], points[j2]):
+            return False
+    return True
+
+
+def _is_convex_polygon(points: Polygon2D) -> bool:
+    direction = 0
+    for i in range(len(points)):
+        a = points[i]
+        b = points[(i + 1) % len(points)]
+        c = points[(i + 2) % len(points)]
+        turn = _orientation(a, b, c)
+        if turn == 0:
+            continue
+        if direction == 0:
+            direction = turn
+        elif turn != direction:
+            return False
+    return direction != 0
+
+
+def _point_in_triangle_2d(point: Float2, a: Float2, b: Float2, c: Float2) -> bool:
+    ab = _orientation(a, b, point)
+    bc = _orientation(b, c, point)
+    ca = _orientation(c, a, point)
+    signs = [value for value in (ab, bc, ca) if value != 0]
+    return len(signs) == 0 or all(value > 0 for value in signs) or all(value < 0 for value in signs)
+
+
+def _triangulate_polygon(points: Polygon2D) -> list[tuple[Float2, Float2, Float2, float]]:
+    remaining = list(range(len(points)))
+    triangles = []
+
+    while len(remaining) > 3:
+        ear_found = False
+        for idx, current in enumerate(remaining):
+            prev = remaining[idx - 1]
+            nxt = remaining[(idx + 1) % len(remaining)]
+            a = points[prev]
+            b = points[current]
+            c = points[nxt]
+            cross = _cross_2d(a, b, c)
+            if cross <= 1e-10:
+                continue
+            if any(
+                candidate not in {prev, current, nxt}
+                and _point_in_triangle_2d(points[candidate], a, b, c)
+                for candidate in remaining
+            ):
+                continue
+            area = abs(cross) * 0.5
+            if area <= 1e-12:
+                continue
+            triangles.append((a, b, c, area))
+            del remaining[idx]
+            ear_found = True
+            break
+        if not ear_found:
+            raise ValueError("polygon is not a simple non-degenerate polygon.")
+
+    a = points[remaining[0]]
+    b = points[remaining[1]]
+    c = points[remaining[2]]
+    area = abs(_cross_2d(a, b, c)) * 0.5
+    if area <= 1e-12:
+        raise ValueError("polygon is degenerate.")
+    triangles.append((a, b, c, area))
+    return triangles
+
+
+def _prepare_polygon_2d(points: Polygon2D) -> tuple[Polygon2D, list[tuple[Float2, Float2, Float2, float]]]:
+    normalized = _normalize_polygon_2d(points)
+    if len(normalized) < 3:
+        raise ValueError("polygon requires at least 3 points.")
+    if not _is_simple_polygon(normalized):
+        raise ValueError("polygon must be simple and non-self-intersecting.")
+    area = _polygon_signed_area(normalized)
+    if abs(area) <= 1e-12:
+        raise ValueError("polygon is degenerate.")
+    if area < 0:
+        normalized = list(reversed(normalized))
+    return normalized, _triangulate_polygon(normalized)
+
+
+def _sample_polygon(
+    triangles: list[tuple[Float2, Float2, Float2, float]],
+    rng: random.Random,
+) -> Float2:
+    total_area = sum(triangle[3] for triangle in triangles)
+    if total_area <= 1e-12:
+        raise ValueError("polygon is degenerate.")
+
+    choice = rng.uniform(0.0, total_area)
+    accum = 0.0
+    selected = triangles[-1]
+    for triangle in triangles:
+        accum += triangle[3]
+        if choice <= accum:
+            selected = triangle
+            break
+
+    a, b, c, _ = selected
+    r1 = math.sqrt(rng.random())
+    r2 = rng.random()
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+    x = (1 - r1) * ax + r1 * ((1 - r2) * bx + r2 * cx)
+    y = (1 - r1) * ay + r1 * ((1 - r2) * by + r2 * cy)
+    return (x, y)
 
 
 def _random_unit_vector(rng: random.Random) -> Vector:

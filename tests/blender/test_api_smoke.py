@@ -6,6 +6,7 @@ import bpy
 import mathutils
 import rv
 import rv.internal as rvi
+from mathutils import Vector
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -71,6 +72,14 @@ class ApiSmokeTest(unittest.TestCase):
             [(-2.0, -2.0), (2.0, -2.0), (2.0, 2.0), (-2.0, 2.0)],
             z=0.5,
         )
+        concave_polygon = rv.Domain.polygon(
+            [(-3.0, -2.0), (3.0, -2.0), (3.0, 2.0), (0.0, 0.0), (-3.0, 2.0)],
+            z=0.5,
+        )
+        convex_polygon = rv.Domain.convex_polygon(
+            [(-2.0, -2.0), (2.0, -2.0), (2.0, 2.0), (-2.0, 2.0)],
+            z=0.5,
+        )
         box = rv.Domain.box(center=(0.0, 0.0, 1.5), size=(6.0, 6.0, 4.0))
         cylinder = rv.Domain.cylinder(center=(0.0, 0.0, 1.5), radius=2.0, height=4.0)
         ellipsoid = rv.Domain.ellipsoid(center=(0.0, 0.0, 1.5), radii=(2.5, 2.0, 1.5))
@@ -79,12 +88,18 @@ class ApiSmokeTest(unittest.TestCase):
         sampled_rect = rect.sample_point(rng)
         sampled_ellipse = ellipse.sample_point(rng)
         sampled_polygon = polygon.sample_point(rng)
+        sampled_concave_polygon = concave_polygon.sample_point(rng)
         sampled_box = box.sample_point(rng)
         sampled_cylinder = cylinder.sample_point(rng)
         sampled_ellipsoid = ellipsoid.sample_point(rng)
         self.assertTrue(rect.contains_point(sampled_rect))
         self.assertTrue(ellipse.contains_point(sampled_ellipse))
         self.assertTrue(polygon.contains_point(sampled_polygon))
+        self.assertTrue(concave_polygon.contains_point(sampled_concave_polygon))
+        self.assertFalse(concave_polygon.contains_point(Vector((0.0, 1.5, 0.5))))
+        self.assertTrue(convex_polygon.contains_point(Vector((0.0, 0.0, 0.5))))
+        with self.assertRaises(ValueError):
+            rv.Domain.convex_polygon([(-1.0, -1.0), (1.0, -1.0), (0.0, 0.0), (1.0, 1.0)])
         self.assertTrue(box.contains_point(sampled_box))
         self.assertTrue(cylinder.contains_point(sampled_cylinder))
         self.assertTrue(ellipsoid.contains_point(sampled_ellipsoid))
@@ -190,8 +205,8 @@ class ApiSmokeTest(unittest.TestCase):
         loader_stats = self.scene.inspect_object(cube, applied_scale=False)
         self.assertIn("dimensions_local", loader_stats.to_dict())
 
-        hull3d = rv.Domain.convex_hull(cube, project_2d=False)
-        hull2d = rv.Domain.convex_hull(cube, project_2d=True)
+        hull3d = rv.Domain.convex_hull_3d(cube)
+        hull2d = rv.Domain.convex_hull_2d(cube)
         self.assertTrue(hull3d.contains_object(cube, mode="mesh"))
         self.assertTrue(box.contains_object(cube, mode="aabb"))
         self.assertTrue(hull2d.contains_point(hull2d.sample_point(rng)))
