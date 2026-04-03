@@ -1524,18 +1524,25 @@ Add or update rigid-body settings for this object.
 **Signature**
 
 ```python
-def add_rigidbody(self, mode: Literal['box', 'sphere', 'hull', 'mesh', 'capsule', 'cylinder', 'cone']='hull', body_type: Literal['ACTIVE', 'PASSIVE']='ACTIVE', mass: float=1.0, friction: float=0.5, restitution: float=0.0, linear_damping: float=0.04, angular_damping: float=0.1) -> 'Object'
+def add_rigidbody(self, mode: Literal['box', 'sphere', 'hull', 'mesh', 'capsule', 'cylinder', 'cone']='hull', mesh_source: Literal['BASE', 'DEFORM', 'FINAL']='FINAL', body_type: Literal['ACTIVE', 'PASSIVE']='ACTIVE', mass: float=1.0, friction: float=0.5, restitution: float=0.0, linear_damping: float=0.04, angular_damping: float=0.1, use_margin: bool=True, collision_margin: float | None=None, use_deactivation: bool | None=None, deactivate_linear_velocity: float | None=None, deactivate_angular_velocity: float | None=None, start_deactivated: bool | None=None) -> 'Object'
 ```
 
 **Arguments**
 
 - **`mode`** : `Literal['box', 'sphere', 'hull', 'mesh', 'capsule', 'cylinder', 'cone']` — Collision shape
+- **`mesh_source`** : `Literal['BASE', 'DEFORM', 'FINAL']` — Source mesh for collision evaluation
 - **`body_type`** : `Literal['ACTIVE', 'PASSIVE']` — Rigid body type
 - **`mass`** : `float` — Body mass
 - **`friction`** : `float` — Surface friction
 - **`restitution`** : `float` — Bounciness
 - **`linear_damping`** : `float` — Linear damping factor
 - **`angular_damping`** : `float` — Angular damping factor
+- **`use_margin`** : `bool` — Enable collision margin
+- **`collision_margin`** : `float | None` — Contact margin for collisions
+- **`use_deactivation`** : `bool | None` — Allow body to sleep when settled
+- **`deactivate_linear_velocity`** : `float | None` — Sleep linear threshold
+- **`deactivate_angular_velocity`** : `float | None` — Sleep angular threshold
+- **`start_deactivated`** : `bool | None` — Start body sleeping
 
 **Returns**: `Self`
 
@@ -2205,7 +2212,7 @@ Simulate current Blender rigid-body world for a fixed number of frames.
 **Signature**
 
 ```python
-def simulate_physics(frames: int=20, substeps: int=10, time_scale: float=1.0) -> None
+def simulate_physics(frames: int=20, substeps: int=10, time_scale: float=1.0, solver_iterations: int | None=None, use_split_impulse: bool | None=None, split_impulse_penetration_threshold: float | None=None) -> None
 ```
 
 **Arguments**
@@ -2213,6 +2220,9 @@ def simulate_physics(frames: int=20, substeps: int=10, time_scale: float=1.0) ->
 - **`frames`** : `int` — Number of simulation frames
 - **`substeps`** : `int` — Substeps per frame
 - **`time_scale`** : `float` — Physics time scale
+- **`solver_iterations`** : `int | None` — Constraint solver iterations
+- **`use_split_impulse`** : `bool | None` — Reduce explosive penetration fixes
+- **`split_impulse_penetration_threshold`** : `float | None` — Split impulse threshold
 
 **Returns**: `None`
 

@@ -2636,6 +2636,12 @@ class Object(_Serializable):
         restitution: float = 0.0,  # Bounciness
         linear_damping: float = 0.04,  # Linear damping factor
         angular_damping: float = 0.1,  # Angular damping factor
+        use_margin: bool = True,  # Enable collision margin
+        collision_margin: float | None = None,  # Contact margin for collisions
+        use_deactivation: bool | None = None,  # Allow body to sleep when settled
+        deactivate_linear_velocity: float | None = None,  # Sleep linear threshold
+        deactivate_angular_velocity: float | None = None,  # Sleep angular threshold
+        start_deactivated: bool | None = None,  # Start body sleeping
     ) -> "Object":
         """
         Add or update rigid-body settings for this object.
@@ -2655,6 +2661,18 @@ class Object(_Serializable):
             )
         if mesh_source not in {"BASE", "DEFORM", "FINAL"}:
             raise ValueError("mesh_source must be one of: BASE, DEFORM, FINAL.")
+        if collision_margin is not None and float(collision_margin) < 0:
+            raise ValueError("collision_margin must be >= 0.")
+        if (
+            deactivate_linear_velocity is not None
+            and float(deactivate_linear_velocity) < 0
+        ):
+            raise ValueError("deactivate_linear_velocity must be >= 0.")
+        if (
+            deactivate_angular_velocity is not None
+            and float(deactivate_angular_velocity) < 0
+        ):
+            raise ValueError("deactivate_angular_velocity must be >= 0.")
         if self.obj.type != "MESH":
             raise TypeError("Rigid body is supported only for mesh objects.")
         _ensure_rigidbody_world()
@@ -2673,9 +2691,28 @@ class Object(_Serializable):
         rb.linear_damping = float(linear_damping)
         rb.angular_damping = float(angular_damping)
         if hasattr(rb, "use_margin"):
-            rb.use_margin = True
+            rb.use_margin = bool(use_margin)
         if hasattr(rb, "collision_margin"):
-            rb.collision_margin = max(0.0, min(self.get_dimensions("world")) * 0.01)
+            if collision_margin is None:
+                rb.collision_margin = max(
+                    0.0, min(self.get_dimensions("world")) * 0.01
+                )
+            else:
+                rb.collision_margin = float(collision_margin)
+        if use_deactivation is not None and hasattr(rb, "use_deactivation"):
+            rb.use_deactivation = bool(use_deactivation)
+        if (
+            deactivate_linear_velocity is not None
+            and hasattr(rb, "deactivate_linear_velocity")
+        ):
+            rb.deactivate_linear_velocity = float(deactivate_linear_velocity)
+        if (
+            deactivate_angular_velocity is not None
+            and hasattr(rb, "deactivate_angular_velocity")
+        ):
+            rb.deactivate_angular_velocity = float(deactivate_angular_velocity)
+        if start_deactivated is not None and hasattr(rb, "use_start_deactivated"):
+            rb.use_start_deactivated = bool(start_deactivated)
         return self
 
     def remove_rigidbody(
@@ -3840,7 +3877,12 @@ def _ensure_rigidbody_world() -> None:
 
 
 def _configure_rigidbody_world(
-    settle_frames: int, substeps: int, time_scale: float
+    settle_frames: int,
+    substeps: int,
+    time_scale: float,
+    solver_iterations: int | None = None,
+    use_split_impulse: bool | None = None,
+    split_impulse_penetration_threshold: float | None = None,
 ) -> tuple[int, int]:
     _ensure_rigidbody_world()
     scene = bpy.context.scene
@@ -3859,7 +3901,21 @@ def _configure_rigidbody_world(
     if hasattr(rbw, "substeps_per_frame"):
         rbw.substeps_per_frame = max(1, int(substeps))
     if hasattr(rbw, "solver_iterations"):
-        rbw.solver_iterations = max(1, int(substeps) * 2)
+        iterations = (
+            max(1, int(substeps) * 2)
+            if solver_iterations is None
+            else max(1, int(solver_iterations))
+        )
+        rbw.solver_iterations = iterations
+    if use_split_impulse is not None and hasattr(rbw, "use_split_impulse"):
+        rbw.use_split_impulse = bool(use_split_impulse)
+    if (
+        split_impulse_penetration_threshold is not None
+        and hasattr(rbw, "split_impulse_penetration_threshold")
+    ):
+        rbw.split_impulse_penetration_threshold = float(
+            split_impulse_penetration_threshold
+        )
 
     cache = getattr(rbw, "point_cache", None)
     if cache is not None:
@@ -3869,10 +3925,20 @@ def _configure_rigidbody_world(
 
 
 def _simulate_rigidbody(
-    settle_frames: int, substeps: int, time_scale: float
+    settle_frames: int,
+    substeps: int,
+    time_scale: float,
+    solver_iterations: int | None = None,
+    use_split_impulse: bool | None = None,
+    split_impulse_penetration_threshold: float | None = None,
 ) -> tuple[int, int]:
     start_frame, end_frame = _configure_rigidbody_world(
-        settle_frames=settle_frames, substeps=substeps, time_scale=time_scale
+        settle_frames=settle_frames,
+        substeps=substeps,
+        time_scale=time_scale,
+        solver_iterations=solver_iterations,
+        use_split_impulse=use_split_impulse,
+        split_impulse_penetration_threshold=split_impulse_penetration_threshold,
     )
     for frame in range(start_frame, end_frame + 1):
         bpy.context.scene.frame_set(frame)
@@ -3883,6 +3949,9 @@ def simulate_physics(
     frames: int = 20,  # Number of simulation frames
     substeps: int = 10,  # Substeps per frame
     time_scale: float = 1.0,  # Physics time scale
+    solver_iterations: int | None = None,  # Constraint solver iterations
+    use_split_impulse: bool | None = None,  # Reduce explosive penetration fixes
+    split_impulse_penetration_threshold: float | None = None,  # Split impulse threshold
 ) -> None:
     """
     Simulate current Blender rigid-body world for a fixed number of frames.
@@ -3896,9 +3965,27 @@ def simulate_physics(
         raise ValueError("substeps must be > 0.")
     if time_scale <= 0:
         raise ValueError("time_scale must be > 0.")
+    if solver_iterations is not None and int(solver_iterations) <= 0:
+        raise ValueError("solver_iterations must be > 0.")
+    if (
+        split_impulse_penetration_threshold is not None
+        and float(split_impulse_penetration_threshold) < 0
+    ):
+        raise ValueError("split_impulse_penetration_threshold must be >= 0.")
 
     _simulate_rigidbody(
-        settle_frames=int(frames), substeps=int(substeps), time_scale=float(time_scale)
+        settle_frames=int(frames),
+        substeps=int(substeps),
+        time_scale=float(time_scale),
+        solver_iterations=(
+            None if solver_iterations is None else int(solver_iterations)
+        ),
+        use_split_impulse=use_split_impulse,
+        split_impulse_penetration_threshold=(
+            None
+            if split_impulse_penetration_threshold is None
+            else float(split_impulse_penetration_threshold)
+        ),
     )
 
 

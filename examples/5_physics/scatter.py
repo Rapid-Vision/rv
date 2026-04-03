@@ -72,10 +72,26 @@ class PhysicsScatterScene(rv.Scene):
                     )
                 ).to_quaternion()
             )
-            cube.add_rigidbody(mode="box", body_type="ACTIVE", mass=0.2, friction=0.7)
+            cube.add_rigidbody(
+                mode="box",
+                body_type="ACTIVE",
+                mass=0.2,
+                friction=0.7,
+                collision_margin=0.01,
+                use_deactivation=True,
+                deactivate_linear_velocity=0.15,
+                deactivate_angular_velocity=0.2,
+            )
             cube.set_tags("cube")
 
-        rv.simulate_physics(frames=120, substeps=10, time_scale=1.0)
+        rv.simulate_physics(
+            frames=120,
+            substeps=12,
+            solver_iterations=30,
+            use_split_impulse=True,
+            split_impulse_penetration_threshold=0.04,
+            time_scale=1.0,
+        )
 
         look_at = self.create_empty("LookAt").set_location((0.0, 0.0, 0.9))
         self.get_camera().set_location((5.0, -5.0, 4.0)).point_at(look_at)

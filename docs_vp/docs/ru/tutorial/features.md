@@ -177,13 +177,28 @@ plane.add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
 ```
 
 ```python
-cube.add_rigidbody(mode="box", body_type="ACTIVE", mass=0.2)
+cube.add_rigidbody(
+    mode="box",
+    body_type="ACTIVE",
+    mass=0.2,
+    collision_margin=0.01,
+    use_deactivation=True,
+    deactivate_linear_velocity=0.15,
+    deactivate_angular_velocity=0.2,
+)
 ```
 
 Запуск симуляции:
 
 ```python
-rv.simulate_physics(frames=120, substeps=10, time_scale=1.0)
+rv.simulate_physics(
+    frames=120,
+    substeps=12,
+    solver_iterations=30,
+    use_split_impulse=True,
+    split_impulse_penetration_threshold=0.04,
+    time_scale=1.0,
+)
 ```
 
 Это особенно полезно для генерации непересекающихся куч объектов и сцен с ударами. Примеры физики включают:
