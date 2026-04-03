@@ -51,56 +51,6 @@ def _normalize_polygon_2d(points: Polygon2D) -> Polygon2D:
     return normalized
 
 
-def _sample_convex_polygon(points: Polygon2D, rng: random.Random) -> Float2:
-    p0 = points[0]
-    tris = []
-    total_area = 0.0
-    for i in range(1, len(points) - 1):
-        p1 = points[i]
-        p2 = points[i + 1]
-        area = abs(_cross_2d(p0, p1, p2))
-        if area > 1e-12:
-            tris.append((p0, p1, p2, area))
-            total_area += area
-    if total_area <= 0:
-        raise ValueError("polygon is degenerate.")
-
-    choice = rng.uniform(0.0, total_area)
-    accum = 0.0
-    selected = tris[-1]
-    for tri in tris:
-        accum += tri[3]
-        if choice <= accum:
-            selected = tri
-            break
-
-    a, b, c, _ = selected
-    r1 = math.sqrt(rng.random())
-    r2 = rng.random()
-    ax, ay = a
-    bx, by = b
-    cx, cy = c
-    x = (1 - r1) * ax + r1 * ((1 - r2) * bx + r2 * cx)
-    y = (1 - r1) * ay + r1 * ((1 - r2) * by + r2 * cy)
-    return (x, y)
-
-
-def _point_in_convex_polygon(point: Float2, points) -> bool:
-    sign = 0
-    for i in range(len(points)):
-        a = points[i]
-        b = points[(i + 1) % len(points)]
-        cross = _cross_2d(a, b, point)
-        if abs(cross) <= 1e-10:
-            continue
-        current_sign = 1 if cross > 0 else -1
-        if sign == 0:
-            sign = current_sign
-        elif sign != current_sign:
-            return False
-    return True
-
-
 def _point_on_segment_2d(point: Float2, a: Float2, b: Float2, eps: float = 1e-10) -> bool:
     cross = _cross_2d(a, b, point)
     if abs(cross) > eps:
@@ -447,30 +397,6 @@ def _build_bvh_from_object(
     finally:
         bm.free()
         obj_eval.to_mesh_clear()
-
-
-def _mesh_overlaps_any(
-    source_obj: bpy.types.Object,
-    location: Vector,
-    rotation: mathutils.Quaternion,
-    scale: float,
-    others: list[bpy.types.Object],
-) -> bool:
-    transform = (
-        mathutils.Matrix.Translation(location)
-        @ rotation.to_matrix().to_4x4()
-        @ mathutils.Matrix.Diagonal((scale, scale, scale, 1.0))
-    )
-    candidate_bvh = _build_bvh_from_object(source_obj, transform=transform)
-    if candidate_bvh is None:
-        return False
-    for other in others:
-        other_bvh = _build_bvh_from_object(other)
-        if other_bvh is None:
-            continue
-        if len(candidate_bvh.overlap(other_bvh)) > 0:
-            return True
-    return False
 
 
 def _mesh_object_overlaps_any(
