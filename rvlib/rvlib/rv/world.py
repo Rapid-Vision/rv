@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import math
+from typing import Self
 
 import bpy
 
@@ -21,7 +22,7 @@ class World(ABC):
         pass
 
     @abstractmethod
-    def set_params(self):
+    def set_params(self) -> Self:
         """
         Update world-specific lighting parameters.
         """

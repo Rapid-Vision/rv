@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Self
 
 import bpy
 
@@ -26,7 +26,7 @@ class Material(ABC, _Serializable):
         self._resolved_material = None
 
     @abstractmethod
-    def set_params(self, **kwargs):
+    def set_params(self, **kwargs) -> Self:
         pass
 
     @abstractmethod

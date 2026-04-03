@@ -238,9 +238,9 @@ class Scene(ABC, _Serializable):
     def get_camera(self) -> "Camera":
         return self.camera
 
-    def set_world(self, world: "World") -> "World":
+    def set_world(self, world: "World") -> "Scene":
         self.world = world
-        return world
+        return self
 
     def get_world(self) -> "World":
         return self.world

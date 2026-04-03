@@ -72,7 +72,7 @@ class _Serializable:
 
     def set_custom_meta(
         self, **custom_meta: Union[JSONSerializable, ObjectStats]
-    ) -> None:
+    ) -> Self:
         """
         Set custom metainformation that may be helpful when using dataset later.
         """
@@ -80,6 +80,7 @@ class _Serializable:
             if isinstance(value, ObjectStats):
                 value = value.to_dict()
             self.custom_meta[key] = value
+        return self
 
     def _get_meta(self) -> dict:
         return {
