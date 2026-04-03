@@ -220,9 +220,9 @@ def _internal_parse_resolution(raw, arg_name: str = "--resolution") -> Resolutio
 
 def _internal_load_scene_class(script_path: str):
     spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
-    module = importlib.util.module_from_spec(spec)
-    if spec.loader is None:
+    if spec is None or spec.loader is None:
         raise RuntimeError(f"Failed to load scene script: {script_path}")
+    module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
     import rv

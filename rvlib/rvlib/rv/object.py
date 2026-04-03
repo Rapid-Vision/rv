@@ -3,7 +3,7 @@ import math
 import numbers
 import random
 import typing
-from typing import Literal, Union
+from typing import Any, Literal, Self, Union
 
 import bpy
 import mathutils
@@ -119,7 +119,7 @@ class ObjectLoader:
 
     def create_instance(
         self,
-        name: str = None,
+        name: str | None = None,
         register_object: bool = True,
         linked_data: bool = True,
     ) -> "Object":
@@ -294,7 +294,7 @@ class Object(_Serializable):
     def set_property(
         self,
         key: str,
-        value: any,
+        value: Any,
     ):
         """
         Set a property of the object. Properties can be used inside object's material nodes.
@@ -306,7 +306,7 @@ class Object(_Serializable):
     def set_modifier_input(
         self,
         input_name: str,
-        value: any,
+        value: Any,
         modifier_name: str | None = None,
     ):
         """
@@ -773,7 +773,7 @@ class Light(Object):
     def set_color(
         self,
         color: Color,
-    ) -> "Light":
+    ) -> Self:
         """
         Set light RGB color. Alpha (if provided) is ignored.
         """
@@ -786,7 +786,7 @@ class Light(Object):
     def set_power(
         self,
         power: float,
-    ) -> "Light":
+    ) -> Self:
         """
         Set light power in Blender `energy` units.
         """
@@ -798,7 +798,7 @@ class Light(Object):
     def set_cast_shadow(
         self,
         enabled: bool = True,
-    ) -> "Light":
+    ) -> Self:
         """
         Enable or disable shadow casting.
         """
@@ -808,7 +808,7 @@ class Light(Object):
     def set_specular_factor(
         self,
         factor: float,
-    ) -> "Light":
+    ) -> Self:
         """
         Set the light contribution to specular highlights.
         """
@@ -818,7 +818,7 @@ class Light(Object):
     def set_softness(
         self,
         value: float,
-    ) -> "Light":
+    ) -> Self:
         """
         Set softness parameter mapped to the current light type.
         """
@@ -830,7 +830,7 @@ class Light(Object):
             self.light_data.shadow_soft_size = value
         return self
 
-    def set_params(self, **kwargs) -> "Light":
+    def set_params(self, **kwargs) -> Self:
         """
         Set known light-data attributes or custom properties.
         """

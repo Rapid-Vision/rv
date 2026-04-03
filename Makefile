@@ -1,4 +1,10 @@
-.PHONY: docs rtasks test-python-unit test-blender
+.PHONY: docs rtasks test-python-unit test-blender mypy ruff
+
+mypy:
+	uvx mypy rvlib/rvlib/
+
+ruff:
+	uvx ruff check rvlib/rvlib/ 
 
 rtasks:
 	rrpc client --lang go -o internal -f rtasks.rrpc

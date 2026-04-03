@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 import bpy
 
@@ -122,14 +123,14 @@ class BasicMaterial(Material):
     def set_params(
         self,
         base_color: OptionalColor = None,
-        roughness: float = None,
-        metallic: float = None,
-        specular: float = None,
+        roughness: float | None = None,
+        metallic: float | None = None,
+        specular: float | None = None,
         emission_color: OptionalColor = None,
-        emission_strength: float = None,
-        alpha: float = None,
-        transmission: float = None,
-        ior: float = None,
+        emission_strength: float | None = None,
+        alpha: float | None = None,
+        transmission: float | None = None,
+        ior: float | None = None,
     ):
         def _as_rgba(color: Color) -> ColorRGBA:
             rgba = tuple(color)
@@ -159,7 +160,7 @@ class BasicMaterial(Material):
             self.ior = ior
         return self
 
-    def set_property(self, key: str, value: any):
+    def set_property(self, key: str, value: Any):
         self.properties[key] = value
         return self
 
@@ -226,7 +227,7 @@ class ImportedMaterial(Material):
     material_name: str | None
     params: dict
 
-    def __init__(self, filepath: str, material_name: str = None):
+    def __init__(self, filepath: str, material_name: str | None = None):
         super().__init__(name=material_name)
         self.filepath = filepath
         self.material_name = material_name

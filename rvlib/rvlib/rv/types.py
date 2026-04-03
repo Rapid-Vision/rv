@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING, TypeAlias, Union
+
 from mathutils import Vector
-from typing import TypeAlias, Union
+
+if TYPE_CHECKING:
+    from .object import Object, ObjectLoader
+    from .passes import RenderPass
 
 
 JSONSerializable: TypeAlias = Union[

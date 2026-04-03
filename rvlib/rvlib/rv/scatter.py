@@ -1,8 +1,15 @@
 import math
 import warnings
+from typing import TYPE_CHECKING
+
 from mathutils import Vector
 
 from .types import Float2, ScatterSource, ScatterValidationResult
+
+if TYPE_CHECKING:
+    from .domain import Domain
+    from .object import Object, ObjectLoader
+    from .scene import Scene
 
 
 def _ensure_positive_tuple(values, expected_len: int, name: str) -> None:

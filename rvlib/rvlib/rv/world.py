@@ -34,7 +34,7 @@ class BasicWorld(World):
     """
 
     color: ColorRGBA | None = None
-    strength: float = None
+    strength: float | None = None
 
     def __init__(self):
         pass
@@ -58,7 +58,9 @@ class BasicWorld(World):
         if self.strength is not None:
             node_background.inputs["Strength"].default_value = self.strength
 
-    def set_params(self, color: ColorRGBA | None = None, strength: float = None):
+    def set_params(
+        self, color: ColorRGBA | None = None, strength: float | None = None
+    ):
         if color is not None:
             self.color = color
         if strength is not None:
@@ -73,12 +75,12 @@ class SkyWorld(World):
     For more information, view [official blender docs](https://docs.blender.org/manual/en/latest/render/shader_nodes/textures/sky.html).
     """
 
-    strength: float = None
-    sun_size: float = None
-    sun_intensity: float = None
-    sun_elevation: float = None
-    rotation_z: float = None
-    altitude: float = None
+    strength: float | None = None
+    sun_size: float | None = None
+    sun_intensity: float | None = None
+    sun_elevation: float | None = None
+    rotation_z: float | None = None
+    altitude: float | None = None
     air: float = 0.1
     aerosol_density: float = 0.01
     ozone: float = 10.0
@@ -125,14 +127,14 @@ class SkyWorld(World):
 
     def set_params(
         self,
-        strength: float = None,
-        sun_size: float = None,
-        sun_intensity: float = None,
-        sun_elevation: float = None,
-        rotation_z: float = None,
-        air: float = None,
-        aerosol_density: float = None,
-        ozone: float = None,
+        strength: float | None = None,
+        sun_size: float | None = None,
+        sun_intensity: float | None = None,
+        sun_elevation: float | None = None,
+        rotation_z: float | None = None,
+        air: float | None = None,
+        aerosol_density: float | None = None,
+        ozone: float | None = None,
     ):
         if strength is not None:
             self.strength = strength
@@ -159,8 +161,8 @@ class HDRIWorld(World):
     """
 
     hdri_path: str
-    strength: float = None
-    rotation_z: float = None
+    strength: float | None = None
+    rotation_z: float | None = None
 
     def __init__(self, hdri_path: str):
         self.hdri_path = hdri_path
@@ -204,9 +206,9 @@ class HDRIWorld(World):
 
     def set_params(
         self,
-        hdri_path: str = None,
-        strength: float = None,
-        rotation_z: float = None,
+        hdri_path: str | None = None,
+        strength: float | None = None,
+        rotation_z: float | None = None,
     ):
         if hdri_path is not None:
             self.hdri_path = hdri_path
@@ -223,10 +225,10 @@ class ImportedWorld(World):
     """
 
     filepath: str
-    world_name: str = None
+    world_name: str | None = None
     params: dict
 
-    def __init__(self, filepath: str, world_name: str = None):
+    def __init__(self, filepath: str, world_name: str | None = None):
         self.filepath = filepath
         self.world_name = world_name
         self.params = dict()

@@ -6,7 +6,7 @@ import pathlib
 import random
 import uuid
 from mathutils import Vector
-from typing import Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 import bpy
 import mathutils
@@ -56,6 +56,11 @@ from .utils import (
     _move_object_to_generated_collection,
 )
 
+if TYPE_CHECKING:
+    from .material import Material
+    from .object import Light
+    from .world import World
+
 class _SpatialHash:
     def __init__(self, cell_size: float, dimension: int) -> None:
         self.cell_size = max(cell_size, 1e-6)
@@ -95,9 +100,9 @@ class _SpatialHash:
 class Scene(ABC, _Serializable):
     resolution: Resolution = (640, 640)
     time_limit: float = 3.0
-    passes: RenderPassSet = None
+    passes: RenderPassSet | None = None
     output_dir: Optional[str]
-    subdir: str
+    subdir: str | None
     camera: "Camera"
     world: "World"
     tags: TagSet
@@ -116,7 +121,7 @@ class Scene(ABC, _Serializable):
     def generate(self, seed: int | None = None) -> None:
         pass
 
-    def __init__(self, output_dir=None) -> None:
+    def __init__(self, output_dir: str | None = None) -> None:
         super().__init__()
         self.passes = set()
         self.output_dir = output_dir
@@ -199,28 +204,36 @@ class Scene(ABC, _Serializable):
         light_obj = bpy.data.objects.new(name, light_data)
         _mark_object_tree(light_obj)
         _get_generated_collection().objects.link(light_obj)
-        return PointLight(light_obj, self).set_power(power)
+        light = PointLight(light_obj, self)
+        light.set_power(power)
+        return light
 
     def create_sun_light(self, name: str = "Sun", power: float = 1.0) -> "SunLight":
         light_data = bpy.data.lights.new(name=name, type="SUN")
         light_obj = bpy.data.objects.new(name, light_data)
         _mark_object_tree(light_obj)
         _get_generated_collection().objects.link(light_obj)
-        return SunLight(light_obj, self).set_power(power)
+        light = SunLight(light_obj, self)
+        light.set_power(power)
+        return light
 
     def create_area_light(self, name: str = "Area", power: float = 100.0) -> "AreaLight":
         light_data = bpy.data.lights.new(name=name, type="AREA")
         light_obj = bpy.data.objects.new(name, light_data)
         _mark_object_tree(light_obj)
         _get_generated_collection().objects.link(light_obj)
-        return AreaLight(light_obj, self).set_power(power)
+        light = AreaLight(light_obj, self)
+        light.set_power(power)
+        return light
 
     def create_spot_light(self, name: str = "Spot", power: float = 1000.0) -> "SpotLight":
         light_data = bpy.data.lights.new(name=name, type="SPOT")
         light_obj = bpy.data.objects.new(name, light_data)
         _mark_object_tree(light_obj)
         _get_generated_collection().objects.link(light_obj)
-        return SpotLight(light_obj, self).set_power(power)
+        light = SpotLight(light_obj, self)
+        light.set_power(power)
+        return light
 
     def get_camera(self) -> "Camera":
         return self.camera
@@ -240,7 +253,9 @@ class Scene(ABC, _Serializable):
         self.tags |= _combine_arglist_set(tags)
         return self
 
-    def load_object(self, blendfile: str, import_name: str = None) -> "ObjectLoader":
+    def load_object(
+        self, blendfile: str, import_name: str | None = None
+    ) -> "ObjectLoader":
         path = str(pathlib.Path(blendfile).expanduser())
         if import_name is None:
             obj = _load_single_object(path)
@@ -257,7 +272,9 @@ class Scene(ABC, _Serializable):
             f"Available objects: [{object_names}]"
         )
 
-    def load_objects(self, blendfile: str, import_names: list[str] = None) -> list["ObjectLoader"]:
+    def load_objects(
+        self, blendfile: str, import_names: list[str] | None = None
+    ) -> list["ObjectLoader"]:
         path = str(pathlib.Path(blendfile).expanduser())
         objects = _load_all_objects(path)
         res = []
@@ -286,7 +303,9 @@ class Scene(ABC, _Serializable):
     def create_material(self, name: str = "Material") -> "BasicMaterial":
         return BasicMaterial(name=name)
 
-    def import_material(self, blendfile: str, material_name: str = None) -> "ImportedMaterial":
+    def import_material(
+        self, blendfile: str, material_name: str | None = None
+    ) -> "ImportedMaterial":
         path = str(pathlib.Path(blendfile).expanduser())
         return ImportedMaterial(filepath=path, material_name=material_name)
 
@@ -317,7 +336,11 @@ class Scene(ABC, _Serializable):
                 dimensions_local=dims_local_out,
                 bounds_world=obj.get_bounds(space="world"),
                 bounds_local=obj.get_bounds(space="local"),
-                scale=tuple(float(v) for v in obj.obj.scale),
+                scale=(
+                    float(obj.obj.scale[0]),
+                    float(obj.obj.scale[1]),
+                    float(obj.obj.scale[2]),
+                ),
             )
             inspected = self.custom_meta.get("inspected_objects", [])
             if not isinstance(inspected, list):
@@ -472,5 +495,7 @@ class Scene(ABC, _Serializable):
         return res
 
     def _internal_save_metadata(self, filename: str) -> None:
+        if self.output_dir is None or self.subdir is None:
+            raise RuntimeError("Cannot save metadata without an output directory.")
         with open(os.path.join(self.output_dir, self.subdir, filename), "w") as fout:
             json.dump(self._get_meta(), fout, indent=4)

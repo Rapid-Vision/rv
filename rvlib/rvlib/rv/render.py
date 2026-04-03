@@ -44,11 +44,11 @@ def _configure_passes(
             setattr(layer, attr, False)
 
     for p in passes:
-        attr = PASS_MAP.get(p)
-        if not attr:
+        pass_attr = PASS_MAP.get(p)
+        if not pass_attr:
             raise RuntimeError(f"Unknown render pass '{p.name}'.")
-        _require_blender_attr(layer, attr, f"render pass {p.name}")
-        setattr(layer, attr, True)
+        _require_blender_attr(layer, pass_attr, f"render pass {p.name}")
+        setattr(layer, pass_attr, True)
 
     _require_blender_attr(layer, "use_pass_object_index", "render pass OBJECT_INDEX")
     layer.use_pass_object_index = True

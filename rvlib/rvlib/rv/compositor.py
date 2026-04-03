@@ -25,7 +25,7 @@ def _configure_semantic_aovs(layer, semantic_channels: SemanticChannelSet) -> No
 
 
 def _configure_compositor(
-    output_dir: str,
+    output_dir: str | None,
     semantic_channels: SemanticChannelSet | None = None,
     semantic_mask_threshold: float = 0.5,
 ) -> None:

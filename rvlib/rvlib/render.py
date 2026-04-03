@@ -120,6 +120,15 @@ def run_script(
 
 ARGS = parse_args()
 
+if ARGS.libpath is None:
+    raise ValueError("--libpath is required")
+if ARGS.cwd is None:
+    raise ValueError("--cwd is required")
+if ARGS.number is None:
+    raise ValueError("--number is required")
+if ARGS.script is None:
+    raise ValueError("--script is required")
+
 sys.path.append(ARGS.libpath)
 os.chdir(ARGS.cwd)
 

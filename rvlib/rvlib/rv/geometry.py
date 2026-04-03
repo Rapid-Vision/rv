@@ -18,12 +18,12 @@ def _convex_hull_2d(points: Polygon2D) -> Polygon2D:
     pts = sorted(set((float(p[0]), float(p[1])) for p in points))
     if len(pts) <= 1:
         return pts
-    lower = []
+    lower: Polygon2D = []
     for p in pts:
         while len(lower) >= 2 and _cross_2d(lower[-2], lower[-1], p) <= 0:
             lower.pop()
         lower.append(p)
-    upper = []
+    upper: Polygon2D = []
     for p in reversed(pts):
         while len(upper) >= 2 and _cross_2d(upper[-2], upper[-1], p) <= 0:
             upper.pop()
@@ -41,7 +41,7 @@ def _polygon_signed_area(points: Polygon2D) -> float:
 
 
 def _normalize_polygon_2d(points: Polygon2D) -> Polygon2D:
-    normalized = []
+    normalized: Polygon2D = []
     for point in points:
         current = (float(point[0]), float(point[1]))
         if len(normalized) == 0 or current != normalized[-1]:
