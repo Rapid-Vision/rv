@@ -262,60 +262,43 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIn("bounds_world", inspect_loader.to_dict())
 
         sphere_domain = rv.Domain.rect(center=(0.0, 0.0), size=(10.0, 10.0), z=0.5)
-        self.assertGreaterEqual(
-            len(
-                self.scene.scatter_by_sphere(
-                    source=exported_loaders,
-                    count=2,
-                    domain=sphere_domain,
-                    min_gap=0.1,
-                    seed=1,
-                    linked_data=False,
-                )
-            ),
-            1,
+        fast_scattered = self.scene.scatter(
+            source=exported_loaders,
+            count=2,
+            domain=sphere_domain,
+            method="fast",
+            gap=0.1,
+            seed=1,
+            unique_data=True,
         )
-        self.assertGreaterEqual(
-            len(
-                self.scene.scatter_by_bvh(
-                    source=exported_loaders[0],
-                    count=1,
-                    domain=sphere_domain,
-                    min_gap=0.0,
-                    seed=2,
-                    linked_data=False,
-                )
-            ),
-            1,
+        self.assertGreaterEqual(len(fast_scattered), 1)
+        exact_scattered = self.scene.scatter(
+            source=exported_loaders[0],
+            count=1,
+            domain=sphere_domain,
+            method="exact",
+            gap=0.0,
+            seed=2,
+            unique_data=True,
         )
+        self.assertGreaterEqual(len(exact_scattered), 1)
 
-        param_source = rv.ParametricSource(exported_loaders[0])
-        param_source.set_sampler(lambda local_rng: {"scale_seed": local_rng.randint(1, 3)})
-        param_source.set_applier(
-            lambda obj, params: obj.set_scale(0.5 + (0.1 * params["scale_seed"]))
+        callback_calls: list[tuple[int, float]] = []
+        parametric = self.scene.scatter(
+            source=exported_loaders[0],
+            count=1,
+            domain=rv.Domain.box(center=(0.0, 0.0, 1.0), size=(6.0, 6.0, 4.0)),
+            method="fast",
+            seed=3,
+            unique_data=True,
+            on_create=lambda obj, local_rng, index: (
+                callback_calls.append((index, local_rng.random())),
+                obj.set_scale(0.7).set_property("scale_seed", index + 1),
+            )[-1],
         )
-        sampled_params = param_source.sample_params(random.Random(5))
-        self.assertIn("scale_seed", sampled_params)
-        param_instance = param_source.create_instance(
-            params={"scale_seed": 2},
-            register_object=False,
-            name="ParametricInstance",
-            linked_data=False,
-        )
-        self.assertEqual(param_instance.obj.name, "ParametricInstance")
-        self.assertGreaterEqual(
-            len(
-                self.scene.scatter_parametric(
-                    source=param_source,
-                    count=1,
-                    domain=rv.Domain.box(center=(0.0, 0.0, 1.0), size=(6.0, 6.0, 4.0)),
-                    strategy="sphere",
-                    seed=3,
-                    linked_data=False,
-                )
-            ),
-            1,
-        )
+        self.assertGreaterEqual(len(parametric), 1)
+        self.assertEqual(callback_calls[0][0], 0)
+        self.assertEqual(parametric[0].properties["scale_seed"], 1)
 
         self.assertTrue(box.contains_object(loader_instance, mode="mesh"))
 

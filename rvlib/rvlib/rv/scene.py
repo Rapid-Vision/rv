@@ -20,7 +20,7 @@ from .assets import (
 )
 from .compositor import _configure_compositor
 from .domain import Domain
-from .geometry import _mesh_object_overlaps_any, _object_world_radius, _sample_rotation_quaternion
+from .geometry import _mesh_object_overlaps_any, _sample_rotation_quaternion
 from .material import BasicMaterial, ImportedMaterial, _normalize_semantic_channel
 from .object import (
     AreaLight,
@@ -28,7 +28,6 @@ from .object import (
     Object,
     ObjectLoader,
     ObjectStats,
-    ParametricSource,
     PointLight,
     SpotLight,
     SunLight,
@@ -43,8 +42,14 @@ from .render import (
     _use_cycles,
     _use_gpu,
 )
-from .scatter import _finalize_scatter_stats, _init_scatter_stats, _overlaps_by_radius, _validate_scatter_common
-from .types import CellCoords, Float2, ObjectLoaderSource, RenderPassSet, Resolution, SemanticChannelSet, TagSet
+from .scatter import (
+    _finalize_scatter_stats,
+    _init_scatter_stats,
+    _normalize_scatter_method,
+    _overlaps_by_radius,
+    _validate_scatter_common,
+)
+from .types import CellCoords, Float2, RenderPassSet, Resolution, ScatterSource, SemanticChannelSet, TagSet
 from .utils import (
     _get_generated_collection,
     _mark_object_tree,
@@ -320,8 +325,35 @@ class Scene(ABC, _Serializable):
             if temp_obj is not None:
                 _remove_blender_object(temp_obj.obj)
 
-    def scatter_by_sphere(self, source: ObjectLoaderSource, count: int, domain: "Domain", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None, linked_data: bool = True) -> list["Object"]:
-        loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(source, count, domain, min_gap, yaw_range, rotation_mode, scale_range, max_attempts_per_object, boundary_mode, boundary_margin)
+    def scatter(
+        self,
+        source: ScatterSource,
+        count: int,
+        domain: "Domain",
+        *,
+        method: Literal["auto", "fast", "exact"] = "auto",
+        gap: float = 0.0,
+        scale: float | Float2 = 1.0,
+        rotation: Literal["yaw", "free"] = "yaw",
+        yaw: Float2 = (0.0, 360.0),
+        margin: float = 0.0,
+        seed: int | None = None,
+        unique_data: bool = False,
+        on_create=None,
+        max_attempts_per_object: int = 100,
+    ) -> list["Object"]:
+        loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(
+            source,
+            count,
+            domain,
+            gap,
+            yaw,
+            rotation,
+            scale,
+            max_attempts_per_object,
+            margin,
+        )
+        resolved_method = _normalize_scatter_method(method, domain, rotation)
         rng = random.Random(seed)
         base_radii: dict[int, float] = {}
         max_scaled_radius = 0.0
@@ -329,11 +361,11 @@ class Scene(ABC, _Serializable):
             radius = _estimate_loader_radius(loader, domain.dimension)
             base_radii[idx] = radius
             max_scaled_radius = max(max_scaled_radius, radius * scale_max)
-        cell_size = max(1e-6, (2.0 * max_scaled_radius) + min_gap)
+        cell_size = max(1e-6, (2.0 * max_scaled_radius) + gap)
         grid = _SpatialHash(cell_size=cell_size, dimension=domain.dimension)
         placed: list[Object] = []
         placed_infos: list[dict] = []
-        stats = _init_scatter_stats(count, domain.kind, "sphere", seed)
+        stats = _init_scatter_stats(count, domain.kind, resolved_method, seed)
         for _ in range(count):
             loader_idx = rng.randrange(0, len(loaders))
             loader = loaders[loader_idx]
@@ -342,122 +374,31 @@ class Scene(ABC, _Serializable):
                 stats["attempts"] += 1
                 scale = rng.uniform(scale_min, scale_max)
                 pos = domain.sample_point(rng)
-                if not domain.contains_point(pos, margin=boundary_margin):
+                if not domain.contains_point(pos, margin=margin):
                     stats["rejected_boundary"] += 1
                     continue
-                rot = _sample_rotation_quaternion(rng=rng, domain_dimension=domain.dimension, rotation_mode=rotation_mode, yaw_min=yaw_min, yaw_max=yaw_max)
+                rot = _sample_rotation_quaternion(rng=rng, domain_dimension=domain.dimension, rotation_mode=rotation, yaw_min=yaw_min, yaw_max=yaw_max)
                 radius = base_radii[loader_idx] * scale
                 neighbors = grid.neighbors(pos)
-                if _overlaps_by_radius(pos, radius, neighbors, placed_infos, domain.dimension, min_gap):
+                if _overlaps_by_radius(pos, radius, neighbors, placed_infos, domain.dimension, gap):
                     stats["rejected_overlap"] += 1
                     continue
-                obj = loader.create_instance(linked_data=linked_data)
-                obj.set_scale(scale).set_rotation(rot).set_location(pos)
-                placed.append(obj)
-                placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj})
-                grid.insert(pos, len(placed_infos) - 1)
-                placed_one = True
-                break
-            if not placed_one:
-                stats["rejected_attempt_limit"] += 1
-        _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
-        return placed
-
-    def scatter_by_bvh(self, source: ObjectLoaderSource, count: int, domain: "Domain", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None, linked_data: bool = True) -> list["Object"]:
-        loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(source, count, domain, min_gap, yaw_range, rotation_mode, scale_range, max_attempts_per_object, boundary_mode, boundary_margin)
-        rng = random.Random(seed)
-        base_radii: dict[int, float] = {}
-        max_scaled_radius = 0.0
-        for idx, loader in enumerate(loaders):
-            radius = _estimate_loader_radius(loader, domain.dimension)
-            base_radii[idx] = radius
-            max_scaled_radius = max(max_scaled_radius, radius * scale_max)
-        cell_size = max(1e-6, (2.0 * max_scaled_radius) + min_gap)
-        grid = _SpatialHash(cell_size=cell_size, dimension=domain.dimension)
-        placed: list[Object] = []
-        placed_infos: list[dict] = []
-        stats = _init_scatter_stats(count, domain.kind, "bvh", seed)
-        for _ in range(count):
-            loader_idx = rng.randrange(0, len(loaders))
-            loader = loaders[loader_idx]
-            placed_one = False
-            for _attempt in range(max_attempts_per_object):
-                stats["attempts"] += 1
-                scale = rng.uniform(scale_min, scale_max)
-                pos = domain.sample_point(rng)
-                if not domain.contains_point(pos, margin=boundary_margin):
-                    stats["rejected_boundary"] += 1
-                    continue
-                rot = _sample_rotation_quaternion(rng=rng, domain_dimension=domain.dimension, rotation_mode=rotation_mode, yaw_min=yaw_min, yaw_max=yaw_max)
-                radius = base_radii[loader_idx] * scale
-                neighbors = grid.neighbors(pos)
-                if _overlaps_by_radius(pos, radius, neighbors, placed_infos, domain.dimension, min_gap):
-                    stats["rejected_overlap"] += 1
-                    continue
-                temp_obj = loader.create_instance(register_object=False)
-                temp_obj.set_scale(scale).set_rotation(rot).set_location(pos)
-                neighbor_objs = [placed_infos[idx]["object"].obj for idx in neighbors]
-                if _mesh_object_overlaps_any(temp_obj.obj, neighbor_objs):
-                    _remove_blender_object(temp_obj.obj)
-                    stats["rejected_overlap"] += 1
-                    continue
-                _remove_blender_object(temp_obj.obj)
-                obj = loader.create_instance(linked_data=linked_data)
-                obj.set_scale(scale).set_rotation(rot).set_location(pos)
-                placed.append(obj)
-                placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj})
-                grid.insert(pos, len(placed_infos) - 1)
-                placed_one = True
-                break
-            if not placed_one:
-                stats["rejected_attempt_limit"] += 1
-        _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
-        return placed
-
-    def scatter_parametric(self, source: "ParametricSource", count: int, domain: "Domain", strategy: Literal["sphere", "bvh"] = "sphere", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None, linked_data: bool = True) -> list["Object"]:
-        if not isinstance(source, ParametricSource):
-            raise TypeError("source must be ParametricSource.")
-        if strategy not in {"sphere", "bvh"}:
-            raise ValueError("strategy must be one of: sphere, bvh.")
-        _loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(source.source, count, domain, min_gap, yaw_range, rotation_mode, scale_range, max_attempts_per_object, boundary_mode, boundary_margin)
-        rng = random.Random(seed)
-        placed: list[Object] = []
-        placed_infos: list[dict] = []
-        stats = _init_scatter_stats(count, domain.kind, f"parametric_{strategy}", seed)
-        for _ in range(count):
-            placed_one = False
-            for _attempt in range(max_attempts_per_object):
-                stats["attempts"] += 1
-                params = source.sample_params(rng)
-                scale = rng.uniform(scale_min, scale_max)
-                pos = domain.sample_point(rng)
-                if not domain.contains_point(pos, margin=boundary_margin):
-                    stats["rejected_boundary"] += 1
-                    continue
-                rot = _sample_rotation_quaternion(rng=rng, domain_dimension=domain.dimension, rotation_mode=rotation_mode, yaw_min=yaw_min, yaw_max=yaw_max)
-                temp_obj = source.create_instance(params=params, register_object=False)
-                temp_obj.set_scale(scale).set_rotation(rot).set_location(pos)
-                radius = _object_world_radius(temp_obj.obj, domain.dimension)
-                neighbors = list(range(len(placed_infos)))
-                if _overlaps_by_radius(pos, radius, neighbors, placed_infos, domain.dimension, min_gap):
-                    _remove_blender_object(temp_obj.obj)
-                    stats["rejected_overlap"] += 1
-                    continue
-                if strategy == "bvh":
+                if resolved_method == "exact":
+                    temp_obj = loader.create_instance(register_object=False)
+                    temp_obj.set_scale(scale).set_rotation(rot).set_location(pos)
                     neighbor_objs = [placed_infos[idx]["object"].obj for idx in neighbors]
                     if _mesh_object_overlaps_any(temp_obj.obj, neighbor_objs):
                         _remove_blender_object(temp_obj.obj)
                         stats["rejected_overlap"] += 1
                         continue
-                _remove_blender_object(temp_obj.obj)
-                obj = source.create_instance(
-                    params=params,
-                    register_object=True,
-                    linked_data=linked_data,
-                )
+                    _remove_blender_object(temp_obj.obj)
+                obj = loader.create_instance(linked_data=not unique_data)
                 obj.set_scale(scale).set_rotation(rot).set_location(pos)
+                if on_create is not None:
+                    on_create(obj, rng, len(placed))
                 placed.append(obj)
-                placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj, "params": params})
+                placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj})
+                grid.insert(pos, len(placed_infos) - 1)
                 placed_one = True
                 break
             if not placed_one:

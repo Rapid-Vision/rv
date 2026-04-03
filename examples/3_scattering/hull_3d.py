@@ -21,16 +21,17 @@ class HullScatterScene(rv.Scene):
             (0, 0, -1000)
         )
         sphere_loader = source_cube.as_loader()
-        placed = self.scatter_by_bvh(
+        placed = self.scatter(
             source=sphere_loader,
             count=300,
             domain=domain,
-            min_gap=0.2,
-            rotation_mode="free",
-            scale_range=(0.25, 0.45),
-            boundary_margin=0.2,
+            method="exact",
+            gap=0.2,
+            rotation="free",
+            scale=(0.25, 0.45),
+            margin=0.2,
             seed=seed,
-            linked_data=False,
+            unique_data=True,
         )
         rng = random.Random(seed)
         for idx, obj in enumerate(placed):

@@ -13,14 +13,15 @@ class EllipseScatterScene(rv.Scene):
         source_cube = self.create_cube(name="ScatterSourceCube", size=1.0).set_location(
             (0, 0, -1000)
         )
-        cubes = self.scatter_by_sphere(
+        cubes = self.scatter(
             source=source_cube.as_loader(),
             count=350,
             domain=domain,
-            min_gap=0.15,
-            scale_range=(0.1, 0.6),
+            method="fast",
+            gap=0.15,
+            scale=(0.1, 0.6),
             seed=seed,
-            linked_data=False,
+            unique_data=True,
         )
         rng = random.Random(seed)
         for idx, cube in enumerate(cubes):

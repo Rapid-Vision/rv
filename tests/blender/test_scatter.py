@@ -24,13 +24,14 @@ class ScatterTest(unittest.TestCase):
         prototype = self.scene.create_cube(size=1.0)
         loader = prototype.as_loader()
         domain = rv.Domain.rect(center=(0.0, 0.0), size=(15.0, 15.0), z=0.5)
-        placed = self.scene.scatter_by_sphere(
+        placed = self.scene.scatter(
             source=loader,
             count=20,
             domain=domain,
-            min_gap=0.1,
+            method="fast",
+            gap=0.1,
             seed=1,
-            linked_data=False,
+            unique_data=True,
         )
         self.assertGreater(len(placed), 0)
         self.assertIsNot(placed[0].obj.data, prototype.obj.data)

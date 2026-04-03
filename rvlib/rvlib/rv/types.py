@@ -23,6 +23,12 @@ SemanticChannelSet: TypeAlias = set[str]
 ObjectLoaderSource: TypeAlias = Union[
     "ObjectLoader", list["ObjectLoader"], tuple["ObjectLoader", ...]
 ]
+ScatterSource: TypeAlias = Union[
+    "Object",
+    "ObjectLoader",
+    list[Union["Object", "ObjectLoader"]],
+    tuple[Union["Object", "ObjectLoader"], ...],
+]
 ScatterValidationResult: TypeAlias = tuple[
     list["ObjectLoader"], float, float, float, float
 ]
