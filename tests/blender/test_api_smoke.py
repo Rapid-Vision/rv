@@ -105,32 +105,43 @@ class ApiSmokeTest(unittest.TestCase):
         plane = self.scene.create_plane("Plane", size=8.0).set_location((0.0, 0.0, 0.0))
 
         basic_world = rv.BasicWorld()
-        basic_world.set_params(color=(0.1, 0.2, 0.3, 1.0), strength=0.5)
+        self.assertIs(
+            basic_world.set_params(color=(0.1, 0.2, 0.3, 1.0), strength=0.5),
+            basic_world,
+        )
         self.scene.set_world(basic_world)
         self.assertIs(self.scene.get_world(), basic_world)
         basic_world._internal_post_gen()
 
         sky_world = rv.SkyWorld()
-        sky_world.set_params(
+        self.assertIs(
+            sky_world.set_params(
             strength=0.3,
-            sun_size=0.2,
+            sun_size=12.0,
             sun_intensity=0.5,
-            sun_elevation=0.4,
-            rotation_z=0.6,
+            sun_elevation=23.0,
+            rotation_z=34.0,
             air=1.0,
             aerosol_density=0.2,
             ozone=0.3,
+            ),
+            sky_world,
         )
         self.scene.set_world(sky_world)
         sky_world._internal_post_gen()
 
         hdri_world = rv.HDRIWorld(str(HDRI_IMAGE))
-        hdri_world.set_params(hdri_path=str(HDRI_IMAGE), strength=0.7, rotation_z=0.2)
+        self.assertIs(
+            hdri_world.set_params(
+                hdri_path=str(HDRI_IMAGE), strength=0.7, rotation_z=15.0
+            ),
+            hdri_world,
+        )
         self.scene.set_world(hdri_world)
         hdri_world._internal_post_gen()
 
         imported_world = rv.ImportedWorld(str(ROCK_BLEND), world_name="World")
-        imported_world.set_params(smoke_world=True)
+        self.assertIs(imported_world.set_params(smoke_world=True), imported_world)
         self.scene.set_world(imported_world)
         imported_world._internal_post_gen()
 

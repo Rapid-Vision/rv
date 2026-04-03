@@ -521,88 +521,6 @@ def create_instance(self, name: str=None, register_object: bool=True, linked_dat
 
 ---
 
-##### `class ParametricSource` {#class-parametricsource}
-Source wrapper for parameterized scattering.
-
-It can sample parameters per candidate and apply them to each created instance.
-
-::: details Methods
-
----
-###### `set_sampler`
-
-Set a callback that samples a parameter dictionary for each candidate.
-
-**Signature**
-
-```python
-def set_sampler(self, sampler: typing.Callable[[random.Random], dict]) -> 'ParametricSource'
-```
-
-**Arguments**
-
-- **`sampler`** : `typing.Callable[[random.Random], dict]`
-
-**Returns**: `Self`
-
----
----
-###### `set_applier`
-
-Set a callback that applies sampled parameters to the created object.
-
-**Signature**
-
-```python
-def set_applier(self, applier: typing.Callable[['Object', dict], None]) -> 'ParametricSource'
-```
-
-**Arguments**
-
-- **`applier`** : `typing.Callable[['Object', dict], None]`
-
-**Returns**: `Self`
-
----
----
-###### `sample_params`
-
-**Signature**
-
-```python
-def sample_params(self, rng: random.Random) -> dict
-```
-
-**Arguments**
-
-- **`rng`** : `random.Random`
-
-**Returns**: `dict`
-
----
----
-###### `create_instance`
-
-**Signature**
-
-```python
-def create_instance(self, params: dict | None=None, register_object: bool=True, name: str=None, linked_data: bool=True) -> 'Object'
-```
-
-**Arguments**
-
-- **`params`** : `dict | None`
-- **`register_object`** : `bool`
-- **`name`** : `str`
-- **`linked_data`** : `bool`
-
-**Returns**: `Self`
-
----
-:::
-
----
-
 ##### `class Object` {#class-object}
 Inherits from: `_Serializable`
 
@@ -1314,17 +1232,17 @@ Directional sun light with angular size control.
 ---
 ###### `set_angle`
 
-Set sun angular size in radians.
+Set sun angular size in degrees.
 
 **Signature**
 
 ```python
-def set_angle(self, angle_radians: float) -> 'SunLight'
+def set_angle(self, angle: float) -> 'SunLight'
 ```
 
 **Arguments**
 
-- **`angle_radians`** : `float`
+- **`angle`** : `float`
 
 **Returns**: `Self`
 
@@ -1409,17 +1327,17 @@ Spot light with cone and blend controls.
 ---
 ###### `set_spot_size`
 
-Set spotlight cone angle in radians.
+Set spotlight cone angle in degrees.
 
 **Signature**
 
 ```python
-def set_spot_size(self, angle_radians: float) -> 'SpotLight'
+def set_spot_size(self, angle: float) -> 'SpotLight'
 ```
 
 **Arguments**
 
-- **`angle_radians`** : `float`
+- **`angle`** : `float`
 
 **Returns**: `Self`
 
@@ -1589,11 +1507,12 @@ Inherits from: `ABC`, `_Serializable`
 
 ```python
 @abstractmethod
-def generate(self) -> None
+def generate(self, seed: int | None=None) -> None
 ```
 
 **Arguments**
 
+- **`seed`** : `int | None`
 
 **Returns**: `None`
 
@@ -1962,83 +1881,29 @@ def inspect_object(self, loader_or_obj: Union['ObjectLoader', 'Object'], applied
 
 ---
 ---
-###### `scatter_by_sphere`
+###### `scatter`
 
 **Signature**
 
 ```python
-def scatter_by_sphere(self, source: ObjectLoaderSource, count: int, domain: 'Domain', min_gap: float=0.0, yaw_range: Float2=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: Float2=(1.0, 1.0), max_attempts_per_object: int=100, boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None, linked_data: bool=True) -> list['Object']
+def scatter(self, source: ScatterSource, count: int, domain: 'Domain', *, method: Literal['auto', 'fast', 'exact']='auto', gap: float=0.0, scale: float | Float2=1.0, rotation: Literal['yaw', 'free']='yaw', yaw: Float2=(0.0, 360.0), margin: float=0.0, seed: int | None=None, unique_data: bool=False, on_create=None, max_attempts_per_object: int=100) -> list['Object']
 ```
 
 **Arguments**
 
-- **`source`** : `ObjectLoaderSource`
+- **`source`** : `ScatterSource`
 - **`count`** : `int`
 - **`domain`** : `'Domain'`
-- **`min_gap`** : `float`
-- **`yaw_range`** : `Float2`
-- **`rotation_mode`** : `Literal['yaw', 'free']`
-- **`scale_range`** : `Float2`
-- **`max_attempts_per_object`** : `int`
-- **`boundary_mode`** : `Literal['center_margin']`
-- **`boundary_margin`** : `float`
+- **`method`** : `Literal['auto', 'fast', 'exact']`
+- **`gap`** : `float`
+- **`scale`** : `float | Float2`
+- **`rotation`** : `Literal['yaw', 'free']`
+- **`yaw`** : `Float2`
+- **`margin`** : `float`
 - **`seed`** : `int | None`
-- **`linked_data`** : `bool`
-
-**Returns**: `Self`
-
----
----
-###### `scatter_by_bvh`
-
-**Signature**
-
-```python
-def scatter_by_bvh(self, source: ObjectLoaderSource, count: int, domain: 'Domain', min_gap: float=0.0, yaw_range: Float2=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: Float2=(1.0, 1.0), max_attempts_per_object: int=100, boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None, linked_data: bool=True) -> list['Object']
-```
-
-**Arguments**
-
-- **`source`** : `ObjectLoaderSource`
-- **`count`** : `int`
-- **`domain`** : `'Domain'`
-- **`min_gap`** : `float`
-- **`yaw_range`** : `Float2`
-- **`rotation_mode`** : `Literal['yaw', 'free']`
-- **`scale_range`** : `Float2`
+- **`unique_data`** : `bool`
+- **`on_create`**
 - **`max_attempts_per_object`** : `int`
-- **`boundary_mode`** : `Literal['center_margin']`
-- **`boundary_margin`** : `float`
-- **`seed`** : `int | None`
-- **`linked_data`** : `bool`
-
-**Returns**: `Self`
-
----
----
-###### `scatter_parametric`
-
-**Signature**
-
-```python
-def scatter_parametric(self, source: 'ParametricSource', count: int, domain: 'Domain', strategy: Literal['sphere', 'bvh']='sphere', min_gap: float=0.0, yaw_range: Float2=(0.0, 360.0), rotation_mode: Literal['yaw', 'free']='yaw', scale_range: Float2=(1.0, 1.0), max_attempts_per_object: int=100, boundary_mode: Literal['center_margin']='center_margin', boundary_margin: float=0.0, seed: int | None=None, linked_data: bool=True) -> list['Object']
-```
-
-**Arguments**
-
-- **`source`** : `'ParametricSource'`
-- **`count`** : `int`
-- **`domain`** : `'Domain'`
-- **`strategy`** : `Literal['sphere', 'bvh']`
-- **`min_gap`** : `float`
-- **`yaw_range`** : `Float2`
-- **`rotation_mode`** : `Literal['yaw', 'free']`
-- **`scale_range`** : `Float2`
-- **`max_attempts_per_object`** : `int`
-- **`boundary_mode`** : `Literal['center_margin']`
-- **`boundary_margin`** : `float`
-- **`seed`** : `int | None`
-- **`linked_data`** : `bool`
 
 **Returns**: `Self`
 
@@ -2122,6 +1987,8 @@ def set_params(self, color: ColorRGBA | None=None, strength: float=None)
 - **`color`** : `ColorRGBA | None`
 - **`strength`** : `float`
 
+**Returns**: `Self`
+
 ---
 :::
 
@@ -2172,6 +2039,8 @@ def set_params(self, strength: float=None, sun_size: float=None, sun_intensity: 
 - **`aerosol_density`** : `float`
 - **`ozone`** : `float`
 
+**Returns**: `Self`
+
 ---
 :::
 
@@ -2209,6 +2078,8 @@ def set_params(self, hdri_path: str=None, strength: float=None, rotation_z: floa
 - **`strength`** : `float`
 - **`rotation_z`** : `float`
 
+**Returns**: `Self`
+
 ---
 :::
 
@@ -2243,6 +2114,8 @@ def set_params(self, **kwargs)
 **Arguments**
 
 - **`**kwargs`**
+
+**Returns**: `Self`
 
 ---
 :::

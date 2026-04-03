@@ -887,18 +887,18 @@ class SunLight(Light):
 
     def set_angle(
         self,
-        angle_radians: float,
+        angle: float,
     ) -> "SunLight":
         """
-        Set sun angular size in radians.
+        Set sun angular size in degrees.
         """
-        if angle_radians < 0:
+        if angle < 0:
             raise ValueError("Sun light angle must be non-negative.")
-        self.light_data.angle = angle_radians
+        self.light_data.angle = math.radians(angle)
         return self
 
     def _type_specific_meta(self) -> dict:
-        return {"angle": self.light_data.angle}
+        return {"angle_degrees": math.degrees(self.light_data.angle)}
 
 
 class AreaLight(Light):
@@ -964,14 +964,14 @@ class SpotLight(Light):
 
     def set_spot_size(
         self,
-        angle_radians: float,
+        angle: float,
     ) -> "SpotLight":
         """
-        Set spotlight cone angle in radians.
+        Set spotlight cone angle in degrees.
         """
-        if angle_radians < 0:
+        if angle < 0:
             raise ValueError("Spot light angle must be non-negative.")
-        self.light_data.spot_size = angle_radians
+        self.light_data.spot_size = math.radians(angle)
         return self
 
     def set_blend(
@@ -998,7 +998,7 @@ class SpotLight(Light):
 
     def _type_specific_meta(self) -> dict:
         return {
-            "spot_size": self.light_data.spot_size,
+            "spot_size_degrees": math.degrees(self.light_data.spot_size),
             "spot_blend": self.light_data.spot_blend,
             "show_cone": self.light_data.show_cone,
         }

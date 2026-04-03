@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import math
 
 import bpy
 
@@ -62,6 +63,7 @@ class BasicWorld(World):
             self.color = color
         if strength is not None:
             self.strength = strength
+        return self
 
 
 class SkyWorld(World):
@@ -105,13 +107,13 @@ class SkyWorld(World):
         if self.strength is not None:
             node_background.inputs["Strength"].default_value = self.strength
         if self.sun_size is not None:
-            node_sky_tex.sun_size = self.sun_size
+            node_sky_tex.sun_size = math.radians(self.sun_size)
         if self.sun_intensity is not None:
             node_sky_tex.sun_intensity = self.sun_intensity
         if self.sun_elevation is not None:
-            node_sky_tex.sun_elevation = self.sun_elevation
+            node_sky_tex.sun_elevation = math.radians(self.sun_elevation)
         if self.rotation_z is not None:
-            node_sky_tex.sun_rotation = self.rotation_z
+            node_sky_tex.sun_rotation = math.radians(self.rotation_z)
         if self.altitude is not None:
             node_sky_tex.altitude = self.altitude
         if self.air is not None:
@@ -148,6 +150,7 @@ class SkyWorld(World):
             self.aerosol_density = aerosol_density
         if ozone is not None:
             self.ozone = ozone
+        return self
 
 
 class HDRIWorld(World):
@@ -195,7 +198,9 @@ class HDRIWorld(World):
         if self.strength is not None:
             node_background.inputs["Strength"].default_value = self.strength
         if self.rotation_z is not None:
-            node_mapping.inputs["Rotation"].default_value[2] = self.rotation_z
+            node_mapping.inputs["Rotation"].default_value[2] = math.radians(
+                self.rotation_z
+            )
 
     def set_params(
         self,
@@ -209,6 +214,7 @@ class HDRIWorld(World):
             self.strength = strength
         if rotation_z is not None:
             self.rotation_z = rotation_z
+        return self
 
 
 class ImportedWorld(World):
@@ -240,3 +246,4 @@ class ImportedWorld(World):
 
     def set_params(self, **kwargs):
         self.params.update(kwargs)
+        return self
