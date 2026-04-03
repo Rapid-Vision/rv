@@ -1,16 +1,10 @@
-import importlib
 import typing
 
 import bpy
 
 from .material import _normalize_semantic_channel, _semantic_aov_name
 from .types import SemanticChannelSet
-from .utils import _mark_node_tree
-
-
-def _require_blender_attr(target, attr: str, feature: str) -> None:
-    # Resolve through the package so tests and callers can patch `rv._require_blender_attr`.
-    importlib.import_module(__package__)._require_blender_attr(target, attr, feature)
+from .utils import _mark_node_tree, _require_blender_attr
 
 
 def _configure_semantic_aovs(layer, semantic_channels: SemanticChannelSet) -> None:

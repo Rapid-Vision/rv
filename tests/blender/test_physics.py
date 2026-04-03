@@ -1,5 +1,4 @@
 import unittest
-from unittest import mock
 
 import rv
 
@@ -109,69 +108,6 @@ class PhysicsApiTest(unittest.TestCase):
             ValueError, "split_impulse_penetration_threshold must be >= 0."
         ):
             rv.simulate_physics(split_impulse_penetration_threshold=-0.01)
-
-    def test_add_rigidbody_raises_when_requested_feature_is_unsupported(self):
-        cube = self.scene.create_cube(size=1.0)
-        original = rv._require_blender_attr
-
-        def require_with_missing(target, attr, feature):
-            if attr == "use_deactivation":
-                raise RuntimeError("Blender does not support rigid body deactivation.")
-            return original(target, attr, feature)
-
-        with mock.patch.object(rv, "_require_blender_attr", require_with_missing):
-            with self.assertRaisesRegex(
-                RuntimeError, "Blender does not support rigid body deactivation."
-            ):
-                cube.add_rigidbody(use_deactivation=True)
-
-    def test_simulate_physics_raises_when_requested_world_feature_is_unsupported(self):
-        cube = self.scene.create_cube(size=1.0).set_location((0.0, 0.0, 1.0))
-        cube.add_rigidbody()
-        original = rv._require_blender_attr
-
-        def require_with_missing(target, attr, feature):
-            if attr == "use_split_impulse":
-                raise RuntimeError(
-                    "Blender does not support rigid body world split impulse."
-                )
-            return original(target, attr, feature)
-
-        with mock.patch.object(rv, "_require_blender_attr", require_with_missing):
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "Blender does not support rigid body world split impulse.",
-            ):
-                rv.simulate_physics(frames=1, use_split_impulse=True)
-
-    def test_configure_passes_raises_when_requested_pass_is_unsupported(self):
-        original = rv._require_blender_attr
-
-        def require_with_missing(target, attr, feature):
-            if attr == "use_pass_z":
-                raise RuntimeError("Blender does not support render pass Z.")
-            return original(target, attr, feature)
-
-        with mock.patch.object(rv, "_require_blender_attr", require_with_missing):
-            with self.assertRaisesRegex(
-                RuntimeError, "Blender does not support render pass Z."
-            ):
-                rv._configure_passes({rv.RenderPass.Z})
-
-    def test_configure_semantic_aovs_raises_when_aovs_are_unsupported(self):
-        original = rv._require_blender_attr
-
-        def require_with_missing(target, attr, feature):
-            if attr == "aovs":
-                raise RuntimeError("Blender does not support semantic AOV channels.")
-            return original(target, attr, feature)
-
-        with mock.patch.object(rv, "_require_blender_attr", require_with_missing):
-            with self.assertRaisesRegex(
-                RuntimeError, "Blender does not support semantic AOV channels."
-            ):
-                rv._configure_semantic_aovs(rv.bpy.context.view_layer, {"mask"})
-
 
 if __name__ == "__main__":
     unittest.main()

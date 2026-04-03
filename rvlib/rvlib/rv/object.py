@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-import importlib
 import math
 import numbers
 import random
@@ -29,12 +28,8 @@ from .utils import (
     _mark_material_tree,
     _mark_node_tree,
     _mark_object_tree,
+    _require_blender_attr,
 )
-
-
-def _require_blender_attr(target, attr: str, feature: str) -> None:
-    # Resolve through the package so tests and callers can patch `rv._require_blender_attr`.
-    importlib.import_module(__package__)._require_blender_attr(target, attr, feature)
 
 @dataclass(frozen=True, slots=True)
 class ObjectStats:

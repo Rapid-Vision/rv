@@ -1,11 +1,5 @@
-import importlib
-
 import bpy
-
-
-def _require_blender_attr(target, attr: str, feature: str) -> None:
-    # Resolve through the package so tests and callers can patch `rv._require_blender_attr`.
-    importlib.import_module(__package__)._require_blender_attr(target, attr, feature)
+from .utils import _require_blender_attr
 
 
 def _ensure_rigidbody_world() -> None:
