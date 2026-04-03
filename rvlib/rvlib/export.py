@@ -39,6 +39,8 @@ def attach_scene_metadata(scene_instance, script_path, cwd):
         "cwd": cwd,
         "resolution": scene_instance.resolution,
         "time_limit": scene_instance.time_limit,
+        "seed": scene_instance.seed,
+        "seed_mode": scene_instance.seed_mode,
         "passes": sorted(pass_.value for pass_ in scene_instance.passes),
         "tags": sorted(scene_instance.tags),
         "semantic_channels": sorted(scene_instance.semantic_channels),

@@ -241,7 +241,8 @@ def _internal_load_scene_class(script_path: str):
 def _internal_run_scene_generate(
     scene_instance, seed: int | None, seed_mode: str | None = None
 ) -> None:
-    scene_instance.set_custom_meta(seed=seed, seed_mode=seed_mode)
+    scene_instance.seed = seed
+    scene_instance.seed_mode = seed_mode
     print(f"[rv] seed={seed}")
     generate = scene_instance.generate
     signature = inspect.signature(generate)

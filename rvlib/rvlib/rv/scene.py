@@ -106,6 +106,8 @@ class Scene(ABC, _Serializable):
     lights: set["Light"]
     semantic_channels: SemanticChannelSet
     semantic_mask_threshold: float = 0.5
+    seed: int | None = None
+    seed_mode: str | None = None
     object_index_counter: int = 0
     material_index_counter: int = 0
     light_index_counter: int = 0
@@ -125,6 +127,8 @@ class Scene(ABC, _Serializable):
         self.tags = set()
         self.semantic_channels = set()
         self.semantic_mask_threshold = 0.5
+        self.seed = None
+        self.seed_mode = None
         self.object_index_counter = 0
         self.material_index_counter = 0
         self.light_index_counter = 0
@@ -454,6 +458,8 @@ class Scene(ABC, _Serializable):
             {
                 "resolution": self.resolution,
                 "time_limit": self.time_limit,
+                "seed": self.seed,
+                "seed_mode": self.seed_mode,
                 "passes": [p.value for p in self.passes],
                 "tags": list(self.tags),
                 "semantic_channels": sorted(self.semantic_channels),

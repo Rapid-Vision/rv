@@ -65,6 +65,12 @@ class ApiSmokeTest(unittest.TestCase):
 
     def test_public_api_smoke(self):
         self.assertIsInstance(rvi._ACTIVE_RUN_ID, str)
+        rvi._internal_run_scene_generate(self.scene, 123, "fixed")
+        scene_meta = self.scene._get_meta()
+        self.assertEqual(scene_meta["seed"], 123)
+        self.assertEqual(scene_meta["seed_mode"], "fixed")
+        self.assertNotIn("seed", scene_meta["custom_meta"])
+        self.assertNotIn("seed_mode", scene_meta["custom_meta"])
 
         rect = rv.Domain.rect(center=(0.0, 0.0), size=(8.0, 8.0), z=0.5)
         ellipse = rv.Domain.ellipse(center=(0.0, 0.0), radii=(4.0, 2.0), z=0.5)
