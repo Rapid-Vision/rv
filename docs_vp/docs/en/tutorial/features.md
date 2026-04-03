@@ -197,7 +197,6 @@ rv.simulate_physics(
     substeps=12,
     solver_iterations=30,
     use_split_impulse=True,
-    split_impulse_penetration_threshold=0.04,
     time_scale=1.0,
 )
 ```

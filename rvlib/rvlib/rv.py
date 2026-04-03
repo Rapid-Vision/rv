@@ -443,6 +443,11 @@ def _purge_orphans() -> None:
         pass
 
 
+def _require_blender_attr(target, attr: str, feature: str) -> None:
+    if not hasattr(target, attr):
+        raise RuntimeError(f"Blender does not support {feature}.")
+
+
 def begin_run(
     purge_orphans: bool = True,  # Remove orphaned Blender datablocks after cleanup
 ) -> str:
@@ -2683,35 +2688,41 @@ class Object(_Serializable):
         rb = self.obj.rigid_body
         rb.type = body_type
         rb.collision_shape = shape_map[mode]
-        if hasattr(rb, "mesh_source"):
-            rb.mesh_source = mesh_source
+        _require_blender_attr(rb, "mesh_source", "rigid body mesh_source")
+        rb.mesh_source = mesh_source
         rb.mass = max(float(mass), 1e-6)
         rb.friction = float(friction)
         rb.restitution = float(restitution)
         rb.linear_damping = float(linear_damping)
         rb.angular_damping = float(angular_damping)
-        if hasattr(rb, "use_margin"):
-            rb.use_margin = bool(use_margin)
-        if hasattr(rb, "collision_margin"):
-            if collision_margin is None:
-                rb.collision_margin = max(
-                    0.0, min(self.get_dimensions("world")) * 0.01
-                )
-            else:
-                rb.collision_margin = float(collision_margin)
-        if use_deactivation is not None and hasattr(rb, "use_deactivation"):
+        _require_blender_attr(rb, "use_margin", "rigid body collision margins")
+        rb.use_margin = bool(use_margin)
+        _require_blender_attr(rb, "collision_margin", "rigid body collision margins")
+        if collision_margin is None:
+            rb.collision_margin = max(0.0, min(self.get_dimensions("world")) * 0.01)
+        else:
+            rb.collision_margin = float(collision_margin)
+        if use_deactivation is not None:
+            _require_blender_attr(rb, "use_deactivation", "rigid body deactivation")
             rb.use_deactivation = bool(use_deactivation)
-        if (
-            deactivate_linear_velocity is not None
-            and hasattr(rb, "deactivate_linear_velocity")
-        ):
+        if deactivate_linear_velocity is not None:
+            _require_blender_attr(
+                rb,
+                "deactivate_linear_velocity",
+                "rigid body deactivate_linear_velocity",
+            )
             rb.deactivate_linear_velocity = float(deactivate_linear_velocity)
-        if (
-            deactivate_angular_velocity is not None
-            and hasattr(rb, "deactivate_angular_velocity")
-        ):
+        if deactivate_angular_velocity is not None:
+            _require_blender_attr(
+                rb,
+                "deactivate_angular_velocity",
+                "rigid body deactivate_angular_velocity",
+            )
             rb.deactivate_angular_velocity = float(deactivate_angular_velocity)
-        if start_deactivated is not None and hasattr(rb, "use_start_deactivated"):
+        if start_deactivated is not None:
+            _require_blender_attr(
+                rb, "use_start_deactivated", "rigid body start_deactivated"
+            )
             rb.use_start_deactivated = bool(start_deactivated)
         return self
 
@@ -3360,20 +3371,22 @@ def _configure_passes(
     # Turn on requested passes
     for p in passes:
         attr = PASS_MAP.get(p)
-        if attr and hasattr(layer, attr):
-            setattr(layer, attr, True)
-        else:
-            print(f"[rv] Warning: unknown or unsupported pass '{p.name}' – skipped.")
+        if not attr:
+            raise RuntimeError(f"Unknown render pass '{p.name}'.")
+        _require_blender_attr(layer, attr, f"render pass {p.name}")
+        setattr(layer, attr, True)
 
     # We always need Object-Index for segmentation masks
+    _require_blender_attr(layer, "use_pass_object_index", "render pass OBJECT_INDEX")
     layer.use_pass_object_index = True
 
     _configure_semantic_aovs(layer, semantic_channels or set())
 
 
 def _configure_semantic_aovs(layer, semantic_channels: SemanticChannelSet) -> None:
-    if not hasattr(layer, "aovs"):
+    if not semantic_channels:
         return
+    _require_blender_attr(layer, "aovs", "semantic AOV channels")
 
     for aov in list(layer.aovs):
         aov_name = getattr(aov, "name", "")
@@ -3896,23 +3909,28 @@ def _configure_rigidbody_world(
     scene.frame_set(start_frame)
     if hasattr(scene, "sync_mode"):
         scene.sync_mode = "NONE"
-    if hasattr(rbw, "time_scale"):
-        rbw.time_scale = float(time_scale)
-    if hasattr(rbw, "substeps_per_frame"):
-        rbw.substeps_per_frame = max(1, int(substeps))
-    if hasattr(rbw, "solver_iterations"):
-        iterations = (
-            max(1, int(substeps) * 2)
-            if solver_iterations is None
-            else max(1, int(solver_iterations))
-        )
-        rbw.solver_iterations = iterations
-    if use_split_impulse is not None and hasattr(rbw, "use_split_impulse"):
+    _require_blender_attr(rbw, "time_scale", "rigid body world time_scale")
+    rbw.time_scale = float(time_scale)
+    _require_blender_attr(rbw, "substeps_per_frame", "rigid body world substeps")
+    rbw.substeps_per_frame = max(1, int(substeps))
+    _require_blender_attr(
+        rbw, "solver_iterations", "rigid body world solver_iterations"
+    )
+    iterations = (
+        max(1, int(substeps) * 2)
+        if solver_iterations is None
+        else max(1, int(solver_iterations))
+    )
+    rbw.solver_iterations = iterations
+    if use_split_impulse is not None:
+        _require_blender_attr(rbw, "use_split_impulse", "rigid body world split impulse")
         rbw.use_split_impulse = bool(use_split_impulse)
-    if (
-        split_impulse_penetration_threshold is not None
-        and hasattr(rbw, "split_impulse_penetration_threshold")
-    ):
+    if split_impulse_penetration_threshold is not None:
+        _require_blender_attr(
+            rbw,
+            "split_impulse_penetration_threshold",
+            "rigid body world split impulse penetration threshold",
+        )
         rbw.split_impulse_penetration_threshold = float(
             split_impulse_penetration_threshold
         )
