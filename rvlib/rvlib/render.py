@@ -87,14 +87,15 @@ def run_script(
     noise_threshold,
 ):
     import rv
+    import rv.internal as rvi
 
-    scene_class = rv._internal_load_scene_class(script_path)
+    scene_class = rvi._internal_load_scene_class(script_path)
 
     def execute_run():
-        rv._internal_begin_run(purge_orphans=True)
+        rvi._internal_begin_run(purge_orphans=True)
         instance = scene_class(output_dir)
         instance.resolution = resolution
-        rv._internal_set_time_limit(instance, time_limit)
+        rvi._internal_set_time_limit(instance, time_limit)
         instance.generate()
         instance._internal_post_gen()
         apply_cycles_overrides(
@@ -103,12 +104,12 @@ def run_script(
             noise_threshold_enabled=noise_threshold_enabled,
             noise_threshold=noise_threshold,
         )
-        selected_backend = rv._internal_configure_cycles_backend(gpu_backend)
+        selected_backend = rvi._internal_configure_cycles_backend(gpu_backend)
         print(f"[rv] selected_gpu_backend={selected_backend}")
-        rv._internal_print_cycles_device_info()
+        rvi._internal_print_cycles_device_info()
         instance._internal_render()
         instance._internal_save_metadata("_meta.json")
-        rv._internal_end_run(purge_orphans=False)
+        rvi._internal_end_run(purge_orphans=False)
 
     execute_run()
 
@@ -119,8 +120,9 @@ sys.path.append(ARGS.libpath)
 os.chdir(ARGS.cwd)
 
 import rv
+import rv.internal as rvi
 
-RESOLUTION = rv._internal_parse_resolution(ARGS.resolution)
+RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
 
 for i in range(ARGS.number):
     run_script(

@@ -2,6 +2,7 @@ import math
 import unittest
 
 import rv
+import rv.internal as rvi
 
 
 class _TestScene(rv.Scene):
@@ -11,7 +12,7 @@ class _TestScene(rv.Scene):
 
 class ScatterTest(unittest.TestCase):
     def setUp(self):
-        rv._internal_begin_run(purge_orphans=True)
+        rvi._internal_begin_run(purge_orphans=True)
         self.scene = _TestScene()
 
     def test_domain_ellipse_contains(self):

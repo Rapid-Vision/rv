@@ -117,11 +117,12 @@ def run_script(
     time_limit=None,
 ):
     import rv
+    import rv.internal as rvi
 
-    scene_class = rv._internal_load_scene_class(script_path)
+    scene_class = rvi._internal_load_scene_class(script_path)
 
     reset_preview_scene_state()
-    rv._internal_begin_run(purge_orphans=True)
+    rvi._internal_begin_run(purge_orphans=True)
     if preview_files:
         os.makedirs(preview_out, exist_ok=True)
         staging_parent = os.path.dirname(preview_out) or "."
@@ -133,17 +134,17 @@ def run_script(
         staging_dir = None
         instance = scene_class()
         instance.resolution = resolution
-    rv._internal_set_time_limit(instance, time_limit)
+    rvi._internal_set_time_limit(instance, time_limit)
     try:
         instance.generate()
         instance._internal_post_gen()
-        selected_backend = rv._internal_configure_cycles_backend(gpu_backend)
+        selected_backend = rvi._internal_configure_cycles_backend(gpu_backend)
         print(f"[rv] selected_gpu_backend={selected_backend}")
-        rv._internal_print_cycles_device_info()
+        rvi._internal_print_cycles_device_info()
         if preview_files:
             instance._internal_render()
     finally:
-        rv._internal_end_run(purge_orphans=False)
+        rvi._internal_end_run(purge_orphans=False)
 
     if preview_files:
         try:
@@ -246,8 +247,9 @@ sys.path.append(ARGS.libpath)
 os.chdir(ARGS.cwd)
 
 import rv
+import rv.internal as rvi
 
-RESOLUTION = rv._internal_parse_resolution(ARGS.resolution)
+RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
 
 if ARGS.no_window and not ARGS.preview_files:
     raise ValueError("--no-window requires --preview-files")

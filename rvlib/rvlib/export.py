@@ -139,9 +139,10 @@ def main():
     os.chdir(args.cwd)
 
     import rv
+    import rv.internal as rvi
 
-    scene_class = rv._internal_load_scene_class(args.script)
-    rv._internal_begin_run(purge_orphans=True)
+    scene_class = rvi._internal_load_scene_class(args.script)
+    rvi._internal_begin_run(purge_orphans=True)
     scene_instance = scene_class(output_dir=None)
     scene_instance.generate()
     scene_instance._internal_post_gen()
@@ -155,7 +156,7 @@ def main():
     attach_object_metadata(scene_instance)
     attach_material_metadata(scene_instance)
     save_scene(args.output)
-    rv._internal_end_run(purge_orphans=False)
+    rvi._internal_end_run(purge_orphans=False)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import unittest
 import bpy
 import mathutils
 import rv
+import rv.internal as rvi
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -55,14 +56,14 @@ def _add_geometry_nodes_modifier(rv_obj: rv.Object, input_name: str = "ScaleInpu
 
 class ApiSmokeTest(unittest.TestCase):
     def setUp(self):
-        rv._internal_begin_run(purge_orphans=True)
+        rvi._internal_begin_run(purge_orphans=True)
         self.scene = _SmokeScene()
 
     def tearDown(self):
-        rv._internal_end_run()
+        rvi._internal_end_run()
 
     def test_public_api_smoke(self):
-        self.assertIsInstance(rv._ACTIVE_RUN_ID, str)
+        self.assertIsInstance(rvi._ACTIVE_RUN_ID, str)
 
         rect = rv.Domain.rect(center=(0.0, 0.0), size=(8.0, 8.0), z=0.5)
         ellipse = rv.Domain.ellipse(center=(0.0, 0.0), radii=(4.0, 2.0), z=0.5)
@@ -304,7 +305,7 @@ class ApiSmokeTest(unittest.TestCase):
 
         self.assertTrue(box.contains_object(loader_instance, mode="mesh"))
 
-        rv._internal_end_run()
+        rvi._internal_end_run()
 
 
 if __name__ == "__main__":
