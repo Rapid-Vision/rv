@@ -182,10 +182,10 @@ def main():
 
     import rv
 
-    rv.begin_run(purge_orphans=True)
+    rv._internal_begin_run(purge_orphans=True)
     scene_instance = scene_class(output_dir=None)
     scene_instance.generate()
-    scene_instance._post_gen()
+    scene_instance._internal_post_gen()
 
     if args.freeze_physics:
         freeze_rigidbody_simulation()
@@ -196,7 +196,7 @@ def main():
     attach_object_metadata(scene_instance)
     attach_material_metadata(scene_instance)
     save_scene(args.output)
-    rv.end_run(purge_orphans=False)
+    rv._internal_end_run(purge_orphans=False)
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ class World(ABC):
         pass
 
     @abstractmethod
-    def _post_gen(self):
+    def _internal_post_gen(self):
         pass
 
     @abstractmethod
@@ -38,7 +38,7 @@ class BasicWorld(World):
     def __init__(self):
         pass
 
-    def _post_gen(self):
+    def _internal_post_gen(self):
         world = bpy.context.scene.world
         world.use_nodes = True
         nodes = world.node_tree.nodes
@@ -84,7 +84,7 @@ class SkyWorld(World):
     def __init__(self):
         pass
 
-    def _post_gen(self):
+    def _internal_post_gen(self):
         world = bpy.context.scene.world
         world.use_nodes = True
         nodes = world.node_tree.nodes
@@ -162,7 +162,7 @@ class HDRIWorld(World):
     def __init__(self, hdri_path: str):
         self.hdri_path = hdri_path
 
-    def _post_gen(self):
+    def _internal_post_gen(self):
         world = bpy.context.scene.world
         world.use_nodes = True
         nodes = world.node_tree.nodes
@@ -225,7 +225,7 @@ class ImportedWorld(World):
         self.world_name = world_name
         self.params = dict()
 
-    def _post_gen(self):
+    def _internal_post_gen(self):
         with bpy.data.libraries.load(self.filepath, link=False) as (data_from, data_to):
             if self.world_name is None:
                 data_to.worlds = [data_from.worlds[0]]

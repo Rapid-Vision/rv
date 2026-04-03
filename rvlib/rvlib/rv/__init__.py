@@ -40,6 +40,7 @@ from .compositor import (
     _configure_semantic_aovs,
     _normalize_socket_name,
 )
+from .domain import Domain
 from .geometry import (
     _aabb_from_points,
     _build_bvh_from_object,
@@ -110,7 +111,7 @@ from .scatter import (
     _overlaps_by_radius,
     _validate_scatter_common,
 )
-from .scene import Domain, Scene
+from .scene import Scene
 from .state import __getattr__
 from .types import (
     AABB,
@@ -133,6 +134,8 @@ from .types import (
 )
 from .utils import (
     _get_generated_collection,
+    _internal_begin_run,
+    _internal_end_run,
     _is_owned,
     _mark_material_tree,
     _mark_node_tree,
@@ -144,7 +147,5 @@ from .utils import (
     _remove_owned_unused,
     _remove_rv_data,
     _require_blender_attr,
-    begin_run,
-    end_run,
 )
 from .world import BasicWorld, HDRIWorld, ImportedWorld, SkyWorld, World

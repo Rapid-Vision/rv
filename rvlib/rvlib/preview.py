@@ -192,7 +192,7 @@ HTTPD = None
 STOP_EVENT = threading.Event()
 
 
-def _iter_files(root_dir):
+def iter_files(root_dir):
     for base, _, files in os.walk(root_dir):
         for filename in files:
             full_path = os.path.join(base, filename)
@@ -200,7 +200,7 @@ def _iter_files(root_dir):
             yield rel_path, full_path
 
 
-def _cleanup_empty_dirs(root_dir):
+def cleanup_empty_dirs(root_dir):
     for base, dirs, files in os.walk(root_dir, topdown=False):
         if base == root_dir:
             continue
@@ -215,7 +215,7 @@ def replace_preview_output(staging_dir, preview_out):
     os.makedirs(preview_out, exist_ok=True)
 
     staged_files = set()
-    for rel_path, staged_full_path in _iter_files(staging_dir):
+    for rel_path, staged_full_path in iter_files(staging_dir):
         staged_files.add(rel_path)
         target_path = os.path.join(preview_out, rel_path)
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -226,7 +226,7 @@ def replace_preview_output(staging_dir, preview_out):
 
     # Remove files that are no longer produced by the latest render.
     existing_files = []
-    for rel_path, existing_full_path in _iter_files(preview_out):
+    for rel_path, existing_full_path in iter_files(preview_out):
         existing_files.append((rel_path, existing_full_path))
     for rel_path, existing_full_path in existing_files:
         if rel_path not in staged_files:
@@ -235,7 +235,7 @@ def replace_preview_output(staging_dir, preview_out):
             except FileNotFoundError:
                 pass
 
-    _cleanup_empty_dirs(preview_out)
+    cleanup_empty_dirs(preview_out)
 
 
 def reset_preview_scene_state():
@@ -278,7 +278,7 @@ def run_script(
         return
 
     reset_preview_scene_state()
-    rv.begin_run(purge_orphans=True)
+    rv._internal_begin_run(purge_orphans=True)
     if preview_files:
         os.makedirs(preview_out, exist_ok=True)
         staging_parent = os.path.dirname(preview_out) or "."
@@ -295,14 +295,14 @@ def run_script(
         instance = scene_classes[0]()
     try:
         instance.generate()
-        instance._post_gen()
+        instance._internal_post_gen()
         selected_backend = configure_cycles_backend(gpu_backend)
         print(f"[rv] selected_gpu_backend={selected_backend}")
         print_cycles_device_info()
         if preview_files:
-            instance._render()
+            instance._internal_render()
     finally:
-        rv.end_run(purge_orphans=False)
+        rv._internal_end_run(purge_orphans=False)
 
     if preview_files:
         try:

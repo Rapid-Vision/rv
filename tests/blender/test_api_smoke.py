@@ -55,11 +55,11 @@ def _add_geometry_nodes_modifier(rv_obj: rv.Object, input_name: str = "ScaleInpu
 
 class ApiSmokeTest(unittest.TestCase):
     def setUp(self):
-        rv.begin_run(purge_orphans=True)
+        rv._internal_begin_run(purge_orphans=True)
         self.scene = _SmokeScene()
 
     def tearDown(self):
-        rv.end_run()
+        rv._internal_end_run()
 
     def test_public_api_smoke(self):
         self.assertIsInstance(rv._ACTIVE_RUN_ID, str)
@@ -107,7 +107,7 @@ class ApiSmokeTest(unittest.TestCase):
         basic_world.set_params(color=(0.1, 0.2, 0.3, 1.0), strength=0.5)
         self.scene.set_world(basic_world)
         self.assertIs(self.scene.get_world(), basic_world)
-        basic_world._post_gen()
+        basic_world._internal_post_gen()
 
         sky_world = rv.SkyWorld()
         sky_world.set_params(
@@ -121,17 +121,17 @@ class ApiSmokeTest(unittest.TestCase):
             ozone=0.3,
         )
         self.scene.set_world(sky_world)
-        sky_world._post_gen()
+        sky_world._internal_post_gen()
 
         hdri_world = rv.HDRIWorld(str(HDRI_IMAGE))
         hdri_world.set_params(hdri_path=str(HDRI_IMAGE), strength=0.7, rotation_z=0.2)
         self.scene.set_world(hdri_world)
-        hdri_world._post_gen()
+        hdri_world._internal_post_gen()
 
         imported_world = rv.ImportedWorld(str(ROCK_BLEND), world_name="World")
         imported_world.set_params(smoke_world=True)
         self.scene.set_world(imported_world)
-        imported_world._post_gen()
+        imported_world._internal_post_gen()
 
         material = self.scene.create_material("SmokeMaterial")
         material.set_params(
@@ -304,7 +304,7 @@ class ApiSmokeTest(unittest.TestCase):
 
         self.assertTrue(box.contains_object(loader_instance, mode="mesh"))
 
-        rv.end_run()
+        rv._internal_end_run()
 
 
 if __name__ == "__main__":

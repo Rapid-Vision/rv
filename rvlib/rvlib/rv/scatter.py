@@ -25,7 +25,7 @@ def _validate_scatter_common(
     boundary_mode: str,
     boundary_margin: float,
 ) -> ScatterValidationResult:
-    from .scene import Domain
+    from .domain import Domain
     from .object import ObjectLoader
 
     if count <= 0:

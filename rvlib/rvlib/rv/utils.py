@@ -196,7 +196,7 @@ def _require_blender_attr(target, attr: str, feature: str) -> None:
         raise RuntimeError(f"Blender does not support {feature}.")
 
 
-def begin_run(purge_orphans: bool = True) -> str:
+def _internal_begin_run(purge_orphans: bool = True) -> str:
     global _ACTIVE_RUN_ID
     _remove_rv_data()
     if purge_orphans:
@@ -205,6 +205,6 @@ def begin_run(purge_orphans: bool = True) -> str:
     return _ACTIVE_RUN_ID
 
 
-def end_run(purge_orphans: bool = False) -> None:
+def _internal_end_run(purge_orphans: bool = False) -> None:
     if purge_orphans:
         _purge_orphans()

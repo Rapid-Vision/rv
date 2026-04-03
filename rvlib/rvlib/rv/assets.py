@@ -3,7 +3,7 @@ import json
 
 from .geometry import _object_world_radius
 from .types import JSONSerializable
-from .utils import begin_run
+from .utils import _internal_begin_run
 
 
 def _remove_blender_object(obj: bpy.types.Object) -> None:
@@ -94,4 +94,4 @@ def _combine_arglist_set(args):
 
 
 def _clear_scene():
-    begin_run(purge_orphans=True)
+    _internal_begin_run(purge_orphans=True)

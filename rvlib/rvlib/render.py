@@ -242,8 +242,8 @@ def run_script(
     if len(scene_classes) != 1:
         raise RuntimeError(CLASS_COUNT_ERROR_MESSAGE.strip())
 
-    def run_script():
-        rv.begin_run(purge_orphans=True)
+    def execute_run():
+        rv._internal_begin_run(purge_orphans=True)
         instance = scene_classes[0](output_dir)
         instance.resolution = resolution
         if time_limit is not None:
@@ -251,7 +251,7 @@ def run_script(
                 raise ValueError("--time-limit must be > 0")
             instance.time_limit = time_limit
         instance.generate()
-        instance._post_gen()
+        instance._internal_post_gen()
         apply_cycles_overrides(
             max_samples=max_samples,
             min_samples=min_samples,
@@ -261,11 +261,11 @@ def run_script(
         selected_backend = configure_cycles_backend(gpu_backend)
         print(f"[rv] selected_gpu_backend={selected_backend}")
         print_cycles_device_info()
-        instance._render()
-        instance._save_metadata("_meta.json")
-        rv.end_run(purge_orphans=False)
+        instance._internal_render()
+        instance._internal_save_metadata("_meta.json")
+        rv._internal_end_run(purge_orphans=False)
 
-    run_script()
+    execute_run()
 
 
 ARGS = parse_args()
