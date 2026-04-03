@@ -2,7 +2,7 @@ import rv
 
 
 class BasicScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         world = rv.SkyWorld()
         world.set_params(strength=0.1, sun_intensity=0.03)
         self.set_world(world)

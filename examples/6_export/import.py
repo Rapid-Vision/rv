@@ -8,7 +8,7 @@ CUBE_NAMES = [f"Cube_{i}" for i in range(30)]
 
 
 class ImportScatteredBoxesScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.get_world().set_params(sun_intensity=0.05, strength=0.4)
 
         floor = self.create_plane(name="Floor", size=18).set_location((1.5, 0.0, 0.0))

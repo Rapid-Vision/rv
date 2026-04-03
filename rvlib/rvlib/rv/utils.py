@@ -1,5 +1,6 @@
 import importlib.util
 import inspect
+import random
 import uuid
 
 import bpy
@@ -33,7 +34,7 @@ Example usage:
 
 import rv
 class MyScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         pass
 """
 _INTERNAL_VALID_GPU_BACKENDS = ("auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu")
@@ -235,6 +236,45 @@ def _internal_load_scene_class(script_path: str):
         raise RuntimeError(_INTERNAL_CLASS_COUNT_ERROR_MESSAGE.strip())
 
     return scene_classes[0]
+
+
+def _internal_run_scene_generate(
+    scene_instance, seed: int | None, seed_mode: str | None = None
+) -> None:
+    scene_instance.set_custom_meta(seed=seed, seed_mode=seed_mode)
+    print(f"[rv] seed={seed}")
+    generate = scene_instance.generate
+    signature = inspect.signature(generate)
+    positional_params = [
+        param
+        for param in signature.parameters.values()
+        if param.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.VAR_POSITIONAL,
+        )
+    ]
+
+    if positional_params:
+        generate(seed)
+        return
+
+    generate()
+
+
+def _internal_resolve_seed(
+    seed_mode: str, seed_value: int | None = None, seed_base: int = 0, index: int = 0
+) -> int:
+    if seed_mode in ("rand", "random"):
+        return random.SystemRandom().randrange(0, 2**63)
+    if seed_mode == "seq":
+        return seed_base + index
+    if seed_mode == "fixed":
+        if seed_value is None:
+            raise ValueError("seed_value is required for fixed seed mode")
+        return seed_value
+    raise ValueError(f"Unsupported seed mode: {seed_mode}")
 
 
 def _internal_iter_cycles_devices(preferences):

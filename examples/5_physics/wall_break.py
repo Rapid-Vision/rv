@@ -3,7 +3,7 @@ import rv
 
 
 class WallBreakPhysicsScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.set_passes([rv.RenderPass.Z])
         self.get_world().set_params(sun_intensity=0.05, strength=0.2)
 

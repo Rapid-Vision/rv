@@ -3,6 +3,8 @@ package preview
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/Rapid-Vision/rv/internal/seed"
 )
 
 func TestValidateOptions(t *testing.T) {
@@ -81,6 +83,7 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 		Resolution:   [2]int{1280, 720},
 		GPUBackend:   "optix",
 		TimeLimit:    floatPtr(2.5),
+		Seed:         seed.Config{Mode: seed.FixedMode, Value: 17},
 	}
 	args := buildBlenderPreviewArgs(opts, "/work/scene.py", "/work", libPath, 12345)
 
@@ -106,13 +109,17 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 	assertContains(t, args, "1280,720")
 	assertContains(t, args, "--gpu-backend")
 	assertContains(t, args, "optix")
+	assertContains(t, args, "--seed-mode")
+	assertContains(t, args, "fixed")
+	assertContains(t, args, "--seed-value")
+	assertContains(t, args, "17")
 	assertContains(t, args, "--time-limit")
 	assertContains(t, args, "2.5")
 }
 
 func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	args := buildBlenderPreviewArgs(
-		Options{PreviewFiles: false, NoWindow: false, Resolution: [2]int{640, 640}},
+		Options{PreviewFiles: false, NoWindow: false, Resolution: [2]int{640, 640}, Seed: seed.Config{Mode: seed.RandomMode}},
 		"/work/scene.py",
 		"/work",
 		"/lib/rvlib",
@@ -124,6 +131,9 @@ func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	assertNotContains(t, args, "--no-window")
 	assertContains(t, args, "--gpu-backend")
 	assertContains(t, args, "auto")
+	assertContains(t, args, "--seed-mode")
+	assertContains(t, args, "rand")
+	assertNotContains(t, args, "--seed-value")
 }
 
 func floatPtr(v float64) *float64 {

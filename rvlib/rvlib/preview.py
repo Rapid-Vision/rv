@@ -27,6 +27,8 @@ def parse_args():
     parser.add_argument("--no-window", action="store_true")
     parser.add_argument("--resolution", type=str, default="640,640")
     parser.add_argument("--gpu-backend", type=str, default="auto")
+    parser.add_argument("--seed-mode", type=str, default="rand")
+    parser.add_argument("--seed-value", type=int, default=None)
     parser.add_argument("--time-limit", type=float, default=None)
 
     return parser.parse_args(args)
@@ -44,6 +46,7 @@ RERUN_PENDING = False
 RERUN_RUNNING = False
 HTTPD = None
 STOP_EVENT = threading.Event()
+RERUN_INDEX = 0
 
 
 def iter_files(root_dir):
@@ -115,6 +118,7 @@ def run_script(
     resolution=(640, 640),
     gpu_backend="auto",
     time_limit=None,
+    seed=None,
 ):
     import rv
     import rv.internal as rvi
@@ -136,7 +140,7 @@ def run_script(
         instance.resolution = resolution
     rvi._internal_set_time_limit(instance, time_limit)
     try:
-        instance.generate()
+        rvi._internal_run_scene_generate(instance, seed, ARGS.seed_mode)
         instance._internal_post_gen()
         selected_backend = rvi._internal_configure_cycles_backend(gpu_backend)
         print(f"[rv] selected_gpu_backend={selected_backend}")
@@ -159,7 +163,7 @@ def request_rerun():
 
 
 def preview_tick():
-    global RERUN_PENDING, RERUN_RUNNING
+    global RERUN_PENDING, RERUN_RUNNING, RERUN_INDEX
 
     if RERUN_RUNNING or not RERUN_PENDING:
         return 0.1
@@ -167,6 +171,9 @@ def preview_tick():
     RERUN_RUNNING = True
     RERUN_PENDING = False
     try:
+        seed = rvi._internal_resolve_seed(
+            ARGS.seed_mode, ARGS.seed_value, 0, RERUN_INDEX
+        )
         run_script(
             ARGS.script,
             preview_files=ARGS.preview_files,
@@ -174,7 +181,9 @@ def preview_tick():
             resolution=RESOLUTION,
             gpu_backend=ARGS.gpu_backend,
             time_limit=ARGS.time_limit,
+            seed=seed,
         )
+        RERUN_INDEX += 1
     except Exception:
         print("ERROR: Failed to execute preview run")
         traceback.print_exc()

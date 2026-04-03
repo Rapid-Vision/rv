@@ -32,7 +32,7 @@ go install github.com/Rapid-Vision/rv@latest
 import rv
 
 class BasicScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         world = rv.SkyWorld()
         world.set_params(strength=0.1, sun_intensity=0.03)
         self.set_world(world)
@@ -80,11 +80,12 @@ rv preview scene.py --preview-files --no-window --preview-out ./preview_out
 ### Randomize the scene
 See how the preview changes on each file save.
 ```python
+import random
 import rv
-from random import uniform
 
 class BasicScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
+        rng = random.Random(seed)
         world = rv.SkyWorld()
         world.set_params(strength=0.1, sun_intensity=0.03)
         self.set_world(world)
@@ -97,7 +98,7 @@ class BasicScene(rv.Scene):
             .set_tags("cube")
             .set_material(mat_cube)
         )
-        cube.rotate_around_axis(rv.mathutils.Vector((0, 0, 1)), uniform(0, 360))
+        cube.rotate_around_axis(rv.mathutils.Vector((0, 0, 1)), rng.uniform(0, 360))
         mat_sphere = self.create_material().set_params(metallic=1, roughness=0.2)
         sphere = (
             self.create_sphere()
@@ -116,6 +117,14 @@ class BasicScene(rv.Scene):
 ### Render the final result
 ```bash copy
 rv render scene.py
+```
+
+Control reproducibility with `--seed`:
+
+```bash copy
+rv render scene.py --seed rand
+rv render scene.py --seed seq
+rv render scene.py --seed 42
 ```
 
 ![Resulting image](examples/1_primitives/1_res.png)

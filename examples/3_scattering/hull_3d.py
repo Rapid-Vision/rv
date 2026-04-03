@@ -4,7 +4,7 @@ import rv
 
 
 class HullScatterScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.get_world().set_params(sun_intensity=0.03)
         self.create_plane(size=120).set_location((0, 0, -6))
         target = self.create_empty().set_location((0, 0, 0))

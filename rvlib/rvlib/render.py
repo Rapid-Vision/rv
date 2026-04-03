@@ -16,6 +16,9 @@ def parse_args():
     parser.add_argument("--number", type=int)
     parser.add_argument("--resolution", type=str, default="640,640")
     parser.add_argument("--gpu-backend", type=str, default="auto")
+    parser.add_argument("--seed-mode", type=str, default="rand")
+    parser.add_argument("--seed-value", type=int, default=None)
+    parser.add_argument("--seed-base", type=int, default=0)
     parser.add_argument("--time-limit", type=float, default=None)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--min-samples", type=int, default=None)
@@ -85,6 +88,7 @@ def run_script(
     min_samples,
     noise_threshold_enabled,
     noise_threshold,
+    seed,
 ):
     import rv
     import rv.internal as rvi
@@ -96,7 +100,7 @@ def run_script(
         instance = scene_class(output_dir)
         instance.resolution = resolution
         rvi._internal_set_time_limit(instance, time_limit)
-        instance.generate()
+        rvi._internal_run_scene_generate(instance, seed, ARGS.seed_mode)
         instance._internal_post_gen()
         apply_cycles_overrides(
             max_samples=max_samples,
@@ -125,6 +129,9 @@ import rv.internal as rvi
 RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
 
 for i in range(ARGS.number):
+    seed = rvi._internal_resolve_seed(
+        ARGS.seed_mode, ARGS.seed_value, ARGS.seed_base, i
+    )
     run_script(
         ARGS.script,
         ARGS.output,
@@ -135,4 +142,5 @@ for i in range(ARGS.number):
         ARGS.min_samples,
         ARGS.noise_threshold_enabled,
         ARGS.noise_threshold,
+        seed,
     )

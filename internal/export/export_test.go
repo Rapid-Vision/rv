@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/Rapid-Vision/rv/internal/seed"
 )
 
 func TestBuildBlenderExportArgs(t *testing.T) {
@@ -16,6 +18,7 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 			OutputPath:    "/tmp/out/scene.blend",
 			FreezePhysics: true,
 			PackResources: true,
+			Seed:          seed.Config{Mode: seed.FixedMode, Value: 33},
 		},
 		"/tmp/lib",
 	)
@@ -31,6 +34,8 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 		{"--libpath", "/tmp/lib"},
 		{"--output", "/tmp/out/scene.blend"},
 		{"--cwd", "/tmp/work"},
+		{"--seed-mode", "fixed"},
+		{"--seed-value", "33"},
 	}
 	for _, pair := range wantPairs {
 		idx := slices.Index(got, pair[0])

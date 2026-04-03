@@ -18,6 +18,8 @@ def parse_args():
     parser.add_argument("--libpath", type=str, required=True)
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--cwd", type=str, required=True)
+    parser.add_argument("--seed-mode", type=str, default="rand")
+    parser.add_argument("--seed-value", type=int, default=None)
     parser.add_argument("--freeze-physics", action="store_true")
     parser.add_argument("--pack-resources", action="store_true")
     return parser.parse_args(args)
@@ -144,7 +146,8 @@ def main():
     scene_class = rvi._internal_load_scene_class(args.script)
     rvi._internal_begin_run(purge_orphans=True)
     scene_instance = scene_class(output_dir=None)
-    scene_instance.generate()
+    seed = rvi._internal_resolve_seed(args.seed_mode, args.seed_value)
+    rvi._internal_run_scene_generate(scene_instance, seed, args.seed_mode)
     scene_instance._internal_post_gen()
 
     if args.freeze_physics:

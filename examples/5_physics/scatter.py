@@ -6,7 +6,7 @@ import rv
 
 
 class PhysicsScatterScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.set_passes([rv.RenderPass.Z])
         self.get_world().set_params(sun_intensity=0.05, strength=0.4)
 
@@ -52,7 +52,7 @@ class PhysicsScatterScene(rv.Scene):
             .add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
         )
 
-        rng = random.Random()
+        rng = random.Random(seed)
 
         for i in range(30):
             cube = self.create_cube(name=f"Cube_{i}", size=0.5)

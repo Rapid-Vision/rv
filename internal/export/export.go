@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
 )
 
@@ -16,6 +17,7 @@ type Options struct {
 	OutputPath    string
 	FreezePhysics bool
 	PackResources bool
+	Seed          seed.Config
 }
 
 func Export(opts Options) error {
@@ -59,6 +61,7 @@ func Export(opts Options) error {
 }
 
 func buildBlenderExportArgs(opts Options, libPath string) []string {
+	opts.Seed = seed.Normalize(opts.Seed)
 	args := []string{
 		filepath.Join(libPath, "template.blend"),
 		"--factory-startup",
@@ -70,6 +73,10 @@ func buildBlenderExportArgs(opts Options, libPath string) []string {
 		"--libpath", libPath,
 		"--output", opts.OutputPath,
 		"--cwd", opts.Cwd,
+		"--seed-mode", string(opts.Seed.Mode),
+	}
+	if opts.Seed.Mode == seed.FixedMode {
+		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))
 	}
 	if opts.FreezePhysics {
 		args = append(args, "--freeze-physics")

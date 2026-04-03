@@ -7,6 +7,7 @@ import (
 
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/render"
+	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,7 @@ var (
 	renderMinSamples            int
 	renderNoiseThresholdEnabled bool
 	renderNoiseThreshold        float64
+	renderSeed                  string
 )
 
 var renderCmd = &cobra.Command{
@@ -47,6 +49,7 @@ func init() {
 	renderCmd.Flags().Float64Var(&renderNoiseThreshold, "noise-threshold", 0, "Cycles adaptive noise threshold value")
 	renderCmd.Flags().StringVarP(&renderOutputDir, "output", "o", "./out", "Output directory")
 	renderCmd.Flags().StringVar(&renderCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
+	renderCmd.Flags().StringVar(&renderSeed, "seed", string(seed.RandomMode), "Scene seed mode: rand, seq, or a concrete integer")
 }
 
 func runRender(cmd *cobra.Command, args []string) {
@@ -59,6 +62,10 @@ func runRender(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logs.Err.Fatalln("Invalid --resolution:", err)
 	}
+	seedCfg, err := parseSeedFlag(renderSeed)
+	if err != nil {
+		logs.Err.Fatalln("Invalid --seed:", err)
+	}
 
 	opts := render.RenderOptions{
 		ScriptPath: paths.ScriptPath,
@@ -68,6 +75,7 @@ func runRender(cmd *cobra.Command, args []string) {
 		Resolution: resolution,
 		OutputDir:  paths.OutputDir,
 		GPUBackend: renderGPUBackend,
+		Seed:       seedCfg,
 	}
 	applyOptionalRenderFlags(cmd, &opts)
 

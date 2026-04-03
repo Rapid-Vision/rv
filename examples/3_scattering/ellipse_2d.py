@@ -3,11 +3,10 @@ import rv
 
 
 class EllipseScatterScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.get_world().set_params(sun_intensity=0.03)
         self.create_plane(size=80).set_location((0, 0, 0))
         target = self.create_empty().set_location((0, 0, 0.6))
-        seed = 42
 
         domain = rv.Domain.ellipse(center=(0.0, 0.0), radii=(12.0, 6.0), z=0.0)
         source_cube = self.create_cube(name="ScatterSourceCube", size=1.0).set_location(

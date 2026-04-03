@@ -6,6 +6,7 @@ import (
 
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/preview"
+	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,7 @@ var (
 	previewRes        string
 	previewGPUBackend string
 	previewTimeLimit  float64
+	previewSeed       string
 )
 
 var previewCmd = &cobra.Command{
@@ -36,6 +38,7 @@ func init() {
 	previewCmd.Flags().StringVar(&previewRes, "resolution", "640,640", "Output image resolution in WIDTH,HEIGHT format (for --preview-files)")
 	previewCmd.Flags().StringVar(&previewGPUBackend, "gpu-backend", "auto", "Cycles render device backend: auto, optix, cuda, hip, oneapi, metal, cpu")
 	previewCmd.Flags().Float64Var(&previewTimeLimit, "time-limit", 0, "Cycles rendering time limit in seconds (for --preview-files)")
+	previewCmd.Flags().StringVar(&previewSeed, "seed", string(seed.RandomMode), "Scene seed mode: rand, seq, or a concrete integer")
 }
 
 func runPreview(cmd *cobra.Command, args []string) {
@@ -56,6 +59,10 @@ func runPreview(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logs.Err.Fatalln("Invalid --resolution:", err)
 	}
+	seedCfg, err := parseSeedFlag(previewSeed)
+	if err != nil {
+		logs.Err.Fatalln("Invalid --seed:", err)
+	}
 	var timeLimit *float64
 	if cmd.Flags().Changed("time-limit") {
 		timeLimit = &previewTimeLimit
@@ -70,6 +77,7 @@ func runPreview(cmd *cobra.Command, args []string) {
 		Resolution:    resolution,
 		GPUBackend:    previewGPUBackend,
 		TimeLimit:     timeLimit,
+		Seed:          seedCfg,
 	})
 }
 

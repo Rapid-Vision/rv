@@ -13,6 +13,8 @@ from .utils import (
     _internal_load_scene_class,
     _internal_parse_resolution,
     _internal_print_cycles_device_info,
+    _internal_resolve_seed,
+    _internal_run_scene_generate,
     _internal_set_time_limit,
 )
 
@@ -24,6 +26,8 @@ __all__ = [
     "_internal_load_scene_class",
     "_internal_parse_resolution",
     "_internal_print_cycles_device_info",
+    "_internal_resolve_seed",
+    "_internal_run_scene_generate",
     "_internal_set_time_limit",
 ]
 

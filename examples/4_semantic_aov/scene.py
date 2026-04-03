@@ -2,7 +2,7 @@ import rv
 
 
 class RustySemanticScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.get_world().set_params(sun_intensity=0.03)
 
         # This material must exist in ./rusty_metal.blend.

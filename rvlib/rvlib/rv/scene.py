@@ -111,7 +111,7 @@ class Scene(ABC, _Serializable):
     light_index_counter: int = 0
 
     @abstractmethod
-    def generate(self) -> None:
+    def generate(self, seed: int | None = None) -> None:
         pass
 
     def __init__(self, output_dir=None) -> None:
