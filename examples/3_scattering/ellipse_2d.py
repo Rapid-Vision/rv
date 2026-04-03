@@ -14,16 +14,16 @@ class EllipseScatterScene(rv.Scene):
             (0, 0, -1000)
         )
         cubes = self.scatter_by_sphere(
-            source=rv.ObjectLoader(source_cube.obj, self),
+            source=source_cube.as_loader(),
             count=350,
             domain=domain,
             min_gap=0.15,
             scale_range=(0.1, 0.6),
             seed=seed,
+            linked_data=False,
         )
         rng = random.Random(seed)
         for idx, cube in enumerate(cubes):
-            cube.obj.data = cube.obj.data.copy()
             material = self.create_material(name=f"CubeMat_{idx}").set_params(
                 base_color=(rng.random(), rng.random(), rng.random()),
                 roughness=0.4,

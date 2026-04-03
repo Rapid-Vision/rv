@@ -20,7 +20,7 @@ class HullScatterScene(rv.Scene):
         source_cube = self.create_cube(name="ScatterSourceCube", size=1.0).set_location(
             (0, 0, -1000)
         )
-        sphere_loader = rv.ObjectLoader(source_cube.obj, self)
+        sphere_loader = source_cube.as_loader()
         placed = self.scatter_by_bvh(
             source=sphere_loader,
             count=300,
@@ -30,10 +30,10 @@ class HullScatterScene(rv.Scene):
             scale_range=(0.25, 0.45),
             boundary_margin=0.2,
             seed=seed,
+            linked_data=False,
         )
         rng = random.Random(seed)
         for idx, obj in enumerate(placed):
-            obj.obj.data = obj.obj.data.copy()
             material = self.create_material(name=f"CubeMat_{idx}").set_params(
                 base_color=(rng.random(), rng.random(), rng.random()),
                 roughness=0.4,

@@ -23,5 +23,5 @@ class RustySemanticScene(rv.Scene):
         self.enable_semantic_channels("rust", "clean_metal")
         self.set_semantic_mask_threshold(0.5)
 
-        target = self.create_empty().set_location(panel.obj.location)
+        target = self.create_empty().set_location(panel.get_location())
         self.get_camera().set_location((5.5, 5.5, 2.7)).point_at(target)

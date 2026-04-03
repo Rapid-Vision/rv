@@ -92,9 +92,15 @@ class ObjectLoader:
     Helper for creating object instances from a loaded Blender object source.
     """
 
-    def __init__(self, obj, scene: "Scene") -> None:
+    def __init__(
+        self,
+        obj,
+        scene: "Scene",
+        source_wrapper: "Object" | None = None,
+    ) -> None:
         self.obj = obj
         self.scene = scene
+        self.source_wrapper = source_wrapper
 
     def set_source(
         self,
@@ -108,24 +114,31 @@ class ObjectLoader:
         if source.scene is not self.scene:
             raise ValueError("source object must belong to the same scene.")
         self.obj = source.obj
+        self.source_wrapper = source
         return self
 
     def create_instance(
         self,
         name: str = None,
         register_object: bool = True,
+        linked_data: bool = True,
     ) -> "Object":
         """
         Create a single object instance from a loader.
         """
         res = self.obj.copy()
+        if not linked_data and getattr(res, "data", None) is not None:
+            res.data = res.data.copy()
         _mark_object_tree(res)
         _get_generated_collection().objects.link(res)
 
         if name is not None:
             res.name = name
 
-        return Object(res, self.scene, register_object=register_object)
+        wrapped = Object(res, self.scene, register_object=register_object)
+        if self.source_wrapper is not None:
+            self.source_wrapper._copy_wrapper_state_to(wrapped)
+        return wrapped
 
 
 class ParametricSource:
@@ -175,8 +188,13 @@ class ParametricSource:
         params: dict | None = None,
         register_object: bool = True,
         name: str = None,
+        linked_data: bool = True,
     ) -> "Object":
-        obj = self.source.create_instance(name=name, register_object=register_object)
+        obj = self.source.create_instance(
+            name=name,
+            register_object=register_object,
+            linked_data=linked_data,
+        )
         if params is None:
             params = {}
         if not isinstance(params, dict):
@@ -231,6 +249,42 @@ class Object(_Serializable):
             self.obj.pass_index = self.index
         self.obj.rotation_mode = "QUATERNION"
 
+    def _copy_wrapper_state_to(self, other: "Object") -> None:
+        other.tags = set(self.tags)
+        other.properties = dict(self.properties)
+        other.modifier_parameters = [
+            dict(parameter) for parameter in self.modifier_parameters
+        ]
+        other.custom_meta = dict(self.custom_meta)
+
+    def as_loader(self) -> ObjectLoader:
+        """
+        Create an `ObjectLoader` that instances this object.
+        """
+        return ObjectLoader(self.obj, self.scene, source_wrapper=self)
+
+    def copy(
+        self,
+        name: str | None = None,
+        linked_data: bool = True,
+        register_object: bool = True,
+    ) -> "Object":
+        """
+        Duplicate this object.
+
+        If `linked_data` is False, mesh/light/camera data is copied as well.
+        """
+        duplicate = self.obj.copy()
+        if not linked_data and getattr(duplicate, "data", None) is not None:
+            duplicate.data = duplicate.data.copy()
+        _mark_object_tree(duplicate)
+        _get_generated_collection().objects.link(duplicate)
+        if name is not None:
+            duplicate.name = name
+        wrapped = Object(duplicate, self.scene, register_object=register_object)
+        self._copy_wrapper_state_to(wrapped)
+        return wrapped
+
     def set_location(
         self,
         location: Union[mathutils.Vector, typing.Sequence[float]],
@@ -245,6 +299,25 @@ class Object(_Serializable):
         else:
             self.obj.location = mathutils.Vector(location)
 
+        return self
+
+    def get_location(self) -> Float3:
+        """
+        Get the object location as an `(x, y, z)` tuple.
+        """
+        location = self.obj.location
+        return (float(location.x), float(location.y), float(location.z))
+
+    def move(
+        self,
+        dx: float = 0.0,
+        dy: float = 0.0,
+        dz: float = 0.0,
+    ) -> "Object":
+        """
+        Translate the object by the given offsets.
+        """
+        self.obj.location += mathutils.Vector((dx, dy, dz))
         return self
 
     def set_rotation(

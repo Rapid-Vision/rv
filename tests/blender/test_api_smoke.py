@@ -244,12 +244,20 @@ class ApiSmokeTest(unittest.TestCase):
         exported_loaders = self.scene.load_objects(
             str(EXPORTED_BLEND), import_names=["Cube_0", "Cube_1"]
         )
+        cube_loader = cube.as_loader()
+        self.assertIs(cube_loader.obj, cube.obj)
         loader_instance = rock_loader.create_instance(name="RockInstance")
         rock_loader.set_source(cube)
         remapped_instance = rock_loader.create_instance(
-            name="CubeClone", register_object=False
+            name="CubeClone", register_object=False, linked_data=False
         )
         self.assertEqual(remapped_instance.obj.name, "CubeClone")
+        self.assertIsNot(remapped_instance.obj.data, cube.obj.data)
+        copied_cube = cube.copy(
+            name="CubeCopy", register_object=False, linked_data=False
+        ).move(dx=1.0, dy=2.0, dz=3.0)
+        self.assertEqual(copied_cube.get_location(), (1.0, 2.0, 4.0))
+        self.assertEqual(copied_cube.tags, cube.tags)
         inspect_loader = self.scene.inspect_object(exported_loaders[0], applied_scale=True)
         self.assertIn("bounds_world", inspect_loader.to_dict())
 
@@ -262,6 +270,7 @@ class ApiSmokeTest(unittest.TestCase):
                     domain=sphere_domain,
                     min_gap=0.1,
                     seed=1,
+                    linked_data=False,
                 )
             ),
             1,
@@ -274,6 +283,7 @@ class ApiSmokeTest(unittest.TestCase):
                     domain=sphere_domain,
                     min_gap=0.0,
                     seed=2,
+                    linked_data=False,
                 )
             ),
             1,
@@ -287,7 +297,10 @@ class ApiSmokeTest(unittest.TestCase):
         sampled_params = param_source.sample_params(random.Random(5))
         self.assertIn("scale_seed", sampled_params)
         param_instance = param_source.create_instance(
-            params={"scale_seed": 2}, register_object=False, name="ParametricInstance"
+            params={"scale_seed": 2},
+            register_object=False,
+            name="ParametricInstance",
+            linked_data=False,
         )
         self.assertEqual(param_instance.obj.name, "ParametricInstance")
         self.assertGreaterEqual(
@@ -298,6 +311,7 @@ class ApiSmokeTest(unittest.TestCase):
                     domain=rv.Domain.box(center=(0.0, 0.0, 1.0), size=(6.0, 6.0, 4.0)),
                     strategy="sphere",
                     seed=3,
+                    linked_data=False,
                 )
             ),
             1,

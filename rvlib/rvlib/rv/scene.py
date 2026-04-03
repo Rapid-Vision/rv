@@ -320,7 +320,7 @@ class Scene(ABC, _Serializable):
             if temp_obj is not None:
                 _remove_blender_object(temp_obj.obj)
 
-    def scatter_by_sphere(self, source: ObjectLoaderSource, count: int, domain: "Domain", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None) -> list["Object"]:
+    def scatter_by_sphere(self, source: ObjectLoaderSource, count: int, domain: "Domain", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None, linked_data: bool = True) -> list["Object"]:
         loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(source, count, domain, min_gap, yaw_range, rotation_mode, scale_range, max_attempts_per_object, boundary_mode, boundary_margin)
         rng = random.Random(seed)
         base_radii: dict[int, float] = {}
@@ -351,7 +351,7 @@ class Scene(ABC, _Serializable):
                 if _overlaps_by_radius(pos, radius, neighbors, placed_infos, domain.dimension, min_gap):
                     stats["rejected_overlap"] += 1
                     continue
-                obj = loader.create_instance()
+                obj = loader.create_instance(linked_data=linked_data)
                 obj.set_scale(scale).set_rotation(rot).set_location(pos)
                 placed.append(obj)
                 placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj})
@@ -363,7 +363,7 @@ class Scene(ABC, _Serializable):
         _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
         return placed
 
-    def scatter_by_bvh(self, source: ObjectLoaderSource, count: int, domain: "Domain", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None) -> list["Object"]:
+    def scatter_by_bvh(self, source: ObjectLoaderSource, count: int, domain: "Domain", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None, linked_data: bool = True) -> list["Object"]:
         loaders, scale_min, scale_max, yaw_min, yaw_max = _validate_scatter_common(source, count, domain, min_gap, yaw_range, rotation_mode, scale_range, max_attempts_per_object, boundary_mode, boundary_margin)
         rng = random.Random(seed)
         base_radii: dict[int, float] = {}
@@ -402,7 +402,7 @@ class Scene(ABC, _Serializable):
                     stats["rejected_overlap"] += 1
                     continue
                 _remove_blender_object(temp_obj.obj)
-                obj = loader.create_instance()
+                obj = loader.create_instance(linked_data=linked_data)
                 obj.set_scale(scale).set_rotation(rot).set_location(pos)
                 placed.append(obj)
                 placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj})
@@ -414,7 +414,7 @@ class Scene(ABC, _Serializable):
         _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)
         return placed
 
-    def scatter_parametric(self, source: "ParametricSource", count: int, domain: "Domain", strategy: Literal["sphere", "bvh"] = "sphere", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None) -> list["Object"]:
+    def scatter_parametric(self, source: "ParametricSource", count: int, domain: "Domain", strategy: Literal["sphere", "bvh"] = "sphere", min_gap: float = 0.0, yaw_range: Float2 = (0.0, 360.0), rotation_mode: Literal["yaw", "free"] = "yaw", scale_range: Float2 = (1.0, 1.0), max_attempts_per_object: int = 100, boundary_mode: Literal["center_margin"] = "center_margin", boundary_margin: float = 0.0, seed: int | None = None, linked_data: bool = True) -> list["Object"]:
         if not isinstance(source, ParametricSource):
             raise TypeError("source must be ParametricSource.")
         if strategy not in {"sphere", "bvh"}:
@@ -450,7 +450,11 @@ class Scene(ABC, _Serializable):
                         stats["rejected_overlap"] += 1
                         continue
                 _remove_blender_object(temp_obj.obj)
-                obj = source.create_instance(params=params, register_object=True)
+                obj = source.create_instance(
+                    params=params,
+                    register_object=True,
+                    linked_data=linked_data,
+                )
                 obj.set_scale(scale).set_rotation(rot).set_location(pos)
                 placed.append(obj)
                 placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj, "params": params})

@@ -18,14 +18,7 @@ class ImportScatteredBoxesScene(rv.Scene):
 
         for loader in loaders:
             left = loader.create_instance()
-            right = loader.create_instance()
-            right.set_location(
-                (
-                    right.obj.location.x + 3.0,
-                    right.obj.location.y,
-                    right.obj.location.z,
-                )
-            )
+            right = loader.create_instance().move(dx=3.0)
 
         look_at = self.create_empty("LookAt").set_location((1.5, 0.0, 0.9))
         self.get_camera().set_location((8.0, -9.0, 5.5)).point_at(look_at)

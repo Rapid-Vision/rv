@@ -13,7 +13,7 @@ class ParametricScatterScene(rv.Scene):
         source_cube = self.create_cube(name="ScatterSourceCube", size=1.0).set_location(
             (0, 0, -1000)
         )
-        loader = rv.ObjectLoader(source_cube.obj, self)
+        loader = source_cube.as_loader()
         source = (
             rv.ParametricSource(loader)
             .set_sampler(lambda rng: {"count": rng.randint(2, 4)})
@@ -31,10 +31,10 @@ class ParametricScatterScene(rv.Scene):
             min_gap=0.2,
             scale_range=(0.1, 1.0),
             seed=seed,
+            linked_data=False,
         )
         rng = random.Random(seed)
         for idx, obj in enumerate(placed):
-            obj.obj.data = obj.obj.data.copy()
             material = self.create_material(name=f"CubeMat_{idx}").set_params(
                 base_color=(rng.random(), rng.random(), rng.random()),
                 roughness=0.4,

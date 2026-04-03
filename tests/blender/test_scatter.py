@@ -22,7 +22,7 @@ class ScatterTest(unittest.TestCase):
 
     def test_bounds_scatter_non_overlap_2d(self):
         prototype = self.scene.create_cube(size=1.0)
-        loader = rv.ObjectLoader(prototype.obj, self.scene)
+        loader = prototype.as_loader()
         domain = rv.Domain.rect(center=(0.0, 0.0), size=(15.0, 15.0), z=0.5)
         placed = self.scene.scatter_by_sphere(
             source=loader,
@@ -30,13 +30,15 @@ class ScatterTest(unittest.TestCase):
             domain=domain,
             min_gap=0.1,
             seed=1,
+            linked_data=False,
         )
         self.assertGreater(len(placed), 0)
+        self.assertIsNot(placed[0].obj.data, prototype.obj.data)
         for i in range(len(placed)):
             for j in range(i + 1, len(placed)):
-                a = placed[i].obj.location
-                b = placed[j].obj.location
-                self.assertGreater(math.hypot(a.x - b.x, a.y - b.y), 0.1)
+                a = placed[i].get_location()
+                b = placed[j].get_location()
+                self.assertGreater(math.hypot(a[0] - b[0], a[1] - b[1]), 0.1)
 
 
 if __name__ == "__main__":
