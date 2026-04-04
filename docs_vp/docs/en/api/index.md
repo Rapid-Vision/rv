@@ -360,12 +360,14 @@ A material descriptor is converted to a real Blender material when assigned to a
 
 ```python
 @abstractmethod
-def set_params(self, **kwargs)
+def set_params(self, **kwargs) -> Self
 ```
 
 **Arguments**
 
 - **`**kwargs`**
+
+**Returns**: `Self`
 
 ---
 :::
@@ -402,20 +404,20 @@ Material descriptor backed by Blender's Principled BSDF shader.
 **Signature**
 
 ```python
-def set_params(self, base_color: OptionalColor=None, roughness: float=None, metallic: float=None, specular: float=None, emission_color: OptionalColor=None, emission_strength: float=None, alpha: float=None, transmission: float=None, ior: float=None)
+def set_params(self, base_color: OptionalColor=None, roughness: float | None=None, metallic: float | None=None, specular: float | None=None, emission_color: OptionalColor=None, emission_strength: float | None=None, alpha: float | None=None, transmission: float | None=None, ior: float | None=None)
 ```
 
 **Arguments**
 
 - **`base_color`** : `OptionalColor`
-- **`roughness`** : `float`
-- **`metallic`** : `float`
-- **`specular`** : `float`
+- **`roughness`** : `float | None`
+- **`metallic`** : `float | None`
+- **`specular`** : `float | None`
 - **`emission_color`** : `OptionalColor`
-- **`emission_strength`** : `float`
-- **`alpha`** : `float`
-- **`transmission`** : `float`
-- **`ior`** : `float`
+- **`emission_strength`** : `float | None`
+- **`alpha`** : `float | None`
+- **`transmission`** : `float | None`
+- **`ior`** : `float | None`
 
 ---
 ---
@@ -424,13 +426,13 @@ def set_params(self, base_color: OptionalColor=None, roughness: float=None, meta
 **Signature**
 
 ```python
-def set_property(self, key: str, value: any)
+def set_property(self, key: str, value: Any)
 ```
 
 **Arguments**
 
 - **`key`** : `str`
-- **`value`** : `any`
+- **`value`** : `Any`
 
 **Returns**: `Self`
 
@@ -557,12 +559,12 @@ Create a single object instance from a loader.
 **Signature**
 
 ```python
-def create_instance(self, name: str=None, register_object: bool=True, linked_data: bool=True) -> 'Object'
+def create_instance(self, name: str | None=None, register_object: bool=True, linked_data: bool=True) -> 'Object'
 ```
 
 **Arguments**
 
-- **`name`** : `str`
+- **`name`** : `str | None`
 - **`register_object`** : `bool`
 - **`linked_data`** : `bool`
 
@@ -734,13 +736,13 @@ Set a property of the object. Properties can be used inside object's material no
 **Signature**
 
 ```python
-def set_property(self, key: str, value: any)
+def set_property(self, key: str, value: Any)
 ```
 
 **Arguments**
 
 - **`key`** : `str`
-- **`value`** : `any`
+- **`value`** : `Any`
 
 **Returns**: `Self`
 
@@ -756,13 +758,13 @@ modifier that exposes the requested input.
 **Signature**
 
 ```python
-def set_modifier_input(self, input_name: str, value: any, modifier_name: str | None=None)
+def set_modifier_input(self, input_name: str, value: Any, modifier_name: str | None=None)
 ```
 
 **Arguments**
 
 - **`input_name`** : `str`
-- **`value`** : `any`
+- **`value`** : `Any`
 - **`modifier_name`** : `str | None`
 
 **Returns**: `Self`
@@ -1141,7 +1143,7 @@ Set light RGB color. Alpha (if provided) is ignored.
 **Signature**
 
 ```python
-def set_color(self, color: Color) -> 'Light'
+def set_color(self, color: Color) -> Self
 ```
 
 **Arguments**
@@ -1159,7 +1161,7 @@ Set light power in Blender `energy` units.
 **Signature**
 
 ```python
-def set_power(self, power: float) -> 'Light'
+def set_power(self, power: float) -> Self
 ```
 
 **Arguments**
@@ -1177,7 +1179,7 @@ Enable or disable shadow casting.
 **Signature**
 
 ```python
-def set_cast_shadow(self, enabled: bool=True) -> 'Light'
+def set_cast_shadow(self, enabled: bool=True) -> Self
 ```
 
 **Arguments**
@@ -1195,7 +1197,7 @@ Set the light contribution to specular highlights.
 **Signature**
 
 ```python
-def set_specular_factor(self, factor: float) -> 'Light'
+def set_specular_factor(self, factor: float) -> Self
 ```
 
 **Arguments**
@@ -1213,7 +1215,7 @@ Set softness parameter mapped to the current light type.
 **Signature**
 
 ```python
-def set_softness(self, value: float) -> 'Light'
+def set_softness(self, value: float) -> Self
 ```
 
 **Arguments**
@@ -1231,7 +1233,7 @@ Set known light-data attributes or custom properties.
 **Signature**
 
 ```python
-def set_params(self, **kwargs) -> 'Light'
+def set_params(self, **kwargs) -> Self
 ```
 
 **Arguments**
@@ -1533,9 +1535,9 @@ Inherits from: `ABC`, `_Serializable`
 | - | - | - |
 | `resolution` | `Resolution` |  |
 | `time_limit` | `float` |  |
-| `passes` | `RenderPassSet` |  |
+| `passes` | `RenderPassSet \| None` |  |
 | `output_dir` | `Optional[str]` |  |
-| `subdir` | `str` |  |
+| `subdir` | `str \| None` |  |
 | `camera` | `'Camera'` |  |
 | `world` | `'World'` |  |
 | `tags` | `TagSet` |  |
@@ -1544,6 +1546,8 @@ Inherits from: `ABC`, `_Serializable`
 | `lights` | `set['Light']` |  |
 | `semantic_channels` | `SemanticChannelSet` |  |
 | `semantic_mask_threshold` | `float` |  |
+| `seed` | `int \| None` |  |
+| `seed_mode` | `str \| None` |  |
 | `object_index_counter` | `int` |  |
 | `material_index_counter` | `int` |  |
 | `light_index_counter` | `int` |  |
@@ -1716,7 +1720,7 @@ def create_point_light(self, name: str='Point', power: float=1000.0) -> 'PointLi
 - **`name`** : `str`
 - **`power`** : `float`
 
-**Returns**: `'PointLight'`
+**Returns**: `Self`
 
 ---
 ---
@@ -1733,7 +1737,7 @@ def create_sun_light(self, name: str='Sun', power: float=1.0) -> 'SunLight'
 - **`name`** : `str`
 - **`power`** : `float`
 
-**Returns**: `'SunLight'`
+**Returns**: `Self`
 
 ---
 ---
@@ -1750,7 +1754,7 @@ def create_area_light(self, name: str='Area', power: float=100.0) -> 'AreaLight'
 - **`name`** : `str`
 - **`power`** : `float`
 
-**Returns**: `'AreaLight'`
+**Returns**: `Self`
 
 ---
 ---
@@ -1767,7 +1771,7 @@ def create_spot_light(self, name: str='Spot', power: float=1000.0) -> 'SpotLight
 - **`name`** : `str`
 - **`power`** : `float`
 
-**Returns**: `'SpotLight'`
+**Returns**: `Self`
 
 ---
 ---
@@ -1791,7 +1795,7 @@ def get_camera(self) -> 'Camera'
 **Signature**
 
 ```python
-def set_world(self, world: 'World') -> 'World'
+def set_world(self, world: 'World') -> 'Scene'
 ```
 
 **Arguments**
@@ -1854,13 +1858,13 @@ def add_tags(self, *tags) -> 'Scene'
 **Signature**
 
 ```python
-def load_object(self, blendfile: str, import_name: str=None) -> 'ObjectLoader'
+def load_object(self, blendfile: str, import_name: str | None=None) -> 'ObjectLoader'
 ```
 
 **Arguments**
 
 - **`blendfile`** : `str`
-- **`import_name`** : `str`
+- **`import_name`** : `str | None`
 
 **Returns**: `'ObjectLoader'`
 
@@ -1871,13 +1875,13 @@ def load_object(self, blendfile: str, import_name: str=None) -> 'ObjectLoader'
 **Signature**
 
 ```python
-def load_objects(self, blendfile: str, import_names: list[str]=None) -> list['ObjectLoader']
+def load_objects(self, blendfile: str, import_names: list[str] | None=None) -> list['ObjectLoader']
 ```
 
 **Arguments**
 
 - **`blendfile`** : `str`
-- **`import_names`** : `list[str]`
+- **`import_names`** : `list[str] | None`
 
 **Returns**: `Self`
 
@@ -1904,13 +1908,13 @@ def create_material(self, name: str='Material') -> 'BasicMaterial'
 **Signature**
 
 ```python
-def import_material(self, blendfile: str, material_name: str=None) -> 'ImportedMaterial'
+def import_material(self, blendfile: str, material_name: str | None=None) -> 'ImportedMaterial'
 ```
 
 **Arguments**
 
 - **`blendfile`** : `str`
-- **`material_name`** : `str`
+- **`material_name`** : `str | None`
 
 **Returns**: `'ImportedMaterial'`
 
@@ -1998,11 +2002,13 @@ Update world-specific lighting parameters.
 
 ```python
 @abstractmethod
-def set_params(self)
+def set_params(self) -> Self
 ```
 
 **Arguments**
 
+
+**Returns**: `Self`
 
 ---
 :::
@@ -2019,7 +2025,7 @@ Inherits from: `World`
 | Name | Type | Description |
 | - | - | - |
 | `color` | `ColorRGBA \| None` |  |
-| `strength` | `float` |  |
+| `strength` | `float \| None` |  |
 
 :::
 
@@ -2031,13 +2037,13 @@ Inherits from: `World`
 **Signature**
 
 ```python
-def set_params(self, color: ColorRGBA | None=None, strength: float=None)
+def set_params(self, color: ColorRGBA | None=None, strength: float | None=None)
 ```
 
 **Arguments**
 
 - **`color`** : `ColorRGBA | None`
-- **`strength`** : `float`
+- **`strength`** : `float | None`
 
 **Returns**: `Self`
 
@@ -2057,12 +2063,12 @@ For more information, view [official blender docs](https://docs.blender.org/manu
 
 | Name | Type | Description |
 | - | - | - |
-| `strength` | `float` |  |
-| `sun_size` | `float` |  |
-| `sun_intensity` | `float` |  |
-| `sun_elevation` | `float` |  |
-| `rotation_z` | `float` |  |
-| `altitude` | `float` |  |
+| `strength` | `float \| None` |  |
+| `sun_size` | `float \| None` |  |
+| `sun_intensity` | `float \| None` |  |
+| `sun_elevation` | `float \| None` |  |
+| `rotation_z` | `float \| None` |  |
+| `altitude` | `float \| None` |  |
 | `air` | `float` |  |
 | `aerosol_density` | `float` |  |
 | `ozone` | `float` |  |
@@ -2077,19 +2083,19 @@ For more information, view [official blender docs](https://docs.blender.org/manu
 **Signature**
 
 ```python
-def set_params(self, strength: float=None, sun_size: float=None, sun_intensity: float=None, sun_elevation: float=None, rotation_z: float=None, air: float=None, aerosol_density: float=None, ozone: float=None)
+def set_params(self, strength: float | None=None, sun_size: float | None=None, sun_intensity: float | None=None, sun_elevation: float | None=None, rotation_z: float | None=None, air: float | None=None, aerosol_density: float | None=None, ozone: float | None=None)
 ```
 
 **Arguments**
 
-- **`strength`** : `float`
-- **`sun_size`** : `float`
-- **`sun_intensity`** : `float`
-- **`sun_elevation`** : `float`
-- **`rotation_z`** : `float`
-- **`air`** : `float`
-- **`aerosol_density`** : `float`
-- **`ozone`** : `float`
+- **`strength`** : `float | None`
+- **`sun_size`** : `float | None`
+- **`sun_intensity`** : `float | None`
+- **`sun_elevation`** : `float | None`
+- **`rotation_z`** : `float | None`
+- **`air`** : `float | None`
+- **`aerosol_density`** : `float | None`
+- **`ozone`** : `float | None`
 
 **Returns**: `Self`
 
@@ -2108,8 +2114,8 @@ Inherits from: `World`
 | Name | Type | Description |
 | - | - | - |
 | `hdri_path` | `str` |  |
-| `strength` | `float` |  |
-| `rotation_z` | `float` |  |
+| `strength` | `float \| None` |  |
+| `rotation_z` | `float \| None` |  |
 
 :::
 
@@ -2121,14 +2127,14 @@ Inherits from: `World`
 **Signature**
 
 ```python
-def set_params(self, hdri_path: str=None, strength: float=None, rotation_z: float=None)
+def set_params(self, hdri_path: str | None=None, strength: float | None=None, rotation_z: float | None=None)
 ```
 
 **Arguments**
 
-- **`hdri_path`** : `str`
-- **`strength`** : `float`
-- **`rotation_z`** : `float`
+- **`hdri_path`** : `str | None`
+- **`strength`** : `float | None`
+- **`rotation_z`** : `float | None`
 
 **Returns**: `Self`
 
@@ -2147,7 +2153,7 @@ Inherits from: `World`
 | Name | Type | Description |
 | - | - | - |
 | `filepath` | `str` |  |
-| `world_name` | `str` |  |
+| `world_name` | `str \| None` |  |
 | `params` | `dict` |  |
 
 :::

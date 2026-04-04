@@ -5,6 +5,12 @@ import sys
 
 import bpy
 
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
+
+from runtime_bootstrap import bootstrap_runtime
+
 EXPORT_SCHEMA_VERSION = 1
 
 
@@ -138,9 +144,7 @@ def pack_resources():
 def main():
     args = parse_args()
 
-    sys.path.insert(0, args.libpath)
-    sys.path.insert(0, args.cwd)
-    os.chdir(args.cwd)
+    bootstrap_runtime(args.libpath, args.cwd)
 
     import rv
     import rv.internal as rvi

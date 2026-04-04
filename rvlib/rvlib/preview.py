@@ -11,6 +11,12 @@ import shutil
 import time
 import tempfile
 
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
+
+from runtime_bootstrap import bootstrap_runtime
+
 
 def parse_args():
     args = []
@@ -252,8 +258,7 @@ def run_headless_loop():
 
 ARGS = parse_args()
 
-sys.path.append(ARGS.libpath)
-os.chdir(ARGS.cwd)
+bootstrap_runtime(ARGS.libpath, ARGS.cwd)
 
 import rv
 import rv.internal as rvi
