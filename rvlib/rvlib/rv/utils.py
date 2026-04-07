@@ -40,6 +40,15 @@ class MyScene(rv.Scene):
 _INTERNAL_VALID_GPU_BACKENDS = ("auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu")
 
 
+def _as_rgba(color: Color) -> ColorRGBA:
+    rgba = tuple(float(component) for component in color)
+    if len(rgba) == 3:
+        return (rgba[0], rgba[1], rgba[2], 1.0)
+    if len(rgba) != 4:
+        raise TypeError("Color must have 3 (RGB) or 4 (RGBA) components.")
+    return rgba
+
+
 def _mark_owned(obj: bpy.types.ID) -> None:
     if obj is None:
         return
@@ -206,6 +215,7 @@ def _purge_orphans() -> None:
 def _require_blender_attr(target, attr: str, feature: str) -> None:
     if not hasattr(target, attr):
         raise RuntimeError(f"Blender does not support {feature}.")
+
 
 def _internal_parse_resolution(raw, arg_name: str = "--resolution") -> Resolution:
     parts = [part.strip() for part in raw.split(",")]

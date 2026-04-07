@@ -6,21 +6,10 @@ from typing import Any
 import bpy
 
 from .material import Material
-from .types import Color, ColorRGBA
+from .utils import _as_rgba
 
 X_SHIFT = 300
 Y_PADDING = 60
-
-
-def _as_rgba(color: Color) -> ColorRGBA:
-    rgba = tuple(float(component) for component in color)
-    if len(rgba) == 3:
-        return (rgba[0], rgba[1], rgba[2], 1.0)
-    if len(rgba) != 4:
-        raise TypeError("Color must have 3 (RGB) or 4 (RGBA) components.")
-    return rgba
-
-
 def _coerce_expr(value: "ShaderValueLike", expected_type: str | None = None) -> "Expr":
     if isinstance(value, Expr):
         return value
@@ -286,20 +275,26 @@ class PrincipledBSDF(ShaderExpr):
     base_color: ShaderValueLike | None = None
     metallic: ShaderValueLike | None = None
     roughness: ShaderValueLike | None = None
+    specular: ShaderValueLike | None = None
     normal: ShaderValueLike | None = None
     emission_color: ShaderValueLike | None = None
     emission_strength: ShaderValueLike | None = None
     alpha: ShaderValueLike | None = None
+    transmission: ShaderValueLike | None = None
+    ior: ShaderValueLike | None = None
 
     def __post_init__(self):
         for field_name, socket_type in (
             ("base_color", "RGBA"),
             ("metallic", "VALUE"),
             ("roughness", "VALUE"),
+            ("specular", "VALUE"),
             ("normal", "VECTOR"),
             ("emission_color", "RGBA"),
             ("emission_strength", "VALUE"),
             ("alpha", "VALUE"),
+            ("transmission", "VALUE"),
+            ("ior", "VALUE"),
         ):
             value = getattr(self, field_name)
             if value is not None:
@@ -315,10 +310,13 @@ class PrincipledBSDF(ShaderExpr):
             "base_color",
             "metallic",
             "roughness",
+            "specular",
             "normal",
             "emission_color",
             "emission_strength",
             "alpha",
+            "transmission",
+            "ior",
         ):
             value = getattr(self, field_name)
             if value is not None:
@@ -330,12 +328,17 @@ class PrincipledBSDF(ShaderExpr):
         compiler.connect_optional(node.inputs["Base Color"], self.base_color)
         compiler.connect_optional(node.inputs["Metallic"], self.metallic)
         compiler.connect_optional(node.inputs["Roughness"], self.roughness)
+        compiler.connect_optional(node.inputs["Specular IOR Level"], self.specular)
         compiler.connect_optional(node.inputs["Normal"], self.normal)
         compiler.connect_optional(node.inputs["Emission Color"], self.emission_color)
         compiler.connect_optional(
             node.inputs["Emission Strength"], self.emission_strength
         )
         compiler.connect_optional(node.inputs["Alpha"], self.alpha)
+        compiler.connect_optional(
+            node.inputs["Transmission Weight"], self.transmission
+        )
+        compiler.connect_optional(node.inputs["IOR"], self.ior)
         return node.outputs["BSDF"]
 
     def node_height(self) -> int:

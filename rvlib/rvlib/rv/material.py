@@ -4,8 +4,8 @@ from typing import Any, Self
 import bpy
 
 from .object import _Serializable
-from .types import Color, ColorRGBA, OptionalColor
-from .utils import _mark_material_tree
+from .types import ColorRGBA, OptionalColor
+from .utils import _as_rgba, _mark_material_tree
 
 
 class Material(ABC, _Serializable):
@@ -64,18 +64,6 @@ class Material(ABC, _Serializable):
             }
         )
         return res
-
-
-def _get_principled_bsdf_node(material: bpy.types.Material):
-    node_tree = getattr(material, "node_tree", None)
-    if node_tree is None:
-        return None
-    for node in node_tree.nodes:
-        if node.type == "BSDF_PRINCIPLED":
-            return node
-    return None
-
-
 def _normalize_semantic_channel(channel: str) -> str:
     normalized = "".join(ch.lower() if ch.isalnum() else "_" for ch in channel).strip(
         "_"
@@ -132,14 +120,6 @@ class BasicMaterial(Material):
         transmission: float | None = None,
         ior: float | None = None,
     ):
-        def _as_rgba(color: Color) -> ColorRGBA:
-            rgba = tuple(color)
-            if len(rgba) == 3:
-                return (rgba[0], rgba[1], rgba[2], 1.0)
-            if len(rgba) != 4:
-                raise TypeError("Color must have 3 (RGB) or 4 (RGBA) components.")
-            return rgba
-
         if base_color is not None:
             self.base_color = _as_rgba(base_color)
         if roughness is not None:
@@ -164,38 +144,26 @@ class BasicMaterial(Material):
         self.properties[key] = value
         return self
 
-    def _build_material(self) -> bpy.types.Material:
-        material = bpy.data.materials.new(name=self.name or "Material")
-        material.use_nodes = True
+    def _to_shader_material(self) -> "Material":
+        from .shader import PrincipledBSDF, ShaderMaterial
 
-        node = _get_principled_bsdf_node(material)
-        if node is None:
-            raise RuntimeError("Failed to create a Principled BSDF node.")
-
-        if self.base_color is not None:
-            node.inputs["Base Color"].default_value = self.base_color
-        if self.roughness is not None:
-            node.inputs["Roughness"].default_value = self.roughness
-        if self.metallic is not None:
-            node.inputs["Metallic"].default_value = self.metallic
-        if self.specular is not None:
-            node.inputs["Specular IOR Level"].default_value = self.specular
-        if self.emission_color is not None:
-            node.inputs["Emission Color"].default_value = self.emission_color
-        if self.emission_strength is not None:
-            node.inputs["Emission Strength"].default_value = self.emission_strength
-        if self.alpha is not None:
-            node.inputs["Alpha"].default_value = self.alpha
-            material.blend_method = "BLEND" if self.alpha < 1.0 else "OPAQUE"
-        if self.transmission is not None:
-            node.inputs["Transmission Weight"].default_value = self.transmission
-        if self.ior is not None:
-            node.inputs["IOR"].default_value = self.ior
-
-        for key, value in self.properties.items():
-            material[key] = value
-
+        shader = PrincipledBSDF(
+            base_color=self.base_color,
+            roughness=self.roughness,
+            metallic=self.metallic,
+            specular=self.specular,
+            emission_color=self.emission_color,
+            emission_strength=self.emission_strength,
+            alpha=self.alpha,
+            transmission=self.transmission,
+            ior=self.ior,
+        )
+        material = ShaderMaterial(shader, name=self.name or "Material")
+        material.properties.update(self.properties)
         return material
+
+    def _build_material(self) -> bpy.types.Material:
+        return self._to_shader_material()._build_material()
 
     def _get_meta(self) -> dict:
         res = super()._get_meta()

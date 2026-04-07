@@ -1,7 +1,10 @@
-.PHONY: docs rtasks test-python-unit test-blender mypy ruff
+.PHONY: docs rtasks test-python-unit test-blender mypy ruff radon
 
 mypy:
 	uvx mypy rvlib/rvlib/
+
+radon:
+	uvx radon cc rvlib/rvlib/rv -nc
 
 ruff:
 	uvx ruff check rvlib/rvlib/ 
