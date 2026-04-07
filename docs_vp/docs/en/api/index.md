@@ -122,6 +122,28 @@ def rect(center: Float2=(0.0, 0.0), size: Float2=(10.0, 10.0), z: float=0.0) -> 
 
 ---
 ---
+###### `custom`
+
+**Signature**
+
+```python
+@staticmethod
+def custom(*, dimension: int, contains_point: Callable[[mathutils.Vector, float], bool], aabb: Callable[[float], AABB], sample_point: Callable[[random.Random, float], mathutils.Vector] | None=None, kind: str='custom', data: dict | None=None) -> 'Domain'
+```
+
+**Arguments**
+
+- **`dimension`** : `int`
+- **`contains_point`** : `Callable[[mathutils.Vector, float], bool]`
+- **`aabb`** : `Callable[[float], AABB]`
+- **`sample_point`** : `Callable[[random.Random, float], mathutils.Vector] | None`
+- **`kind`** : `str`
+- **`data`** : `dict | None`
+
+**Returns**: `'Domain'`
+
+---
+---
 ###### `ellipse`
 
 **Signature**

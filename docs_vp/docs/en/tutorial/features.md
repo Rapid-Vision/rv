@@ -138,6 +138,22 @@ The available example scenes show three useful patterns:
 - [`examples/3_scattering/ellipse_2d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/ellipse_2d.py): fast planar scattering inside an ellipse.
 - [`examples/3_scattering/hull_3d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/hull_3d.py): fill a 3D convex hull volume.
 - [`examples/3_scattering/parametric_scatter.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/parametric_scatter.py): vary each placed instance with a sampler/applier pair.
+- [`examples/3_scattering/custom_domain.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/custom_domain.py): define a custom 3D domain for the region `z^2 < x^2 + y^2`.
+
+You can also define your own scatter domain by providing membership and bounding-box functions:
+
+```python
+domain = rv.Domain.custom(
+    dimension=3,
+    contains_point=lambda point, margin: (
+        (point.z * point.z) < (point.x * point.x + point.y * point.y)
+    ),
+    aabb=lambda inset_margin: (
+        rv.Vector((-10.0, -10.0, -6.0)),
+        rv.Vector((10.0, 10.0, 6.0)),
+    ),
+)
+```
 
 For many synthetic scenes this is enough. If you need physically plausible final resting positions, use rigid body simulation after or instead of geometric scattering.
 

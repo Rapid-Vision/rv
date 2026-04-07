@@ -89,6 +89,21 @@ class ApiSmokeTest(unittest.TestCase):
         box = rv.Domain.box(center=(0.0, 0.0, 1.5), size=(6.0, 6.0, 4.0))
         cylinder = rv.Domain.cylinder(center=(0.0, 0.0, 1.5), radius=2.0, height=4.0)
         ellipsoid = rv.Domain.ellipsoid(center=(0.0, 0.0, 1.5), radii=(2.5, 2.0, 1.5))
+        custom_domain = rv.Domain.custom(
+            dimension=3,
+            contains_point=lambda point, margin: (
+                mathutils.Vector((point.x, point.y)).length >= abs(point.z) + margin
+                and abs(point.x) <= 4.0 - margin
+                and abs(point.y) <= 4.0 - margin
+                and abs(point.z) <= 3.0 - margin
+            ),
+            aabb=lambda inset_margin: (
+                Vector((-4.0 + inset_margin, -4.0 + inset_margin, -3.0 + inset_margin)),
+                Vector((4.0 - inset_margin, 4.0 - inset_margin, 3.0 - inset_margin)),
+            ),
+            kind="double_cone",
+            data={"equation": "z^2 < x^2 + y^2"},
+        )
         inset_rect = rect.inset(0.25)
         rng = random.Random(123)
         sampled_rect = rect.sample_point(rng)
@@ -98,6 +113,7 @@ class ApiSmokeTest(unittest.TestCase):
         sampled_box = box.sample_point(rng)
         sampled_cylinder = cylinder.sample_point(rng)
         sampled_ellipsoid = ellipsoid.sample_point(rng)
+        sampled_custom = custom_domain.sample_point(rng)
         self.assertTrue(rect.contains_point(sampled_rect))
         self.assertTrue(ellipse.contains_point(sampled_ellipse))
         self.assertTrue(polygon.contains_point(sampled_polygon))
@@ -109,6 +125,7 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertTrue(box.contains_point(sampled_box))
         self.assertTrue(cylinder.contains_point(sampled_cylinder))
         self.assertTrue(ellipsoid.contains_point(sampled_ellipsoid))
+        self.assertTrue(custom_domain.contains_point(sampled_custom))
         self.assertIsNotNone(inset_rect.aabb())
 
         self.scene.set_rendering_time_limit(1.5)

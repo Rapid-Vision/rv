@@ -2,7 +2,7 @@ import math
 import random
 import warnings
 from mathutils import Vector
-from typing import Literal, Protocol
+from typing import Callable, Literal, Protocol
 
 import mathutils
 
@@ -339,6 +339,56 @@ class _Hull3DShape:
         return Vector(self.data["aabb_min"]), Vector(self.data["aabb_max"])
 
 
+class _CustomShape:
+    kind = "custom"
+
+    def __init__(
+        self,
+        data: dict,
+        dimension: int,
+        contains_point_fn: Callable[[mathutils.Vector, float], bool],
+        aabb_fn: Callable[[float], AABB],
+        sample_point_fn: Callable[[random.Random, float], mathutils.Vector] | None = None,
+    ) -> None:
+        self.data = data
+        self.dimension = dimension
+        self._contains_point_fn = contains_point_fn
+        self._aabb_fn = aabb_fn
+        self._sample_point_fn = sample_point_fn
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        if self._sample_point_fn is not None:
+            return self._sample_point_fn(rng, inset_margin)
+
+        aabb_min, aabb_max = self.aabb(inset_margin)
+        for _ in range(2048):
+            if self.dimension == 2:
+                point = Vector(
+                    (
+                        rng.uniform(aabb_min.x, aabb_max.x),
+                        rng.uniform(aabb_min.y, aabb_max.y),
+                        aabb_min.z,
+                    )
+                )
+            else:
+                point = Vector(
+                    (
+                        rng.uniform(aabb_min.x, aabb_max.x),
+                        rng.uniform(aabb_min.y, aabb_max.y),
+                        rng.uniform(aabb_min.z, aabb_max.z),
+                    )
+                )
+            if self.contains_point(point, inset_margin):
+                return point
+        raise ValueError("custom domain sampler failed to find a point inside the domain.")
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        return bool(self._contains_point_fn(point, margin))
+
+    def aabb(self, inset_margin: float) -> AABB:
+        return self._aabb_fn(inset_margin)
+
+
 _SHAPE_TYPES = {
     "rect": _RectShape,
     "ellipse": _EllipseShape,
@@ -370,6 +420,12 @@ class Domain:
 
     def __init__(self, kind: str, data: dict, dimension: int):
         self._shape = _build_shape(kind, data, dimension)
+
+    @classmethod
+    def _from_shape(cls, shape: _DomainShape) -> "Domain":
+        domain = cls.__new__(cls)
+        domain._shape = shape
+        return domain
 
     @property
     def kind(self) -> str:
@@ -403,6 +459,35 @@ class Domain:
     ) -> "Domain":
         _ensure_positive_tuple(size, 2, "size")
         return Domain("rect", {"center": tuple(center), "size": tuple(size), "z": z}, 2)
+
+    @staticmethod
+    def custom(
+        *,
+        dimension: int,
+        contains_point: Callable[[mathutils.Vector, float], bool],
+        aabb: Callable[[float], AABB],
+        sample_point: Callable[[random.Random, float], mathutils.Vector] | None = None,
+        kind: str = "custom",
+        data: dict | None = None,
+    ) -> "Domain":
+        if dimension not in {2, 3}:
+            raise ValueError("dimension must be 2 or 3.")
+        if not callable(contains_point):
+            raise TypeError("contains_point must be callable.")
+        if not callable(aabb):
+            raise TypeError("aabb must be callable.")
+        if sample_point is not None and not callable(sample_point):
+            raise TypeError("sample_point must be callable.")
+
+        shape = _CustomShape(
+            data={} if data is None else dict(data),
+            dimension=dimension,
+            contains_point_fn=contains_point,
+            aabb_fn=aabb,
+            sample_point_fn=sample_point,
+        )
+        shape.kind = kind
+        return Domain._from_shape(shape)
 
     @staticmethod
     def ellipse(

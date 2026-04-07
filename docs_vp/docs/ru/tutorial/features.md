@@ -137,6 +137,22 @@ self.scatter_parametric(source=source, count=30, domain=domain, strategy="bvh")
 - [`examples/3_scattering/ellipse_2d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/ellipse_2d.py): быстрое плоское распределение внутри эллипса.
 - [`examples/3_scattering/hull_3d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/hull_3d.py): заполнение трехмерного объема, заданного выпуклой оболочкой.
 - [`examples/3_scattering/parametric_scatter.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/parametric_scatter.py): изменение каждого размещенного инстанса через пару sampler/applier.
+- [`examples/3_scattering/custom_domain.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/custom_domain.py): пользовательский трехмерный домен для области `z^2 < x^2 + y^2`.
+
+Можно определить и собственный scatter-домен, передав функции проверки принадлежности и ограничивающего bounding box:
+
+```python
+domain = rv.Domain.custom(
+    dimension=3,
+    contains_point=lambda point, margin: (
+        (point.z * point.z) < (point.x * point.x + point.y * point.y)
+    ),
+    aabb=lambda inset_margin: (
+        rv.Vector((-10.0, -10.0, -6.0)),
+        rv.Vector((10.0, 10.0, 6.0)),
+    ),
+)
+```
 
 Для многих синтетических сцен этого достаточно. Если вам нужны физически правдоподобные итоговые положения объектов, используйте симуляцию rigid body после или вместо геометрического scatter-размещения.
 
