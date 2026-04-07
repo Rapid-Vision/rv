@@ -2,7 +2,7 @@ import math
 import random
 import warnings
 from mathutils import Vector
-from typing import Literal
+from typing import Literal, Protocol
 
 import mathutils
 
@@ -24,19 +24,364 @@ from .scatter import _ensure_positive_tuple
 from .types import AABB, Float2, Float3
 
 
+class _DomainShape(Protocol):
+    kind: str
+    dimension: int
+    data: dict
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector: ...
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool: ...
+
+    def aabb(self, inset_margin: float) -> AABB: ...
+
+
+class _RectShape:
+    kind = "rect"
+    dimension = 2
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        cx, cy = self.data["center"]
+        sx, sy = self.data["size"]
+        half_x = sx * 0.5 - inset_margin
+        half_y = sy * 0.5 - inset_margin
+        if half_x <= 0 or half_y <= 0:
+            raise ValueError("domain inset is too large to sample from rect.")
+        z = self.data["z"]
+        return Vector(
+            (rng.uniform(cx - half_x, cx + half_x), rng.uniform(cy - half_y, cy + half_y), z)
+        )
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        cx, cy = self.data["center"]
+        sx, sy = self.data["size"]
+        half_x = sx * 0.5 - margin
+        half_y = sy * 0.5 - margin
+        if half_x <= 0 or half_y <= 0:
+            return False
+        return (
+            abs(point.x - cx) <= half_x + 1e-9
+            and abs(point.y - cy) <= half_y + 1e-9
+            and abs(point.z - self.data["z"]) <= 1e-6
+        )
+
+    def aabb(self, inset_margin: float) -> AABB:
+        cx, cy = self.data["center"]
+        sx, sy = self.data["size"]
+        half_x = max(0.0, sx * 0.5 - inset_margin)
+        half_y = max(0.0, sy * 0.5 - inset_margin)
+        z = self.data["z"]
+        return Vector((cx - half_x, cy - half_y, z)), Vector((cx + half_x, cy + half_y, z))
+
+
+class _EllipseShape:
+    kind = "ellipse"
+    dimension = 2
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        cx, cy = self.data["center"]
+        rx, ry = self.data["radii"]
+        rx_in = rx - inset_margin
+        ry_in = ry - inset_margin
+        if rx_in <= 0 or ry_in <= 0:
+            raise ValueError("domain inset is too large to sample from ellipse.")
+        z = self.data["z"]
+        theta = rng.uniform(0.0, 2.0 * math.pi)
+        rr = math.sqrt(rng.random())
+        return Vector((cx + rr * rx_in * math.cos(theta), cy + rr * ry_in * math.sin(theta), z))
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        cx, cy = self.data["center"]
+        rx, ry = self.data["radii"]
+        rx_in = rx - margin
+        ry_in = ry - margin
+        if rx_in <= 0 or ry_in <= 0:
+            return False
+        dx = (point.x - cx) / rx_in
+        dy = (point.y - cy) / ry_in
+        return dx * dx + dy * dy <= 1.0 + 1e-9 and abs(point.z - self.data["z"]) <= 1e-6
+
+    def aabb(self, inset_margin: float) -> AABB:
+        cx, cy = self.data["center"]
+        rx, ry = self.data["radii"]
+        rx_in = max(0.0, rx - inset_margin)
+        ry_in = max(0.0, ry - inset_margin)
+        z = self.data["z"]
+        return Vector((cx - rx_in, cy - ry_in, z)), Vector((cx + rx_in, cy + ry_in, z))
+
+
+class _PolygonShape:
+    kind = "polygon"
+    dimension = 2
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        z = self.data["z"]
+        for _ in range(512):
+            x, y = _sample_polygon(self.data["triangles"], rng)
+            point = Vector((x, y, z))
+            if self.contains_point(point, inset_margin):
+                return point
+        raise ValueError("domain inset is too large to sample from polygon/hull2d.")
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        if abs(point.z - self.data["z"]) > 1e-6:
+            return False
+        pt = (point.x, point.y)
+        if not _point_in_polygon(pt, self.data["points"]):
+            return False
+        if margin <= 0:
+            return True
+        return _distance_to_polygon_edges(pt, self.data["points"]) >= margin - 1e-9
+
+    def aabb(self, inset_margin: float) -> AABB:
+        del inset_margin
+        xs = [p[0] for p in self.data["points"]]
+        ys = [p[1] for p in self.data["points"]]
+        z = self.data["z"]
+        return Vector((min(xs), min(ys), z)), Vector((max(xs), max(ys), z))
+
+
+class _Hull2DShape(_PolygonShape):
+    kind = "hull2d"
+
+
+class _BoxShape:
+    kind = "box"
+    dimension = 3
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        cx, cy, cz = self.data["center"]
+        sx, sy, sz = self.data["size"]
+        hx = sx * 0.5 - inset_margin
+        hy = sy * 0.5 - inset_margin
+        hz = sz * 0.5 - inset_margin
+        if hx <= 0 or hy <= 0 or hz <= 0:
+            raise ValueError("domain inset is too large to sample from box.")
+        return Vector(
+            (
+                rng.uniform(cx - hx, cx + hx),
+                rng.uniform(cy - hy, cy + hy),
+                rng.uniform(cz - hz, cz + hz),
+            )
+        )
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        cx, cy, cz = self.data["center"]
+        sx, sy, sz = self.data["size"]
+        hx = sx * 0.5 - margin
+        hy = sy * 0.5 - margin
+        hz = sz * 0.5 - margin
+        if hx <= 0 or hy <= 0 or hz <= 0:
+            return False
+        return (
+            abs(point.x - cx) <= hx + 1e-9
+            and abs(point.y - cy) <= hy + 1e-9
+            and abs(point.z - cz) <= hz + 1e-9
+        )
+
+    def aabb(self, inset_margin: float) -> AABB:
+        cx, cy, cz = self.data["center"]
+        sx, sy, sz = self.data["size"]
+        hx = max(0.0, sx * 0.5 - inset_margin)
+        hy = max(0.0, sy * 0.5 - inset_margin)
+        hz = max(0.0, sz * 0.5 - inset_margin)
+        return Vector((cx - hx, cy - hy, cz - hz)), Vector((cx + hx, cy + hy, cz + hz))
+
+
+class _CylinderShape:
+    kind = "cylinder"
+    dimension = 3
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        cx, cy, cz = self.data["center"]
+        radius = self.data["radius"] - inset_margin
+        half_h = self.data["height"] * 0.5 - inset_margin
+        if radius <= 0 or half_h <= 0:
+            raise ValueError("domain inset is too large to sample from cylinder.")
+        axis = self.data["axis"]
+        theta = rng.uniform(0.0, 2.0 * math.pi)
+        rr = math.sqrt(rng.random()) * radius
+        h = rng.uniform(-half_h, half_h)
+        if axis == "X":
+            return Vector((cx + h, cy + rr * math.cos(theta), cz + rr * math.sin(theta)))
+        if axis == "Y":
+            return Vector((cx + rr * math.cos(theta), cy + h, cz + rr * math.sin(theta)))
+        return Vector((cx + rr * math.cos(theta), cy + rr * math.sin(theta), cz + h))
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        cx, cy, cz = self.data["center"]
+        radius = self.data["radius"] - margin
+        half_h = self.data["height"] * 0.5 - margin
+        if radius <= 0 or half_h <= 0:
+            return False
+        axis = self.data["axis"]
+        if axis == "X":
+            radial = math.hypot(point.y - cy, point.z - cz)
+            return radial <= radius + 1e-9 and abs(point.x - cx) <= half_h + 1e-9
+        if axis == "Y":
+            radial = math.hypot(point.x - cx, point.z - cz)
+            return radial <= radius + 1e-9 and abs(point.y - cy) <= half_h + 1e-9
+        radial = math.hypot(point.x - cx, point.y - cy)
+        return radial <= radius + 1e-9 and abs(point.z - cz) <= half_h + 1e-9
+
+    def aabb(self, inset_margin: float) -> AABB:
+        cx, cy, cz = self.data["center"]
+        radius = max(0.0, self.data["radius"] - inset_margin)
+        half_h = max(0.0, self.data["height"] * 0.5 - inset_margin)
+        axis = self.data["axis"]
+        if axis == "X":
+            return Vector((cx - half_h, cy - radius, cz - radius)), Vector(
+                (cx + half_h, cy + radius, cz + radius)
+            )
+        if axis == "Y":
+            return Vector((cx - radius, cy - half_h, cz - radius)), Vector(
+                (cx + radius, cy + half_h, cz + radius)
+            )
+        return Vector((cx - radius, cy - radius, cz - half_h)), Vector(
+            (cx + radius, cy + radius, cz + half_h)
+        )
+
+
+class _EllipsoidShape:
+    kind = "ellipsoid"
+    dimension = 3
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        cx, cy, cz = self.data["center"]
+        rx, ry, rz = self.data["radii"]
+        rx_in = rx - inset_margin
+        ry_in = ry - inset_margin
+        rz_in = rz - inset_margin
+        if rx_in <= 0 or ry_in <= 0 or rz_in <= 0:
+            raise ValueError("domain inset is too large to sample from ellipsoid.")
+        direction = _random_unit_vector(rng)
+        radial = rng.random() ** (1.0 / 3.0)
+        return Vector(
+            (
+                cx + direction.x * rx_in * radial,
+                cy + direction.y * ry_in * radial,
+                cz + direction.z * rz_in * radial,
+            )
+        )
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        cx, cy, cz = self.data["center"]
+        rx, ry, rz = self.data["radii"]
+        rx_in = rx - margin
+        ry_in = ry - margin
+        rz_in = rz - margin
+        if rx_in <= 0 or ry_in <= 0 or rz_in <= 0:
+            return False
+        dx = (point.x - cx) / rx_in
+        dy = (point.y - cy) / ry_in
+        dz = (point.z - cz) / rz_in
+        return dx * dx + dy * dy + dz * dz <= 1.0 + 1e-9
+
+    def aabb(self, inset_margin: float) -> AABB:
+        cx, cy, cz = self.data["center"]
+        rx, ry, rz = self.data["radii"]
+        rx_in = max(0.0, rx - inset_margin)
+        ry_in = max(0.0, ry - inset_margin)
+        rz_in = max(0.0, rz - inset_margin)
+        return Vector((cx - rx_in, cy - ry_in, cz - rz_in)), Vector(
+            (cx + rx_in, cy + ry_in, cz + rz_in)
+        )
+
+
+class _Hull3DShape:
+    kind = "hull3d"
+    dimension = 3
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def sample_point(self, rng: random.Random, inset_margin: float) -> mathutils.Vector:
+        aabb_min = Vector(self.data["aabb_min"])
+        aabb_max = Vector(self.data["aabb_max"])
+        for _ in range(512):
+            point = Vector(
+                (
+                    rng.uniform(aabb_min.x, aabb_max.x),
+                    rng.uniform(aabb_min.y, aabb_max.y),
+                    rng.uniform(aabb_min.z, aabb_max.z),
+                )
+            )
+            if self.contains_point(point, inset_margin):
+                return point
+        return Vector(self.data["centroid"])
+
+    def contains_point(self, point: mathutils.Vector, margin: float) -> bool:
+        for nx, ny, nz, d in self.data["planes"]:
+            if nx * point.x + ny * point.y + nz * point.z + d > -margin + 1e-9:
+                return False
+        return True
+
+    def aabb(self, inset_margin: float) -> AABB:
+        del inset_margin
+        return Vector(self.data["aabb_min"]), Vector(self.data["aabb_max"])
+
+
+_SHAPE_TYPES = {
+    "rect": _RectShape,
+    "ellipse": _EllipseShape,
+    "polygon": _PolygonShape,
+    "hull2d": _Hull2DShape,
+    "box": _BoxShape,
+    "cylinder": _CylinderShape,
+    "ellipsoid": _EllipsoidShape,
+    "hull3d": _Hull3DShape,
+}
+
+
+def _build_shape(kind: str, data: dict, dimension: int) -> _DomainShape:
+    try:
+        shape_cls = _SHAPE_TYPES[kind]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported domain kind: {kind}") from exc
+
+    shape = shape_cls(data)
+    if shape.dimension != dimension:
+        raise ValueError(f"Invalid dimension {dimension} for domain kind: {kind}")
+    return shape
+
+
 class Domain:
     """
     Scatter domain descriptor used by scene scattering methods.
     """
 
-    kind: str
-    data: dict
-    dimension: int
-
     def __init__(self, kind: str, data: dict, dimension: int):
-        self.kind = kind
-        self.data = data
-        self.dimension = dimension
+        self._shape = _build_shape(kind, data, dimension)
+
+    @property
+    def kind(self) -> str:
+        return self._shape.kind
+
+    @property
+    def data(self) -> dict:
+        return self._shape.data
+
+    @property
+    def dimension(self) -> int:
+        return self._shape.dimension
 
     def inset(self, margin: float) -> "Domain":
         margin = float(margin)
@@ -173,181 +518,13 @@ class Domain:
 
     def sample_point(self, rng: random.Random) -> mathutils.Vector:
         inset_margin = self._effective_inset_margin()
-        if self.kind == "rect":
-            cx, cy = self.data["center"]
-            sx, sy = self.data["size"]
-            half_x = sx * 0.5 - inset_margin
-            half_y = sy * 0.5 - inset_margin
-            if half_x <= 0 or half_y <= 0:
-                raise ValueError("domain inset is too large to sample from rect.")
-            z = self.data["z"]
-            return Vector(
-                (rng.uniform(cx - half_x, cx + half_x), rng.uniform(cy - half_y, cy + half_y), z)
-            )
-        if self.kind == "ellipse":
-            cx, cy = self.data["center"]
-            rx, ry = self.data["radii"]
-            rx_in = rx - inset_margin
-            ry_in = ry - inset_margin
-            if rx_in <= 0 or ry_in <= 0:
-                raise ValueError("domain inset is too large to sample from ellipse.")
-            z = self.data["z"]
-            theta = rng.uniform(0.0, 2.0 * math.pi)
-            rr = math.sqrt(rng.random())
-            return Vector((cx + rr * rx_in * math.cos(theta), cy + rr * ry_in * math.sin(theta), z))
-        if self.kind in {"polygon", "hull2d"}:
-            points = self.data["points"]
-            z = self.data["z"]
-            for _ in range(512):
-                x, y = _sample_polygon(self.data["triangles"], rng)
-                p = Vector((x, y, z))
-                if self.contains_point(p, margin=0.0):
-                    return p
-            raise ValueError("domain inset is too large to sample from polygon/hull2d.")
-        if self.kind == "box":
-            cx, cy, cz = self.data["center"]
-            sx, sy, sz = self.data["size"]
-            hx = sx * 0.5 - inset_margin
-            hy = sy * 0.5 - inset_margin
-            hz = sz * 0.5 - inset_margin
-            if hx <= 0 or hy <= 0 or hz <= 0:
-                raise ValueError("domain inset is too large to sample from box.")
-            return Vector(
-                (
-                    rng.uniform(cx - hx, cx + hx),
-                    rng.uniform(cy - hy, cy + hy),
-                    rng.uniform(cz - hz, cz + hz),
-                )
-            )
-        if self.kind == "cylinder":
-            cx, cy, cz = self.data["center"]
-            radius = self.data["radius"] - inset_margin
-            half_h = self.data["height"] * 0.5 - inset_margin
-            if radius <= 0 or half_h <= 0:
-                raise ValueError("domain inset is too large to sample from cylinder.")
-            axis = self.data["axis"]
-            theta = rng.uniform(0.0, 2.0 * math.pi)
-            rr = math.sqrt(rng.random()) * radius
-            h = rng.uniform(-half_h, half_h)
-            if axis == "X":
-                return Vector((cx + h, cy + rr * math.cos(theta), cz + rr * math.sin(theta)))
-            if axis == "Y":
-                return Vector((cx + rr * math.cos(theta), cy + h, cz + rr * math.sin(theta)))
-            return Vector((cx + rr * math.cos(theta), cy + rr * math.sin(theta), cz + h))
-        if self.kind == "ellipsoid":
-            cx, cy, cz = self.data["center"]
-            rx, ry, rz = self.data["radii"]
-            rx_in = rx - inset_margin
-            ry_in = ry - inset_margin
-            rz_in = rz - inset_margin
-            if rx_in <= 0 or ry_in <= 0 or rz_in <= 0:
-                raise ValueError("domain inset is too large to sample from ellipsoid.")
-            direction = _random_unit_vector(rng)
-            radial = rng.random() ** (1.0 / 3.0)
-            return Vector(
-                (
-                    cx + direction.x * rx_in * radial,
-                    cy + direction.y * ry_in * radial,
-                    cz + direction.z * rz_in * radial,
-                )
-            )
-        if self.kind == "hull3d":
-            aabb_min = Vector(self.data["aabb_min"])
-            aabb_max = Vector(self.data["aabb_max"])
-            for _ in range(512):
-                p = Vector(
-                    (
-                        rng.uniform(aabb_min.x, aabb_max.x),
-                        rng.uniform(aabb_min.y, aabb_max.y),
-                        rng.uniform(aabb_min.z, aabb_max.z),
-                    )
-                )
-                if self.contains_point(p, margin=0.0):
-                    return p
-            return Vector(self.data["centroid"])
-        raise ValueError(f"Unsupported domain kind: {self.kind}")
+        return self._shape.sample_point(rng, inset_margin)
 
     def contains_point(self, point: mathutils.Vector, margin: float = 0.0) -> bool:
         if margin < 0:
             raise ValueError("margin must be >= 0.")
         margin = float(margin) + float(self.data.get("inset_margin", 0.0))
-        if self.kind == "rect":
-            cx, cy = self.data["center"]
-            sx, sy = self.data["size"]
-            half_x = sx * 0.5 - margin
-            half_y = sy * 0.5 - margin
-            if half_x <= 0 or half_y <= 0:
-                return False
-            return (
-                abs(point.x - cx) <= half_x + 1e-9
-                and abs(point.y - cy) <= half_y + 1e-9
-                and abs(point.z - self.data["z"]) <= 1e-6
-            )
-        if self.kind == "ellipse":
-            cx, cy = self.data["center"]
-            rx, ry = self.data["radii"]
-            rx_in = rx - margin
-            ry_in = ry - margin
-            if rx_in <= 0 or ry_in <= 0:
-                return False
-            dx = (point.x - cx) / rx_in
-            dy = (point.y - cy) / ry_in
-            return dx * dx + dy * dy <= 1.0 + 1e-9 and abs(point.z - self.data["z"]) <= 1e-6
-        if self.kind in {"polygon", "hull2d"}:
-            if abs(point.z - self.data["z"]) > 1e-6:
-                return False
-            pt = (point.x, point.y)
-            if not _point_in_polygon(pt, self.data["points"]):
-                return False
-            if margin <= 0:
-                return True
-            return _distance_to_polygon_edges(pt, self.data["points"]) >= margin - 1e-9
-        if self.kind == "box":
-            cx, cy, cz = self.data["center"]
-            sx, sy, sz = self.data["size"]
-            hx = sx * 0.5 - margin
-            hy = sy * 0.5 - margin
-            hz = sz * 0.5 - margin
-            if hx <= 0 or hy <= 0 or hz <= 0:
-                return False
-            return (
-                abs(point.x - cx) <= hx + 1e-9
-                and abs(point.y - cy) <= hy + 1e-9
-                and abs(point.z - cz) <= hz + 1e-9
-            )
-        if self.kind == "cylinder":
-            cx, cy, cz = self.data["center"]
-            radius = self.data["radius"] - margin
-            half_h = self.data["height"] * 0.5 - margin
-            if radius <= 0 or half_h <= 0:
-                return False
-            axis = self.data["axis"]
-            if axis == "X":
-                radial = math.hypot(point.y - cy, point.z - cz)
-                return radial <= radius + 1e-9 and abs(point.x - cx) <= half_h + 1e-9
-            if axis == "Y":
-                radial = math.hypot(point.x - cx, point.z - cz)
-                return radial <= radius + 1e-9 and abs(point.y - cy) <= half_h + 1e-9
-            radial = math.hypot(point.x - cx, point.y - cy)
-            return radial <= radius + 1e-9 and abs(point.z - cz) <= half_h + 1e-9
-        if self.kind == "ellipsoid":
-            cx, cy, cz = self.data["center"]
-            rx, ry, rz = self.data["radii"]
-            rx_in = rx - margin
-            ry_in = ry - margin
-            rz_in = rz - margin
-            if rx_in <= 0 or ry_in <= 0 or rz_in <= 0:
-                return False
-            dx = (point.x - cx) / rx_in
-            dy = (point.y - cy) / ry_in
-            dz = (point.z - cz) / rz_in
-            return dx * dx + dy * dy + dz * dz <= 1.0 + 1e-9
-        if self.kind == "hull3d":
-            for nx, ny, nz, d in self.data["planes"]:
-                if nx * point.x + ny * point.y + nz * point.z + d > -margin + 1e-9:
-                    return False
-            return True
-        raise ValueError(f"Unsupported domain kind: {self.kind}")
+        return self._shape.contains_point(point, margin)
 
     def contains_object(
         self,
@@ -387,49 +564,4 @@ class Domain:
 
     def aabb(self) -> AABB:
         inset_margin = self._effective_inset_margin()
-        if self.kind == "rect":
-            cx, cy = self.data["center"]
-            sx, sy = self.data["size"]
-            half_x = max(0.0, sx * 0.5 - inset_margin)
-            half_y = max(0.0, sy * 0.5 - inset_margin)
-            z = self.data["z"]
-            return Vector((cx - half_x, cy - half_y, z)), Vector((cx + half_x, cy + half_y, z))
-        if self.kind == "ellipse":
-            cx, cy = self.data["center"]
-            rx, ry = self.data["radii"]
-            rx_in = max(0.0, rx - inset_margin)
-            ry_in = max(0.0, ry - inset_margin)
-            z = self.data["z"]
-            return Vector((cx - rx_in, cy - ry_in, z)), Vector((cx + rx_in, cy + ry_in, z))
-        if self.kind in {"polygon", "hull2d"}:
-            xs = [p[0] for p in self.data["points"]]
-            ys = [p[1] for p in self.data["points"]]
-            z = self.data["z"]
-            return Vector((min(xs), min(ys), z)), Vector((max(xs), max(ys), z))
-        if self.kind == "box":
-            cx, cy, cz = self.data["center"]
-            sx, sy, sz = self.data["size"]
-            hx = max(0.0, sx * 0.5 - inset_margin)
-            hy = max(0.0, sy * 0.5 - inset_margin)
-            hz = max(0.0, sz * 0.5 - inset_margin)
-            return Vector((cx - hx, cy - hy, cz - hz)), Vector((cx + hx, cy + hy, cz + hz))
-        if self.kind == "cylinder":
-            cx, cy, cz = self.data["center"]
-            r = max(0.0, self.data["radius"] - inset_margin)
-            h = max(0.0, self.data["height"] * 0.5 - inset_margin)
-            axis = self.data["axis"]
-            if axis == "X":
-                return Vector((cx - h, cy - r, cz - r)), Vector((cx + h, cy + r, cz + r))
-            if axis == "Y":
-                return Vector((cx - r, cy - h, cz - r)), Vector((cx + r, cy + h, cz + r))
-            return Vector((cx - r, cy - r, cz - h)), Vector((cx + r, cy + r, cz + h))
-        if self.kind == "ellipsoid":
-            cx, cy, cz = self.data["center"]
-            rx, ry, rz = self.data["radii"]
-            rx_in = max(0.0, rx - inset_margin)
-            ry_in = max(0.0, ry - inset_margin)
-            rz_in = max(0.0, rz - inset_margin)
-            return Vector((cx - rx_in, cy - ry_in, cz - rz_in)), Vector((cx + rx_in, cy + ry_in, cz + rz_in))
-        if self.kind == "hull3d":
-            return Vector(self.data["aabb_min"]), Vector(self.data["aabb_max"])
-        raise ValueError(f"Unsupported domain kind: {self.kind}")
+        return self._shape.aabb(inset_margin)
