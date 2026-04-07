@@ -30,6 +30,15 @@ from .object import (
 from .passes import PASS_MAP, RenderPass
 from .physics import simulate_physics
 from .scene import Scene
+from .shader import (
+    ColorValue,
+    NormalMap,
+    PrincipledBSDF,
+    ShaderMaterial,
+    TextureImage,
+    Value,
+    VectorValue,
+)
 from .state import __getattr__
 from .types import (
     AABB,
@@ -81,6 +90,7 @@ __all__ = [
     "OptionalColor",
     "PointLight",
     "Polygon2D",
+    "PrincipledBSDF",
     "RenderPass",
     "RenderPassSet",
     "Resolution",
@@ -88,11 +98,17 @@ __all__ = [
     "ScatterSource",
     "Scene",
     "SemanticChannelSet",
+    "ShaderMaterial",
     "SkyWorld",
     "SpotLight",
     "SunLight",
     "TagSet",
+    "TextureImage",
+    "ColorValue",
+    "Value",
     "Vector",
+    "VectorValue",
     "World",
+    "NormalMap",
     "simulate_physics",
 ]
