@@ -8,12 +8,12 @@ import rv
 class ExportScatteredBoxesScene(rv.Scene):
     def generate(self, seed):
         self.set_passes([rv.RenderPass.Z])
-        self.get_world().set_params(sun_intensity=0.05, strength=0.4)
+        self.world.set_params(sun_intensity=0.05, strength=0.4)
 
         base_length = 5
         height = 1
 
-        floor = self.create_plane(name="Floor", size=base_length).set_location(
+        floor = self.objects.plane(name="Floor", size=base_length).set_location(
             (0.0, 0.0, 0.0)
         )
         floor.add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
@@ -22,7 +22,7 @@ class ExportScatteredBoxesScene(rv.Scene):
         rng = random.Random(7)
 
         for i in range(30):
-            cube = self.create_cube(name=f"Cube_{i}", size=0.5)
+            cube = self.objects.cube(name=f"Cube_{i}", size=0.5)
             cube.set_location(
                 (
                     rng.uniform(-base_length, base_length) / 2.0 * 0.5,
@@ -44,5 +44,5 @@ class ExportScatteredBoxesScene(rv.Scene):
 
         rv.simulate_physics(frames=120, substeps=10, time_scale=1.0)
 
-        look_at = self.create_empty("LookAt").set_location((1.5, 0.0, 0.9))
-        self.get_camera().set_location((7.0, -8.0, 5.0)).point_at(look_at)
+        look_at = self.objects.empty("LookAt").set_location((1.5, 0.0, 0.9))
+        self.camera.set_location((7.0, -8.0, 5.0)).point_at(look_at)

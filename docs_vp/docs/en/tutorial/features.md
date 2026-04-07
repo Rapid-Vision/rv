@@ -55,7 +55,7 @@ This mode does not open Blender. Instead, it continuously refreshes the preview 
 When geometry is more complex than a few primitives, design it in Blender and import from Python. `rv` loads named objects from a `.blend` file and returns an `ObjectLoader`:
 
 ```python
-rock_loader = self.load_object("./rock.blend", "Rock")
+rock_loader = self.assets.object("./rock.blend", "Rock")
 rock = rock_loader.create_instance()
 ```
 
@@ -220,7 +220,7 @@ rv export examples/6_export/export.py -o examples/6_export/exported.blend --free
 Load the saved objects later:
 
 ```python
-loaders = self.load_objects(str(EXPORTED_BLEND), import_names=CUBE_NAMES)
+loaders = self.assets.objects(str(EXPORTED_BLEND), import_names=CUBE_NAMES)
 ```
 
 Instantiate them as many times as needed:

@@ -61,6 +61,157 @@ if TYPE_CHECKING:
     from .object import Light
     from .world import World
 
+
+class ObjectFactory:
+    def __init__(self, scene: "Scene") -> None:
+        self.scene = scene
+
+    def empty(self, name: str = "Empty") -> "Object":
+        empty = bpy.data.objects.new(name, None)
+        _mark_object_tree(empty)
+        _get_generated_collection().objects.link(empty)
+        return Object(empty, self.scene)
+
+    def sphere(
+        self,
+        name: str = "Sphere",
+        radius: float = 1.0,
+        segments: int = 32,
+        ring_count: int = 16,
+    ) -> "Object":
+        bpy.ops.mesh.primitive_uv_sphere_add(
+            radius=radius, segments=segments, ring_count=ring_count
+        )
+        sphere = bpy.context.active_object
+        _move_object_to_generated_collection(sphere)
+        _mark_object_tree(sphere)
+        sphere.name = name
+        return Object(sphere, self.scene)
+
+    def cube(self, name: str = "Cube", size: float = 2.0) -> "Object":
+        bpy.ops.mesh.primitive_cube_add(size=size)
+        cube = bpy.context.active_object
+        _move_object_to_generated_collection(cube)
+        _mark_object_tree(cube)
+        cube.name = name
+        return Object(cube, self.scene)
+
+    def plane(self, name: str = "Plane", size: float = 2.0) -> "Object":
+        bpy.ops.mesh.primitive_plane_add(size=size)
+        plane = bpy.context.active_object
+        _move_object_to_generated_collection(plane)
+        _mark_object_tree(plane)
+        plane.name = name
+        return Object(plane, self.scene)
+
+
+class LightFactory:
+    def __init__(self, scene: "Scene") -> None:
+        self.scene = scene
+
+    def point(self, name: str = "Point", power: float = 1000.0) -> "PointLight":
+        light_data = bpy.data.lights.new(name=name, type="POINT")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        light = PointLight(light_obj, self.scene)
+        light.set_power(power)
+        return light
+
+    def sun(self, name: str = "Sun", power: float = 1.0) -> "SunLight":
+        light_data = bpy.data.lights.new(name=name, type="SUN")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        light = SunLight(light_obj, self.scene)
+        light.set_power(power)
+        return light
+
+    def area(self, name: str = "Area", power: float = 100.0) -> "AreaLight":
+        light_data = bpy.data.lights.new(name=name, type="AREA")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        light = AreaLight(light_obj, self.scene)
+        light.set_power(power)
+        return light
+
+    def spot(self, name: str = "Spot", power: float = 1000.0) -> "SpotLight":
+        light_data = bpy.data.lights.new(name=name, type="SPOT")
+        light_obj = bpy.data.objects.new(name, light_data)
+        _mark_object_tree(light_obj)
+        _get_generated_collection().objects.link(light_obj)
+        light = SpotLight(light_obj, self.scene)
+        light.set_power(power)
+        return light
+
+
+class MaterialFactory:
+    def __init__(self, scene: "Scene") -> None:
+        self.scene = scene
+
+    def basic(self, name: str = "Material") -> "BasicMaterial":
+        return BasicMaterial(name=name)
+
+    def imported(
+        self, blendfile: str, material_name: str | None = None
+    ) -> "ImportedMaterial":
+        path = str(pathlib.Path(blendfile).expanduser())
+        return ImportedMaterial(filepath=path, material_name=material_name)
+
+
+class AssetFactory:
+    def __init__(self, scene: "Scene") -> None:
+        self.scene = scene
+
+    def object(
+        self, blendfile: str, import_name: str | None = None
+    ) -> "ObjectLoader":
+        path = str(pathlib.Path(blendfile).expanduser())
+        if import_name is None:
+            obj = _load_single_object(path)
+            _mark_object_tree(obj)
+            return ObjectLoader(obj, self.scene)
+        objects = _load_all_objects(path)
+        for obj in objects:
+            _mark_object_tree(obj)
+            if obj.name == import_name:
+                return ObjectLoader(obj, self.scene)
+        object_names = ", ".join(obj.name for obj in objects)
+        raise ValueError(
+            f"Object '{import_name}' was not found in '{path}'. "
+            f"Available objects: [{object_names}]"
+        )
+
+    def objects(
+        self, blendfile: str, import_names: list[str] | None = None
+    ) -> list["ObjectLoader"]:
+        path = str(pathlib.Path(blendfile).expanduser())
+        objects = _load_all_objects(path)
+        res = []
+        if import_names is None:
+            for obj in objects:
+                _mark_object_tree(obj)
+                res.append(ObjectLoader(obj, self.scene))
+        else:
+            import_names_set = set(import_names)
+            found_import_names = set()
+            for obj in objects:
+                _mark_object_tree(obj)
+                if obj.name in import_names_set:
+                    found_import_names.add(obj.name)
+                    res.append(ObjectLoader(obj, self.scene))
+            missing = import_names_set - found_import_names
+            if missing:
+                missing_sorted = ", ".join(sorted(missing))
+                available = ", ".join(obj.name for obj in objects)
+                raise ValueError(
+                    f"Objects [{missing_sorted}] were not found in '{path}'. "
+                    f"Available objects: [{available}]"
+                )
+        return res
+
+
 class _SpatialHash:
     def __init__(self, cell_size: float, dimension: int) -> None:
         self.cell_size = max(cell_size, 1e-6)
@@ -106,9 +257,13 @@ class Scene(ABC, _Serializable):
     camera: "Camera"
     world: "World"
     tags: TagSet
-    objects: set["Object"]
-    materials: set["Material"]
-    lights: set["Light"]
+    objects: ObjectFactory
+    materials: MaterialFactory
+    lights: LightFactory
+    assets: AssetFactory
+    _objects: set["Object"]
+    _materials: set["Material"]
+    _lights: set["Light"]
     semantic_channels: SemanticChannelSet
     semantic_mask_threshold: float = 0.5
     seed: int | None = None
@@ -126,9 +281,9 @@ class Scene(ABC, _Serializable):
         self.passes = set()
         self.output_dir = output_dir
         self.subdir = None
-        self.objects = set()
-        self.materials = set()
-        self.lights = set()
+        self._objects = set()
+        self._materials = set()
+        self._lights = set()
         self.tags = set()
         self.semantic_channels = set()
         self.semantic_mask_threshold = 0.5
@@ -137,6 +292,10 @@ class Scene(ABC, _Serializable):
         self.object_index_counter = 0
         self.material_index_counter = 0
         self.light_index_counter = 0
+        self.objects = ObjectFactory(self)
+        self.materials = MaterialFactory(self)
+        self.lights = LightFactory(self)
+        self.assets = AssetFactory(self)
 
         _get_generated_collection()
         bpy.ops.object.camera_add()
@@ -169,82 +328,6 @@ class Scene(ABC, _Serializable):
         self.semantic_mask_threshold = threshold
         return self
 
-    def create_empty(self, name: str = "Empty") -> "Object":
-        empty = bpy.data.objects.new(name, None)
-        _mark_object_tree(empty)
-        _get_generated_collection().objects.link(empty)
-        return Object(empty, self)
-
-    def create_sphere(self, name: str = "Sphere", radius: float = 1.0, segments: int = 32, ring_count: int = 16) -> "Object":
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, segments=segments, ring_count=ring_count)
-        sphere = bpy.context.active_object
-        _move_object_to_generated_collection(sphere)
-        _mark_object_tree(sphere)
-        sphere.name = name
-        return Object(sphere, self)
-
-    def create_cube(self, name: str = "Cube", size: float = 2.0) -> "Object":
-        bpy.ops.mesh.primitive_cube_add(size=size)
-        cube = bpy.context.active_object
-        _move_object_to_generated_collection(cube)
-        _mark_object_tree(cube)
-        cube.name = name
-        return Object(cube, self)
-
-    def create_plane(self, name: str = "Plane", size: float = 2.0) -> "Object":
-        bpy.ops.mesh.primitive_plane_add(size=size)
-        plane = bpy.context.active_object
-        _move_object_to_generated_collection(plane)
-        _mark_object_tree(plane)
-        plane.name = name
-        return Object(plane, self)
-
-    def create_point_light(self, name: str = "Point", power: float = 1000.0) -> "PointLight":
-        light_data = bpy.data.lights.new(name=name, type="POINT")
-        light_obj = bpy.data.objects.new(name, light_data)
-        _mark_object_tree(light_obj)
-        _get_generated_collection().objects.link(light_obj)
-        light = PointLight(light_obj, self)
-        light.set_power(power)
-        return light
-
-    def create_sun_light(self, name: str = "Sun", power: float = 1.0) -> "SunLight":
-        light_data = bpy.data.lights.new(name=name, type="SUN")
-        light_obj = bpy.data.objects.new(name, light_data)
-        _mark_object_tree(light_obj)
-        _get_generated_collection().objects.link(light_obj)
-        light = SunLight(light_obj, self)
-        light.set_power(power)
-        return light
-
-    def create_area_light(self, name: str = "Area", power: float = 100.0) -> "AreaLight":
-        light_data = bpy.data.lights.new(name=name, type="AREA")
-        light_obj = bpy.data.objects.new(name, light_data)
-        _mark_object_tree(light_obj)
-        _get_generated_collection().objects.link(light_obj)
-        light = AreaLight(light_obj, self)
-        light.set_power(power)
-        return light
-
-    def create_spot_light(self, name: str = "Spot", power: float = 1000.0) -> "SpotLight":
-        light_data = bpy.data.lights.new(name=name, type="SPOT")
-        light_obj = bpy.data.objects.new(name, light_data)
-        _mark_object_tree(light_obj)
-        _get_generated_collection().objects.link(light_obj)
-        light = SpotLight(light_obj, self)
-        light.set_power(power)
-        return light
-
-    def get_camera(self) -> "Camera":
-        return self.camera
-
-    def set_world(self, world: "World") -> "Scene":
-        self.world = world
-        return self
-
-    def get_world(self) -> "World":
-        return self.world
-
     def set_tags(self, *tags) -> "Scene":
         self.tags = _combine_arglist_set(tags)
         return self
@@ -252,62 +335,6 @@ class Scene(ABC, _Serializable):
     def add_tags(self, *tags) -> "Scene":
         self.tags |= _combine_arglist_set(tags)
         return self
-
-    def load_object(
-        self, blendfile: str, import_name: str | None = None
-    ) -> "ObjectLoader":
-        path = str(pathlib.Path(blendfile).expanduser())
-        if import_name is None:
-            obj = _load_single_object(path)
-            _mark_object_tree(obj)
-            return ObjectLoader(obj, self)
-        objects = _load_all_objects(path)
-        for obj in objects:
-            _mark_object_tree(obj)
-            if obj.name == import_name:
-                return ObjectLoader(obj, self)
-        object_names = ", ".join(obj.name for obj in objects)
-        raise ValueError(
-            f"Object '{import_name}' was not found in '{path}'. "
-            f"Available objects: [{object_names}]"
-        )
-
-    def load_objects(
-        self, blendfile: str, import_names: list[str] | None = None
-    ) -> list["ObjectLoader"]:
-        path = str(pathlib.Path(blendfile).expanduser())
-        objects = _load_all_objects(path)
-        res = []
-        if import_names is None:
-            for obj in objects:
-                _mark_object_tree(obj)
-                res.append(ObjectLoader(obj, self))
-        else:
-            import_names_set = set(import_names)
-            found_import_names = set()
-            for obj in objects:
-                _mark_object_tree(obj)
-                if obj.name in import_names_set:
-                    found_import_names.add(obj.name)
-                    res.append(ObjectLoader(obj, self))
-            missing = import_names_set - found_import_names
-            if missing:
-                missing_sorted = ", ".join(sorted(missing))
-                available = ", ".join(obj.name for obj in objects)
-                raise ValueError(
-                    f"Objects [{missing_sorted}] were not found in '{path}'. "
-                    f"Available objects: [{available}]"
-                )
-        return res
-
-    def create_material(self, name: str = "Material") -> "BasicMaterial":
-        return BasicMaterial(name=name)
-
-    def import_material(
-        self, blendfile: str, material_name: str | None = None
-    ) -> "ImportedMaterial":
-        path = str(pathlib.Path(blendfile).expanduser())
-        return ImportedMaterial(filepath=path, material_name=material_name)
 
     def inspect_object(self, loader_or_obj: Union["ObjectLoader", "Object"], applied_scale: bool = True) -> ObjectStats:
         temp_obj = None
@@ -462,17 +489,17 @@ class Scene(ABC, _Serializable):
 
     def _register_object(self, obj: "Object") -> int:
         self.object_index_counter += 1
-        self.objects.add(obj)
+        self._objects.add(obj)
         return self.object_index_counter
 
     def _register_material(self, material: "Material") -> int:
         self.material_index_counter += 1
-        self.materials.add(material)
+        self._materials.add(material)
         return self.material_index_counter
 
     def _register_light(self, light: "Light") -> int:
         self.light_index_counter += 1
-        self.lights.add(light)
+        self._lights.add(light)
         return self.light_index_counter
 
     def _get_meta(self) -> dict:
@@ -487,9 +514,9 @@ class Scene(ABC, _Serializable):
                 "tags": list(self.tags),
                 "semantic_channels": sorted(self.semantic_channels),
                 "semantic_mask_threshold": self.semantic_mask_threshold,
-                "objects": list(obj._get_meta() for obj in self.objects),
-                "materials": list(material._get_meta() for material in self.materials),
-                "lights": list(light._get_meta() for light in self.lights),
+                "objects": list(obj._get_meta() for obj in self._objects),
+                "materials": list(material._get_meta() for material in self._materials),
+                "lights": list(light._get_meta() for light in self._lights),
             }
         )
         return res

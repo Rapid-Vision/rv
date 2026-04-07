@@ -118,20 +118,20 @@ class ApiSmokeTest(unittest.TestCase):
         self.scene.set_tags("scene")
         self.scene.add_tags("smoke")
 
-        empty = self.scene.create_empty("Target").set_location((0.0, 0.0, 1.0))
-        sphere = self.scene.create_sphere("Sphere", radius=0.5).set_location(
+        empty = self.scene.objects.empty("Target").set_location((0.0, 0.0, 1.0))
+        sphere = self.scene.objects.sphere("Sphere", radius=0.5).set_location(
             (-1.0, 0.0, 1.0)
         )
-        cube = self.scene.create_cube("Cube", size=1.0).set_location((0.0, 0.0, 1.0))
-        plane = self.scene.create_plane("Plane", size=8.0).set_location((0.0, 0.0, 0.0))
+        cube = self.scene.objects.cube("Cube", size=1.0).set_location((0.0, 0.0, 1.0))
+        plane = self.scene.objects.plane("Plane", size=8.0).set_location((0.0, 0.0, 0.0))
 
         basic_world = rv.BasicWorld()
         self.assertIs(
             basic_world.set_params(color=(0.1, 0.2, 0.3, 1.0), strength=0.5),
             basic_world,
         )
-        self.scene.set_world(basic_world)
-        self.assertIs(self.scene.get_world(), basic_world)
+        self.scene.world = basic_world
+        self.assertIs(self.scene.world, basic_world)
         basic_world._internal_post_gen()
 
         sky_world = rv.SkyWorld()
@@ -148,7 +148,7 @@ class ApiSmokeTest(unittest.TestCase):
             ),
             sky_world,
         )
-        self.scene.set_world(sky_world)
+        self.scene.world = sky_world
         sky_world._internal_post_gen()
 
         hdri_world = rv.HDRIWorld(str(HDRI_IMAGE))
@@ -158,15 +158,15 @@ class ApiSmokeTest(unittest.TestCase):
             ),
             hdri_world,
         )
-        self.scene.set_world(hdri_world)
+        self.scene.world = hdri_world
         hdri_world._internal_post_gen()
 
         imported_world = rv.ImportedWorld(str(ROCK_BLEND), world_name="World")
         self.assertIs(imported_world.set_params(smoke_world=True), imported_world)
-        self.scene.set_world(imported_world)
+        self.scene.world = imported_world
         imported_world._internal_post_gen()
 
-        material = self.scene.create_material("SmokeMaterial")
+        material = self.scene.materials.basic("SmokeMaterial")
         material.set_params(
             base_color=(0.8, 0.2, 0.1, 1.0),
             roughness=0.4,
@@ -179,7 +179,7 @@ class ApiSmokeTest(unittest.TestCase):
             ior=1.45,
         ).set_property("tag", "basic")
 
-        imported_material = self.scene.import_material(
+        imported_material = self.scene.materials.imported(
             str(RUSTY_BLEND), material_name="RustyMetal"
         )
         imported_material.set_params(smoke_material=True)
@@ -245,10 +245,10 @@ class ApiSmokeTest(unittest.TestCase):
         plane.remove_rigidbody(keep_transform=True)
         cube.hide("wireframe")
 
-        camera = self.scene.get_camera()
+        camera = self.scene.camera
         camera.set_location((3.0, -3.0, 2.0)).point_at(empty).set_fov(60.0)
 
-        point = self.scene.create_point_light("Point", power=50.0)
+        point = self.scene.lights.point("Point", power=50.0)
         self.assertIs(point.light_data, point.obj.data)
         point.set_color((1.0, 0.9, 0.8))
         point.set_power(25.0)
@@ -258,22 +258,22 @@ class ApiSmokeTest(unittest.TestCase):
         point.set_params(diffuse_factor=0.7, smoke_flag=True)
         point.set_radius(0.2)
 
-        sun = self.scene.create_sun_light("Sun", power=1.0)
+        sun = self.scene.lights.sun("Sun", power=1.0)
         sun.set_angle(0.2)
         sun.set_softness(0.05)
 
-        area = self.scene.create_area_light("Area", power=20.0)
+        area = self.scene.lights.area("Area", power=20.0)
         area.set_shape("RECTANGLE")
         area.set_size(1.5)
         area.set_size_xy(1.5, 0.75)
 
-        spot = self.scene.create_spot_light("Spot", power=35.0)
+        spot = self.scene.lights.spot("Spot", power=35.0)
         spot.set_spot_size(0.6)
         spot.set_blend(0.3)
         spot.set_show_cone(True)
 
-        rock_loader = self.scene.load_object(str(ROCK_BLEND), import_name="Rock")
-        exported_loaders = self.scene.load_objects(
+        rock_loader = self.scene.assets.object(str(ROCK_BLEND), import_name="Rock")
+        exported_loaders = self.scene.assets.objects(
             str(EXPORTED_BLEND), import_names=["Cube_0", "Cube_1"]
         )
         cube_loader = cube.as_loader()

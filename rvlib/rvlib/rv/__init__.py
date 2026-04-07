@@ -29,7 +29,7 @@ from .object import (
 )
 from .passes import PASS_MAP, RenderPass
 from .physics import simulate_physics
-from .scene import Scene
+from .scene import AssetFactory, LightFactory, MaterialFactory, ObjectFactory, Scene
 from .shader import (
     ColorValue,
     NormalMap,
@@ -65,6 +65,7 @@ from .world import BasicWorld, HDRIWorld, ImportedWorld, SkyWorld, World
 __all__ = [
     "AABB",
     "AreaLight",
+    "AssetFactory",
     "BasicMaterial",
     "BasicWorld",
     "BVHTree",
@@ -82,8 +83,11 @@ __all__ = [
     "ImportedWorld",
     "JSONSerializable",
     "Light",
+    "LightFactory",
     "Material",
+    "MaterialFactory",
     "Object",
+    "ObjectFactory",
     "ObjectLoader",
     "ObjectLoaderSource",
     "ObjectStats",

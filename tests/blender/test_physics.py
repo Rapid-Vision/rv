@@ -15,7 +15,7 @@ class PhysicsApiTest(unittest.TestCase):
         self.scene = _TestScene()
 
     def test_add_rigidbody_applies_explicit_margin(self):
-        cube = self.scene.create_cube(size=2.0)
+        cube = self.scene.objects.cube(size=2.0)
         cube.add_rigidbody(use_margin=False, collision_margin=0.125)
 
         rb = cube.obj.rigid_body
@@ -26,7 +26,7 @@ class PhysicsApiTest(unittest.TestCase):
             self.assertAlmostEqual(rb.collision_margin, 0.125, places=6)
 
     def test_add_rigidbody_uses_auto_margin_by_default(self):
-        cube = self.scene.create_cube(size=2.0)
+        cube = self.scene.objects.cube(size=2.0)
         cube.add_rigidbody(collision_margin=None)
 
         rb = cube.obj.rigid_body
@@ -35,7 +35,7 @@ class PhysicsApiTest(unittest.TestCase):
             self.assertAlmostEqual(rb.collision_margin, 0.02, places=6)
 
     def test_add_rigidbody_applies_deactivation_controls_when_supported(self):
-        cube = self.scene.create_cube(size=1.0)
+        cube = self.scene.objects.cube(size=1.0)
         cube.add_rigidbody(
             use_deactivation=True,
             deactivate_linear_velocity=0.15,
@@ -55,7 +55,7 @@ class PhysicsApiTest(unittest.TestCase):
             self.assertTrue(rb.use_start_deactivated)
 
     def test_simulate_physics_applies_world_settings_when_supported(self):
-        cube = self.scene.create_cube(size=1.0).set_location((0.0, 0.0, 1.0))
+        cube = self.scene.objects.cube(size=1.0).set_location((0.0, 0.0, 1.0))
         cube.add_rigidbody()
         rbw = rv.bpy.context.scene.rigidbody_world
         kwargs = {
@@ -87,12 +87,12 @@ class PhysicsApiTest(unittest.TestCase):
             )
 
     def test_add_rigidbody_rejects_negative_margin(self):
-        cube = self.scene.create_cube(size=1.0)
+        cube = self.scene.objects.cube(size=1.0)
         with self.assertRaisesRegex(ValueError, "collision_margin must be >= 0."):
             cube.add_rigidbody(collision_margin=-0.01)
 
     def test_add_rigidbody_rejects_negative_deactivation_thresholds(self):
-        cube = self.scene.create_cube(size=1.0)
+        cube = self.scene.objects.cube(size=1.0)
         with self.assertRaisesRegex(
             ValueError, "deactivate_linear_velocity must be >= 0."
         ):

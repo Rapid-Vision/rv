@@ -2,17 +2,17 @@ import rv
 
 
 def box(scene, base_length, height):
-    box_center = scene.create_empty("BoxCenter").set_location((0, 0, height / 2.0))
+    box_center = scene.objects.empty("BoxCenter").set_location((0, 0, height / 2.0))
 
     wall = (
-        scene.create_plane(name="wall_1", size=1.0)
+        scene.objects.plane(name="wall_1", size=1.0)
         .set_scale((base_length, 1.0, height))
         .set_location((0.0, base_length / 2.0, height / 2.0))
         .point_at(box_center)
         .add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
     )
     wall = (
-        scene.create_plane(name="wall_2", size=1.0)
+        scene.objects.plane(name="wall_2", size=1.0)
         .set_scale((base_length, 1.0, height))
         .set_location((0.0, -base_length / 2.0, height / 2.0))
         .point_at(box_center)
@@ -20,7 +20,7 @@ def box(scene, base_length, height):
     )
 
     wall = (
-        scene.create_plane(name="wall_3", size=1.0)
+        scene.objects.plane(name="wall_3", size=1.0)
         .set_scale((1.0, base_length, height))
         .set_location((base_length / 2.0, 0.0, height / 2.0))
         .point_at(box_center, 90)
@@ -28,7 +28,7 @@ def box(scene, base_length, height):
     )
 
     wall = (
-        scene.create_plane(name="wall_4", size=1.0)
+        scene.objects.plane(name="wall_4", size=1.0)
         .set_scale((1.0, base_length, height))
         .set_location((-base_length / 2.0, 0.0, height / 2.0))
         .point_at(box_center, 90)
@@ -39,20 +39,20 @@ def box(scene, base_length, height):
 class PhysicsScatterScene(rv.Scene):
     def generate(self, seed):
         self.set_passes([rv.RenderPass.Z])
-        self.get_world().set_params(sun_intensity=0.05, strength=0.4)
+        self.world.set_params(sun_intensity=0.05, strength=0.4)
 
         base_length = 5
         height = 1
 
         box(self, base_length, height)
 
-        floor = self.create_plane(name="Floor", size=base_length).set_location(
+        floor = self.objects.plane(name="Floor", size=base_length).set_location(
             (0.0, 0.0, 0.0)
         )
         floor.add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
         floor.set_tags("box")
 
-        cube_source = self.create_cube(name="ScatterSourceCube", size=0.5).set_location(
+        cube_source = self.objects.cube(name="ScatterSourceCube", size=0.5).set_location(
             (0.0, 0.0, -1000.0)
         )
         spawn_domain = rv.Domain.box(
@@ -95,5 +95,5 @@ class PhysicsScatterScene(rv.Scene):
             time_scale=1.0,
         )
 
-        look_at = self.create_empty("LookAt").set_location((0.0, 0.0, 0.9))
-        self.get_camera().set_location((5.0, -5.0, 4.0)).point_at(look_at)
+        look_at = self.objects.empty("LookAt").set_location((0.0, 0.0, 0.9))
+        self.camera.set_location((5.0, -5.0, 4.0)).point_at(look_at)

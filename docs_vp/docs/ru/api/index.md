@@ -36,18 +36,56 @@ Runner-only helpers remain importable as underscored module attributes for the
 ##### `class Domain` {#class-domain}
 Scatter domain descriptor used by scene scattering methods.
 
-::: details Attributes
-
-| Name | Type | Description |
-| - | - | - |
-| `kind` | `str` |  |
-| `data` | `dict` |  |
-| `dimension` | `int` |  |
-
-:::
-
 ::: details Methods
 
+---
+###### `kind`
+
+**Signature**
+
+```python
+@property
+def kind(self) -> str
+```
+
+**Arguments**
+
+
+**Returns**: `str`
+
+---
+---
+###### `data`
+
+**Signature**
+
+```python
+@property
+def data(self) -> dict
+```
+
+**Arguments**
+
+
+**Returns**: `dict`
+
+---
+---
+###### `dimension`
+
+**Signature**
+
+```python
+@property
+def dimension(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
 ---
 ###### `inset`
 
@@ -418,6 +456,8 @@ def set_params(self, base_color: OptionalColor=None, roughness: float | None=Non
 - **`alpha`** : `float | None`
 - **`transmission`** : `float | None`
 - **`ior`** : `float | None`
+
+**Returns**: `Self`
 
 ---
 ---
@@ -1526,6 +1566,238 @@ def simulate_physics(frames: int=20, substeps: int=10, time_scale: float=1.0, so
 
 #### Classes
 
+##### `class ObjectFactory` {#class-objectfactory}
+::: details Methods
+
+---
+###### `empty`
+
+**Signature**
+
+```python
+def empty(self, name: str='Empty') -> 'Object'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+
+**Returns**: `'Object'`
+
+---
+---
+###### `sphere`
+
+**Signature**
+
+```python
+def sphere(self, name: str='Sphere', radius: float=1.0, segments: int=32, ring_count: int=16) -> 'Object'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`radius`** : `float`
+- **`segments`** : `int`
+- **`ring_count`** : `int`
+
+**Returns**: `'Object'`
+
+---
+---
+###### `cube`
+
+**Signature**
+
+```python
+def cube(self, name: str='Cube', size: float=2.0) -> 'Object'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`size`** : `float`
+
+**Returns**: `'Object'`
+
+---
+---
+###### `plane`
+
+**Signature**
+
+```python
+def plane(self, name: str='Plane', size: float=2.0) -> 'Object'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`size`** : `float`
+
+**Returns**: `'Object'`
+
+---
+:::
+
+---
+
+##### `class LightFactory` {#class-lightfactory}
+::: details Methods
+
+---
+###### `point`
+
+**Signature**
+
+```python
+def point(self, name: str='Point', power: float=1000.0) -> 'PointLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `Self`
+
+---
+---
+###### `sun`
+
+**Signature**
+
+```python
+def sun(self, name: str='Sun', power: float=1.0) -> 'SunLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `Self`
+
+---
+---
+###### `area`
+
+**Signature**
+
+```python
+def area(self, name: str='Area', power: float=100.0) -> 'AreaLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `Self`
+
+---
+---
+###### `spot`
+
+**Signature**
+
+```python
+def spot(self, name: str='Spot', power: float=1000.0) -> 'SpotLight'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+- **`power`** : `float`
+
+**Returns**: `Self`
+
+---
+:::
+
+---
+
+##### `class MaterialFactory` {#class-materialfactory}
+::: details Methods
+
+---
+###### `basic`
+
+**Signature**
+
+```python
+def basic(self, name: str='Material') -> 'BasicMaterial'
+```
+
+**Arguments**
+
+- **`name`** : `str`
+
+**Returns**: `'BasicMaterial'`
+
+---
+---
+###### `imported`
+
+**Signature**
+
+```python
+def imported(self, blendfile: str, material_name: str | None=None) -> 'ImportedMaterial'
+```
+
+**Arguments**
+
+- **`blendfile`** : `str`
+- **`material_name`** : `str | None`
+
+**Returns**: `'ImportedMaterial'`
+
+---
+:::
+
+---
+
+##### `class AssetFactory` {#class-assetfactory}
+::: details Methods
+
+---
+###### `object`
+
+**Signature**
+
+```python
+def object(self, blendfile: str, import_name: str | None=None) -> 'ObjectLoader'
+```
+
+**Arguments**
+
+- **`blendfile`** : `str`
+- **`import_name`** : `str | None`
+
+**Returns**: `'ObjectLoader'`
+
+---
+---
+###### `objects`
+
+**Signature**
+
+```python
+def objects(self, blendfile: str, import_names: list[str] | None=None) -> list['ObjectLoader']
+```
+
+**Arguments**
+
+- **`blendfile`** : `str`
+- **`import_names`** : `list[str] | None`
+
+**Returns**: `Self`
+
+---
+:::
+
+---
+
 ##### `class Scene` {#class-scene}
 Inherits from: `ABC`, `_Serializable`
 
@@ -1541,9 +1813,10 @@ Inherits from: `ABC`, `_Serializable`
 | `camera` | `'Camera'` |  |
 | `world` | `'World'` |  |
 | `tags` | `TagSet` |  |
-| `objects` | `set['Object']` |  |
-| `materials` | `set['Material']` |  |
-| `lights` | `set['Light']` |  |
+| `objects` | `ObjectFactory` |  |
+| `materials` | `MaterialFactory` |  |
+| `lights` | `LightFactory` |  |
+| `assets` | `AssetFactory` |  |
 | `semantic_channels` | `SemanticChannelSet` |  |
 | `semantic_mask_threshold` | `float` |  |
 | `seed` | `int \| None` |  |
@@ -1638,189 +1911,6 @@ def set_semantic_mask_threshold(self, threshold: float) -> 'Scene'
 
 ---
 ---
-###### `create_empty`
-
-**Signature**
-
-```python
-def create_empty(self, name: str='Empty') -> 'Object'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-
-**Returns**: `'Object'`
-
----
----
-###### `create_sphere`
-
-**Signature**
-
-```python
-def create_sphere(self, name: str='Sphere', radius: float=1.0, segments: int=32, ring_count: int=16) -> 'Object'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-- **`radius`** : `float`
-- **`segments`** : `int`
-- **`ring_count`** : `int`
-
-**Returns**: `'Object'`
-
----
----
-###### `create_cube`
-
-**Signature**
-
-```python
-def create_cube(self, name: str='Cube', size: float=2.0) -> 'Object'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-- **`size`** : `float`
-
-**Returns**: `'Object'`
-
----
----
-###### `create_plane`
-
-**Signature**
-
-```python
-def create_plane(self, name: str='Plane', size: float=2.0) -> 'Object'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-- **`size`** : `float`
-
-**Returns**: `'Object'`
-
----
----
-###### `create_point_light`
-
-**Signature**
-
-```python
-def create_point_light(self, name: str='Point', power: float=1000.0) -> 'PointLight'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-- **`power`** : `float`
-
-**Returns**: `Self`
-
----
----
-###### `create_sun_light`
-
-**Signature**
-
-```python
-def create_sun_light(self, name: str='Sun', power: float=1.0) -> 'SunLight'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-- **`power`** : `float`
-
-**Returns**: `Self`
-
----
----
-###### `create_area_light`
-
-**Signature**
-
-```python
-def create_area_light(self, name: str='Area', power: float=100.0) -> 'AreaLight'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-- **`power`** : `float`
-
-**Returns**: `Self`
-
----
----
-###### `create_spot_light`
-
-**Signature**
-
-```python
-def create_spot_light(self, name: str='Spot', power: float=1000.0) -> 'SpotLight'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-- **`power`** : `float`
-
-**Returns**: `Self`
-
----
----
-###### `get_camera`
-
-**Signature**
-
-```python
-def get_camera(self) -> 'Camera'
-```
-
-**Arguments**
-
-
-**Returns**: `'Camera'`
-
----
----
-###### `set_world`
-
-**Signature**
-
-```python
-def set_world(self, world: 'World') -> 'Scene'
-```
-
-**Arguments**
-
-- **`world`** : `'World'`
-
-**Returns**: `Self`
-
----
----
-###### `get_world`
-
-**Signature**
-
-```python
-def get_world(self) -> 'World'
-```
-
-**Arguments**
-
-
-**Returns**: `'World'`
-
----
----
 ###### `set_tags`
 
 **Signature**
@@ -1850,73 +1940,6 @@ def add_tags(self, *tags) -> 'Scene'
 - **`*tags`**
 
 **Returns**: `Self`
-
----
----
-###### `load_object`
-
-**Signature**
-
-```python
-def load_object(self, blendfile: str, import_name: str | None=None) -> 'ObjectLoader'
-```
-
-**Arguments**
-
-- **`blendfile`** : `str`
-- **`import_name`** : `str | None`
-
-**Returns**: `'ObjectLoader'`
-
----
----
-###### `load_objects`
-
-**Signature**
-
-```python
-def load_objects(self, blendfile: str, import_names: list[str] | None=None) -> list['ObjectLoader']
-```
-
-**Arguments**
-
-- **`blendfile`** : `str`
-- **`import_names`** : `list[str] | None`
-
-**Returns**: `Self`
-
----
----
-###### `create_material`
-
-**Signature**
-
-```python
-def create_material(self, name: str='Material') -> 'BasicMaterial'
-```
-
-**Arguments**
-
-- **`name`** : `str`
-
-**Returns**: `'BasicMaterial'`
-
----
----
-###### `import_material`
-
-**Signature**
-
-```python
-def import_material(self, blendfile: str, material_name: str | None=None) -> 'ImportedMaterial'
-```
-
-**Arguments**
-
-- **`blendfile`** : `str`
-- **`material_name`** : `str | None`
-
-**Returns**: `'ImportedMaterial'`
 
 ---
 ---
@@ -1960,6 +1983,533 @@ def scatter(self, source: ScatterSource, count: int, domain: 'Domain', *, method
 - **`unique_data`** : `bool`
 - **`on_create`**
 - **`max_attempts_per_object`** : `int`
+
+**Returns**: `Self`
+
+---
+:::
+
+---
+
+## Module: `shader`
+
+### File: `shader.py`
+
+#### Classes
+
+##### `class Expr` {#class-expr}
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `value_type` | `str` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+---
+###### `to_meta`
+
+**Signature**
+
+```python
+def to_meta(self) -> dict[str, Any]
+```
+
+**Arguments**
+
+
+**Returns**: `Self`
+
+---
+---
+###### `x_depth`
+
+**Signature**
+
+```python
+@cached_property
+def x_depth(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class FloatExpr` {#class-floatexpr}
+Inherits from: `Expr`
+
+---
+
+##### `class ColorExpr` {#class-colorexpr}
+Inherits from: `Expr`
+
+---
+
+##### `class VectorExpr` {#class-vectorexpr}
+Inherits from: `Expr`
+
+---
+
+##### `class NormalExpr` {#class-normalexpr}
+Inherits from: `VectorExpr`
+
+---
+
+##### `class ShaderExpr` {#class-shaderexpr}
+Inherits from: `Expr`
+
+---
+
+##### `class Value` {#class-value}
+Inherits from: `FloatExpr`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `value` | `float` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class ColorValue` {#class-colorvalue}
+Inherits from: `ColorExpr`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `value` | `tuple[float, ...]` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class VectorValue` {#class-vectorvalue}
+Inherits from: `VectorExpr`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `value` | `tuple[float, ...]` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class BinaryMath` {#class-binarymath}
+Inherits from: `Expr`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `operation` | `str` |  |
+| `left` | `Expr` |  |
+| `right` | `Expr` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `value_type`
+
+**Signature**
+
+```python
+@property
+def value_type(self) -> str
+```
+
+**Arguments**
+
+
+**Returns**: `str`
+
+---
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class TextureImage` {#class-textureimage}
+Inherits from: `ColorExpr`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `path` | `str` |  |
+| `colorspace` | `str` |  |
+| `interpolation` | `str` |  |
+| `projection` | `str` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class NormalMap` {#class-normalmap}
+Inherits from: `NormalExpr`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `color` | `ShaderValueLike` |  |
+| `strength` | `ShaderValueLike` |  |
+| `space` | `str` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class PrincipledBSDF` {#class-principledbsdf}
+Inherits from: `ShaderExpr`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `base_color` | `ShaderValueLike \| None` |  |
+| `metallic` | `ShaderValueLike \| None` |  |
+| `roughness` | `ShaderValueLike \| None` |  |
+| `specular` | `ShaderValueLike \| None` |  |
+| `normal` | `ShaderValueLike \| None` |  |
+| `emission_color` | `ShaderValueLike \| None` |  |
+| `emission_strength` | `ShaderValueLike \| None` |  |
+| `alpha` | `ShaderValueLike \| None` |  |
+| `transmission` | `ShaderValueLike \| None` |  |
+| `ior` | `ShaderValueLike \| None` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `compile`
+
+**Signature**
+
+```python
+def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
+```
+
+**Arguments**
+
+- **`compiler`** : `'_ShaderGraphCompiler'`
+
+**Returns**: `bpy.types.NodeSocket`
+
+---
+---
+###### `node_height`
+
+**Signature**
+
+```python
+def node_height(self) -> int
+```
+
+**Arguments**
+
+
+**Returns**: `int`
+
+---
+:::
+
+---
+
+##### `class ShaderMaterial` {#class-shadermaterial}
+Inherits from: `Material`
+
+::: details Attributes
+
+| Name | Type | Description |
+| - | - | - |
+| `shader` | `ShaderExpr` |  |
+| `properties` | `dict[str, Any]` |  |
+
+:::
+
+::: details Methods
+
+---
+###### `set_params`
+
+**Signature**
+
+```python
+def set_params(self, shader: ShaderExpr | None=None)
+```
+
+**Arguments**
+
+- **`shader`** : `ShaderExpr | None`
+
+**Returns**: `Self`
+
+---
+---
+###### `set_property`
+
+**Signature**
+
+```python
+def set_property(self, key: str, value: Any)
+```
+
+**Arguments**
+
+- **`key`** : `str`
+- **`value`** : `Any`
 
 **Returns**: `Self`
 

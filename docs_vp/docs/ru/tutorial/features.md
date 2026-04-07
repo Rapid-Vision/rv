@@ -54,7 +54,7 @@ rv preview examples/1_primitives/scene.py --preview-files --no-window
 Когда геометрия становится сложнее нескольких примитивов, ее удобнее собрать в Blender и импортировать из Python. `rv` загружает именованные объекты из `.blend` файла и возвращает `ObjectLoader`:
 
 ```python
-rock_loader = self.load_object("./rock.blend", "Rock")
+rock_loader = self.assets.object("./rock.blend", "Rock")
 rock = rock_loader.create_instance()
 ```
 
@@ -219,7 +219,7 @@ rv export examples/6_export/export.py -o examples/6_export/exported.blend --free
 Позже можно загрузить сохраненные объекты:
 
 ```python
-loaders = self.load_objects(str(EXPORTED_BLEND), import_names=CUBE_NAMES)
+loaders = self.assets.objects(str(EXPORTED_BLEND), import_names=CUBE_NAMES)
 ```
 
 И создавать из них столько инстансов, сколько нужно:

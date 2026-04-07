@@ -21,7 +21,7 @@ class ScatterTest(unittest.TestCase):
         self.assertFalse(domain.contains_point(rv.mathutils.Vector((10.0, 0.0, 1.0))))
 
     def test_bounds_scatter_non_overlap_2d(self):
-        prototype = self.scene.create_cube(size=1.0)
+        prototype = self.scene.objects.cube(size=1.0)
         loader = prototype.as_loader()
         domain = rv.Domain.rect(center=(0.0, 0.0), size=(15.0, 15.0), z=0.5)
         placed = self.scene.scatter(

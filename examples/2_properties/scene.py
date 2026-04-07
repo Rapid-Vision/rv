@@ -8,8 +8,8 @@ dark_base = (0.12, 0.08, 0.07)
 class BasicScene(rv.Scene):
     def generate(self, seed):
         rng = random.Random(seed)
-        self.get_world().set_params(sun_intensity=0.1)
-        rock_loader = self.load_object("./rock.blend", "Rock")
+        self.world.set_params(sun_intensity=0.1)
+        rock_loader = self.assets.object("./rock.blend", "Rock")
         rock = rock_loader.create_instance()
         rock.set_modifier_input("seed1", rng.uniform(0, 1000))
         rock.set_property(
@@ -22,7 +22,7 @@ class BasicScene(rv.Scene):
         )
         rock.set_property("color_base", rng.choice([light_base, dark_base]))
 
-        plane = self.create_plane(size=100).set_location([0, 0, 0])
-        empty = self.create_empty().set_location((0, 0, 0.1))
+        plane = self.objects.plane(size=100).set_location([0, 0, 0])
+        empty = self.objects.empty().set_location((0, 0, 0.1))
 
-        cam = self.get_camera().set_location((1, 0, 0.2)).point_at(empty)
+        cam = self.camera.set_location((1, 0, 0.2)).point_at(empty)
