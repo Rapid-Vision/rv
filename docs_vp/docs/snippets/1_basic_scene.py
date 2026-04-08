@@ -1,7 +1,7 @@
 import rv
 
 class BasicScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.world.set_params(sun_intensity=0.03)
         cube = (
             self.objects.cube()

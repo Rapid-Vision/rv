@@ -19,7 +19,7 @@ class ExportScatteredBoxesScene(rv.Scene):
         floor.add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
         floor.set_tags("floor")
 
-        rng = random.Random(7)
+        rng = random.Random(seed)
 
         for i in range(30):
             cube = self.objects.cube(name=f"Cube_{i}", size=0.5)

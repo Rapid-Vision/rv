@@ -1,5 +1,3 @@
-import random
-
 import rv
 
 
@@ -8,13 +6,11 @@ class ParametricScatterScene(rv.Scene):
         self.world.set_params(sun_intensity=0.03)
         self.objects.plane(size=100).set_location((0, 0, -1))
         target = self.objects.empty().set_location((0, 0, 0))
-        seed = 11
 
         source_cube = self.objects.cube(name="ScatterSourceCube", size=1.0).set_location(
             (0, 0, -1000)
         )
         domain = rv.Domain.ellipse(center=(0, 0), radii=(15, 9), z=0.0)
-        rng = random.Random(seed)
         self.scatter(
             source=source_cube,
             count=30,
@@ -27,7 +23,11 @@ class ParametricScatterScene(rv.Scene):
             on_create=lambda obj, local_rng, index: (
                 obj.set_material(
                     self.materials.basic(name=f"CubeMat_{index}").set_params(
-                        base_color=(rng.random(), rng.random(), rng.random()),
+                        base_color=(
+                            local_rng.random(),
+                            local_rng.random(),
+                            local_rng.random(),
+                        ),
                         roughness=0.4,
                     )
                 ).set_tags("parametric")

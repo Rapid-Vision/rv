@@ -1,8 +1,9 @@
+import random # [!code ++]
 import rv
-from random import uniform # [!code ++]
 
 class BasicScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
+        rng = random.Random(seed)          # [!code ++]
         self.world.set_params(sun_intensity=0.03)
         cube = (
             self.objects.cube()
@@ -12,7 +13,7 @@ class BasicScene(rv.Scene):
         )
         cube.rotate_around_axis(            # [!code ++]
             rv.mathutils.Vector((0, 0, 1)), # [!code ++]
-            uniform(0, 360),                # [!code ++]
+            rng.uniform(0, 360),            # [!code ++]
         )                                   # [!code ++]
         sphere = (
             self.objects.sphere()

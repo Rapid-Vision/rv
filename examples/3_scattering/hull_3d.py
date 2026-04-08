@@ -8,7 +8,6 @@ class HullScatterScene(rv.Scene):
         self.world.set_params(sun_intensity=0.03)
         self.objects.plane(size=120).set_location((0, 0, -6))
         target = self.objects.empty().set_location((0, 0, 0))
-        seed = 7
 
         container = (
             self.objects.cube(name="Container", size=14)
