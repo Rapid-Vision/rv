@@ -49,6 +49,33 @@ This mode does not open Blender. Instead, it continuously refreshes the preview 
 2. Headless: `--preview-files --no-window`.
 3. Combined: `--preview-files` for Blender window plus rendered preview files on disk.
 
+## Seed
+
+Every `Scene.generate(...)` call receives a `seed` value. Use it to drive your randomization in a reproducible way:
+
+```python
+import random
+
+class BasicScene(rv.Scene):
+    def generate(self, seed):
+        rng = random.Random(seed)
+```
+
+This is the recommended pattern for scene variation. A fixed seed reproduces the same generated scene, while different seeds produce different parameter samples.
+
+You can control the seed from the CLI for `render`, `preview`, and `export`:
+
+```bash
+rv render scene.py --seed rand
+rv render scene.py --seed seq
+rv render scene.py --seed 42
+```
+
+- `rand`: choose a random seed for each run.
+- `seq`: use deterministic sequential seeds across generated outputs.
+- `<integer>`: force one specific seed for reproducible results. In this case only rendering with `-n 1` makes sense because all renders will be same.
+
+See [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py) for a simple `random.Random(seed)` workflow.
 
 ## Import reusable assets from `.blend` files
 

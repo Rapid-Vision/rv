@@ -49,6 +49,34 @@ rv preview examples/1_primitives/scene.py --preview-files --no-window
 2. Headless: `--preview-files --no-window`.
 3. Комбинированный: `--preview-files` для окна Blender и preview-файлов на диске.
 
+## Seed
+
+Каждому вызову `Scene.generate(...)` передается значение `seed`. Используйте его, чтобы управлять рандомизацией воспроизводимым способом:
+
+```python
+import random
+
+class BasicScene(rv.Scene):
+    def generate(self, seed):
+        rng = random.Random(seed)
+```
+
+Это рекомендуемый паттерн для управления вариативностью сцены. Фиксированный seed воспроизводит одну и ту же сгенерированную сцену, а разные seed дают разные наборы параметров.
+
+Управлять seed можно из CLI для `render`, `preview` и `export`:
+
+```bash
+rv render scene.py --seed rand
+rv render scene.py --seed seq
+rv render scene.py --seed 42
+```
+
+- `rand`: случайный seed для каждого запуска.
+- `seq`: детерминированная последовательность seed для набора выходных данных.
+- `<integer>`: один конкретный seed для воспроизводимого результата. При его использовании имеет смысл только генерация единственного сэмпла, так как все результаты все равно будут одинаковыми.
+
+Простой пример паттерна `random.Random(seed)` см. в [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py).
+
 ## Импорт переиспользуемых ассетов из `.blend` файлов
 
 Когда геометрия становится сложнее нескольких примитивов, ее удобнее собрать в Blender и импортировать из Python. `rv` загружает именованные объекты из `.blend` файла и возвращает `ObjectLoader`:
