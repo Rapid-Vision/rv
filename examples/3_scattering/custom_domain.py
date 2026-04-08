@@ -14,9 +14,7 @@ class CustomDomainScatterScene(rv.Scene):
         max_height = 6.0
 
         def contains_point(point: rv.mathutils.Vector, margin: float) -> bool:
-            v = point.x**2 + point.y**2
-            z_abs = abs(point.z)
-            return v <= z_abs - margin and z_abs <= max_height - margin
+            return point.x**2 + point.y**2 <= abs(point.z) - margin
 
         def aabb(inset_margin: float) -> rv.AABB:
             radial_limit = max(0.0, max_radius - inset_margin)
@@ -31,7 +29,7 @@ class CustomDomainScatterScene(rv.Scene):
             contains_point=contains_point,
             aabb=aabb,
             kind="double_cone_shell",
-            data={"equation": "z^2 > x^2 + y^2"},
+            data={"equation": "abs(z) > x^2 + y^2"},
         )
 
         source = self.objects.cube(name="ScatterSourceCube", size=1.0).set_location(

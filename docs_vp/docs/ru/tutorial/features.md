@@ -137,7 +137,7 @@ self.scatter_parametric(source=source, count=30, domain=domain, strategy="bvh")
 - [`examples/3_scattering/ellipse_2d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/ellipse_2d.py): быстрое плоское распределение внутри эллипса.
 - [`examples/3_scattering/hull_3d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/hull_3d.py): заполнение трехмерного объема, заданного выпуклой оболочкой.
 - [`examples/3_scattering/parametric_scatter.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/parametric_scatter.py): изменение каждого размещенного инстанса через пару sampler/applier.
-- [`examples/3_scattering/custom_domain.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/custom_domain.py): пользовательский трехмерный домен для области `z^2 < x^2 + y^2`.
+- [`examples/3_scattering/custom_domain.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/custom_domain.py): пользовательский трехмерный домен для области `abs(z) > x^2 + y^2`.
 
 Можно определить и собственный scatter-домен, передав функции проверки принадлежности и ограничивающего bounding box:
 
@@ -235,7 +235,7 @@ rv export examples/6_export/export.py -o examples/6_export/exported.blend --free
 Позже можно загрузить сохраненные объекты:
 
 ```python
-loaders = self.assets.objects(str(EXPORTED_BLEND), import_names=CUBE_NAMES)
+loaders = self.assets.objects("exported.blend", import_names=CUBE_NAMES)
 ```
 
 И создавать из них столько инстансов, сколько нужно:
@@ -246,23 +246,14 @@ obj = loader.create_instance()
 
 Это полезно, когда вы хотите один раз выполнить симуляцию, а потом рендерить много вариантов камеры или освещения на основе сохраненного результата. См. [`examples/6_export/export.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/6_export/export.py), [`examples/6_export/import.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/6_export/import.py) и [`examples/6_export/README.md`](https://github.com/Rapid-Vision/rv/blob/main/examples/6_export/README.md).
 
-## Preview-текстуры
+## Человекочитаемый результат
 
-Экспортированные depth- и index-маски плохо воспринимаются человеком. Поэтому `rv` дополнительно экспортирует preview-версии этих масок.
+Экспортированные depth- и index-маски плохо воспринимаются человеком. Поэтому `rv` дополнительно экспортирует человекочитаемые версии этих масок.
 
 <div class="image_block">
     <img alt="Preview Depth" src="/assets/depth_preview.png" style="width: 100%;" />
     <img alt="Preview Index" src="/assets/index_preview.png" style="width: 100%;" />
 </div>
 
-## Типичный порядок работы
-
-На практике многие скрипты датасетов следуют одной и той же схеме:
-
-1. Создать или импортировать ассеты.
-2. Рандомизировать свойства объектов, которые управляют узлами Blender.
-3. Разместить объекты вручную, через scatter или через физику.
-4. Добавить теги, семантические каналы и проходы рендеринга.
-5. Запустить `rv render` или сохранить промежуточную сцену через `rv export`.
-
+## Дополнительные материалы
 Начните с изучения небольших примеров в [`examples/`](https://github.com/Rapid-Vision/rv/blob/main/examples), а затем переходите к [API reference](/ru/api/), когда понадобятся полные сигнатуры методов.
