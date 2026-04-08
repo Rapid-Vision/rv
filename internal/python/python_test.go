@@ -33,6 +33,15 @@ func TestInstall_WritesEmbeddedRVPackageToSitePackages(t *testing.T) {
 	if filepath.Base(result.InstalledPath) != "__init__.py" {
 		t.Fatalf("InstalledPath = %q, want rv/__init__.py", result.InstalledPath)
 	}
+
+	markerPath := filepath.Join(sitePackagesDir, "rv", "py.typed")
+	marker, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatalf("read py.typed marker: %v", err)
+	}
+	if len(marker) != 0 {
+		t.Fatalf("py.typed contents = %q, want empty file", string(marker))
+	}
 }
 
 func TestInstall_UsesActiveVirtualEnvByDefault(t *testing.T) {

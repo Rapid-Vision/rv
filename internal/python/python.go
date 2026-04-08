@@ -38,18 +38,13 @@ func Install(opts InstallOptions) (InstallResult, error) {
 		return InstallResult{}, err
 	}
 
-	rvSource, err := rvlib.ReadEmbeddedFile("rv.py")
-	if err != nil {
-		return InstallResult{}, err
-	}
-
 	packageDir := filepath.Join(sitePackagesDir, "rv")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		return InstallResult{}, fmt.Errorf("create package directory: %w", err)
 	}
 
 	installedPath := filepath.Join(packageDir, "__init__.py")
-	if err := os.WriteFile(installedPath, rvSource, 0o644); err != nil {
+	if err := rvlib.UnpackRVLib(sitePackagesDir); err != nil {
 		return InstallResult{}, fmt.Errorf("write rv package: %w", err)
 	}
 

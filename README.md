@@ -32,33 +32,31 @@ go install github.com/Rapid-Vision/rv@latest
 import rv
 
 class BasicScene(rv.Scene):
-    def generate(self):
-        world = rv.SkyWorld()
-        world.set_params(strength=0.1, sun_intensity=0.03)
-        self.set_world(world)
+    def generate(self, seed):
+        self.world = rv.SkyWorld().set_params(strength=0.1, sun_intensity=0.03)
 
-        mat_cube = self.create_material().set_params(base_color=[1, 0, 0])
+        mat_cube = self.materials.basic().set_params(base_color=[1, 0, 0])
         cube = (
-            self.create_cube()
+            self.objects.cube()
             .set_location((1, 0, 0.5))
             .set_scale(0.5)
             .set_tags("cube")
             .set_material(mat_cube)
         )
-        mat_sphere = self.create_material().set_params(metallic=1, roughness=0.2)
+        mat_sphere = self.materials.basic().set_params(metallic=1, roughness=0.2)
         sphere = (
-            self.create_sphere()
+            self.objects.sphere()
             .set_location((-1, 0, 1))
             .set_shading("smooth")
             .set_tags("sphere")
             .set_material(mat_sphere)
         )
-        plane = self.create_plane(size=1000)
-        empty = self.create_empty().set_location((0, 0, 1))
+        plane = self.objects.plane(size=1000)
+        empty = self.objects.empty().set_location((0, 0, 1))
 
-        light = self.create_point_light(power=10).set_location([0, 0, 0.1])
+        light = self.lights.point(power=10).set_location([0, 0, 0.1])
 
-        cam = self.get_camera().set_location((5, 5, 2)).point_at(empty)
+        cam = self.camera.set_location((5, 5, 2)).point_at(empty)
 ```
 
 ### Preview the scene
@@ -80,42 +78,49 @@ rv preview scene.py --preview-files --no-window --preview-out ./preview_out
 ### Randomize the scene
 See how the preview changes on each file save.
 ```python
+import random
 import rv
-from random import uniform
 
 class BasicScene(rv.Scene):
-    def generate(self):
-        world = rv.SkyWorld()
-        world.set_params(strength=0.1, sun_intensity=0.03)
-        self.set_world(world)
+    def generate(self, seed):
+        rng = random.Random(seed)
+        self.world = rv.SkyWorld().set_params(strength=0.1, sun_intensity=0.03)
 
-        mat_cube = self.create_material().set_params(base_color=[1, 0, 0])
+        mat_cube = self.materials.basic().set_params(base_color=[1, 0, 0])
         cube = (
-            self.create_cube()
+            self.objects.cube()
             .set_location((1, 0, 0.5))
             .set_scale(0.5)
             .set_tags("cube")
             .set_material(mat_cube)
         )
-        cube.rotate_around_axis(rv.mathutils.Vector((0, 0, 1)), uniform(0, 360))
-        mat_sphere = self.create_material().set_params(metallic=1, roughness=0.2)
+        cube.rotate_around_axis(rv.mathutils.Vector((0, 0, 1)), rng.uniform(0, 360))
+        mat_sphere = self.materials.basic().set_params(metallic=1, roughness=0.2)
         sphere = (
-            self.create_sphere()
+            self.objects.sphere()
             .set_location((-1, 0, 1))
             .set_shading("smooth")
             .set_tags("sphere")
             .set_material(mat_sphere)
         )
-        plane = self.create_plane(size=1000)
-        empty = self.create_empty().set_location((0, 0, 1))
+        plane = self.objects.plane(size=1000)
+        empty = self.objects.empty().set_location((0, 0, 1))
 
-        light = self.create_point_light(power=10).set_location([0, 0, 0.1])
+        light = self.lights.point(power=10).set_location([0, 0, 0.1])
 
-        cam = self.get_camera().set_location((5, 5, 2)).point_at(empty)
+        cam = self.camera.set_location((5, 5, 2)).point_at(empty)
 ```
 ### Render the final result
 ```bash copy
 rv render scene.py
+```
+
+Control reproducibility with `--seed`:
+
+```bash copy
+rv render scene.py --seed rand
+rv render scene.py --seed seq
+rv render scene.py --seed 42
 ```
 
 ![Resulting image](examples/1_primitives/1_res.png)

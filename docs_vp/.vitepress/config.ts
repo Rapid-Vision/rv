@@ -1,12 +1,14 @@
 import { defineConfig } from 'vitepress'
 
+const basePath = "/rv/";
+
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  base: "/rv/",
+  base: basePath,
   srcDir: "docs",
   ignoreDeadLinks: [/^\/home\//],
 
-  head: [['link', { rel: 'icon', href: '/favicon.png' }]],
+  head: [['link', { rel: 'icon', href: `${basePath}favicon.png` }]],
 
   title: "RV",
   description: "Framework for procedural synthetic dataset generation",

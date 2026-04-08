@@ -43,27 +43,63 @@ rv preview examples/1_primitives/scene.py --preview-files --no-window
 
 This mode does not open Blender. Instead, it continuously refreshes the preview files on disk, which is useful for remote environments or when you only want image outputs.
 
-**TLDR;** Live-view workflows are:
+**TLDR;** Live-preview workflows are:
 
 1. Default: Blender window only.
 2. Headless: `--preview-files --no-window`.
 3. Combined: `--preview-files` for Blender window plus rendered preview files on disk.
 
+## Seed
+
+Every `Scene.generate(...)` call receives a `seed` value. Use it to drive your randomization in a reproducible way:
+
+```python
+import random
+
+class BasicScene(rv.Scene):
+    def generate(self, seed):
+        rng = random.Random(seed)
+```
+
+This is the recommended pattern for scene variation. A fixed seed reproduces the same generated scene, while different seeds produce different parameter samples.
+
+You can control the seed from the CLI for `render`, `preview`, and `export`:
+
+```bash
+rv render scene.py --seed rand
+rv render scene.py --seed seq
+rv render scene.py --seed 42
+```
+
+- `rand`: choose a random seed for each run.
+- `seq`: use deterministic sequential seeds across generated outputs.
+- `<integer>`: force one specific seed for reproducible results. In this case only rendering with `-n 1` makes sense because all renders will be same.
+
+See [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py) for a simple `random.Random(seed)` workflow.
 
 ## Import reusable assets from `.blend` files
 
 When geometry is more complex than a few primitives, design it in Blender and import from Python. `rv` loads named objects from a `.blend` file and returns an `ObjectLoader`:
 
 ```python
-rock_loader = self.load_object("./rock.blend", "Rock")
+rock_loader = self.assets.object("./rock.blend", "Rock")
 rock = rock_loader.create_instance()
 ```
 
 This is the recommended workflow for artist-made assets, procedural Blender setups, and scenes you want to reuse across multiple dataset scripts. See [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py).
 
-## Drive Blender node setups with object properties
+## Building shader graph
+
+`rv` can also build Blender shader graphs directly from code, which makes it possible to define materials procedurally from Python instead of preparing every node setup by hand.
+
+<<<@/snippets/8_shader_graph.py{python:line-numbers}
+
+This feature is still in development. Most shader nodes are not available yet, so for now it should be treated as experimental.
+
+## Parametrize the scene 
 
 Synthetic data usually needs variability. In `rv`, the preferred way to expose that variability is to keep procedural logic in Blender and drive it from Python using object properties.
+
 
 ### Material nodes
 
@@ -138,6 +174,22 @@ The available example scenes show three useful patterns:
 - [`examples/3_scattering/ellipse_2d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/ellipse_2d.py): fast planar scattering inside an ellipse.
 - [`examples/3_scattering/hull_3d.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/hull_3d.py): fill a 3D convex hull volume.
 - [`examples/3_scattering/parametric_scatter.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/parametric_scatter.py): vary each placed instance with a sampler/applier pair.
+- [`examples/3_scattering/custom_domain.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/3_scattering/custom_domain.py): define a custom 3D domain for the region `abs(z) > x^2 + y^2`.
+
+You can also define your own scatter domain by providing membership and bounding-box functions:
+
+```python
+domain = rv.Domain.custom(
+    dimension=3,
+    contains_point=lambda point, margin: (
+        (point.z * point.z) < (point.x * point.x + point.y * point.y)
+    ),
+    aabb=lambda inset_margin: (
+        rv.Vector((-10.0, -10.0, -6.0)),
+        rv.Vector((10.0, 10.0, 6.0)),
+    ),
+)
+```
 
 For many synthetic scenes this is enough. If you need physically plausible final resting positions, use rigid body simulation after or instead of geometric scattering.
 
@@ -178,13 +230,27 @@ plane.add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
 ```
 
 ```python
-cube.add_rigidbody(mode="box", body_type="ACTIVE", mass=0.2)
+cube.add_rigidbody(
+    mode="box",
+    body_type="ACTIVE",
+    mass=0.2,
+    collision_margin=0.01,
+    use_deactivation=True,
+    deactivate_linear_velocity=0.15,
+    deactivate_angular_velocity=0.2,
+)
 ```
 
 Run the simulation:
 
 ```python
-rv.simulate_physics(frames=120, substeps=10, time_scale=1.0)
+rv.simulate_physics(
+    frames=120,
+    substeps=12,
+    solver_iterations=30,
+    use_split_impulse=True,
+    time_scale=1.0,
+)
 ```
 
 This is especially useful for generating non-intersecting object piles and impact scenes. The physics examples include:
@@ -206,7 +272,7 @@ rv export examples/6_export/export.py -o examples/6_export/exported.blend --free
 Load the saved objects later:
 
 ```python
-loaders = self.load_objects(str(EXPORTED_BLEND), import_names=CUBE_NAMES)
+loaders = self.assets.objects("exported.blend", import_names=CUBE_NAMES)
 ```
 
 Instantiate them as many times as needed:
@@ -218,21 +284,13 @@ obj = loader.create_instance()
 This is useful when you want to simulate once and then render many camera or lighting variations from the saved result. See [`examples/6_export/export.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/6_export/export.py), [`examples/6_export/import.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/6_export/import.py), and [`examples/6_export/README.md`](https://github.com/Rapid-Vision/rv/blob/main/examples/6_export/README.md).
 
 ## Preview textures
-Exported depth and index masks are not comprehendable by human eye. This `rv` exports additional preview masks alongside them.
+Exported depth and index masks are not comprehendable by human eye. Thats why `rv` exports additional preview masks alongside them.
 
 <div class="image_block">
     <img alt="Preview Depth" src="/assets/depth_preview.png" style="width: 100%;" />
     <img alt="Preview Index" src="/assets/index_preview.png" style="width: 100%;" />
 </div>
 
-## Typical workflow
-
-In practice, many dataset scripts follow the same pattern:
-
-1. Build or import assets.
-2. Randomize object properties that drive Blender nodes.
-3. Place objects manually or with scattering or physics.
-4. Add tags, semantic channels, and render passes.
-5. Render with `rv render` or save an intermediate scene with `rv export`.
+## Additional information
 
 Start with the small examples in [`examples/`](https://github.com/Rapid-Vision/rv/blob/main/examples), then use the [API reference](/en/api/) when you need the full method signatures.

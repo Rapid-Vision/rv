@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/Rapid-Vision/rv/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
 	"github.com/Rapid-Vision/rv/internal/watcher"
 )
@@ -25,6 +26,7 @@ type Options struct {
 	Resolution    [2]int
 	GPUBackend    string
 	TimeLimit     *float64
+	Seed          seed.Config
 }
 
 func normalizedGPUBackend(value string) string {
@@ -116,6 +118,8 @@ func Preview(opts Options) {
 }
 
 func validateOptions(opts Options) error {
+	opts.Seed = seed.Normalize(opts.Seed)
+
 	if opts.NoWindow && !opts.PreviewFiles {
 		return errors.New("--no-window requires --preview-files")
 	}
@@ -137,6 +141,7 @@ func validateOptions(opts Options) error {
 }
 
 func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, libPath string, port int) []string {
+	opts.Seed = seed.Normalize(opts.Seed)
 	gpuBackend := normalizedGPUBackend(opts.GPUBackend)
 	args := []string{
 		filepath.Join(libPath, "template.blend"),
@@ -155,14 +160,20 @@ func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, lib
 		"--script", scriptPath,
 		"--libpath", libPath,
 		"--cwd", cwdAbs,
-		"--preview-files", fmt.Sprintf("%t", opts.PreviewFiles),
-		"--no-window", fmt.Sprintf("%t", opts.NoWindow),
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--gpu-backend", gpuBackend,
+		"--seed-mode", string(opts.Seed.Mode),
 	)
+	if opts.Seed.Mode == seed.FixedMode {
+		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))
+	}
 
 	if opts.PreviewFiles {
+		args = append(args, "--preview-files")
 		args = append(args, "--preview-out", opts.PreviewOut)
+	}
+	if opts.NoWindow {
+		args = append(args, "--no-window")
 	}
 	if opts.TimeLimit != nil {
 		args = append(args, "--time-limit", fmt.Sprintf("%g", *opts.TimeLimit))

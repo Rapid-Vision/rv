@@ -3,16 +3,16 @@ import rv
 
 
 class WallBreakPhysicsScene(rv.Scene):
-    def generate(self):
+    def generate(self, seed):
         self.set_passes([rv.RenderPass.Z])
-        self.get_world().set_params(sun_intensity=0.05, strength=0.2)
+        self.world.set_params(sun_intensity=0.05, strength=0.2)
 
-        ground = self.create_plane(name="Ground", size=20).set_location((0.0, 0.0, 0.0))
+        ground = self.objects.plane(name="Ground", size=20).set_location((0.0, 0.0, 0.0))
         ground.add_rigidbody(mode="box", body_type="PASSIVE", friction=0.9)
         ground.set_tags("ground")
 
         ramp = (
-            self.create_plane(name="Ramp", size=6.0)
+            self.objects.plane(name="Ramp", size=6.0)
             .set_location((-2.4, 0.0, 0.9))
             .set_rotation(mathutils.Euler((0.0, 0.42, 0.0)).to_quaternion())
         )
@@ -25,7 +25,7 @@ class WallBreakPhysicsScene(rv.Scene):
         wall: list[rv.Object] = []
         for row in range(3):
             for col in range(3):
-                cube = self.create_cube(name=f"WallCube_{row}_{col}", size=cube_size)
+                cube = self.objects.cube(name=f"WallCube_{row}_{col}", size=cube_size)
                 cube.set_location(
                     (
                         wall_origin_x,
@@ -45,7 +45,7 @@ class WallBreakPhysicsScene(rv.Scene):
                 cube.set_tags("wall_cube")
                 wall.append(cube)
 
-        sphere = self.create_sphere(name="Ball", radius=0.28).set_location(
+        sphere = self.objects.sphere(name="Ball", radius=0.28).set_location(
             (-4.3, 0.0, 2)
         )
         sphere.add_rigidbody(
@@ -67,5 +67,5 @@ class WallBreakPhysicsScene(rv.Scene):
         ramp.remove_rigidbody(keep_transform=True)
         ground.remove_rigidbody(keep_transform=True)
 
-        target = self.create_empty("LookAt").set_location((0.8, 0.0, 0.8))
-        self.get_camera().set_location((6.0, -5.0, 3.2)).point_at(target)
+        target = self.objects.empty("LookAt").set_location((0.8, 0.0, 0.8))
+        self.camera.set_location((6.0, -5.0, 3.2)).point_at(target)

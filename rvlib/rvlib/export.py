@@ -1,22 +1,17 @@
 import argparse
-import importlib.util
-import inspect
 import json
 import os
 import sys
 
 import bpy
 
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
+
+from runtime_bootstrap import bootstrap_runtime
+
 EXPORT_SCHEMA_VERSION = 1
-
-CLASS_COUNT_ERROR_MESSAGE = """ERROR: exactly one class derived from rv.Scene must be defined.
-Example usage:
-
-import rv
-class MyScene(rv.Scene):
-    def generate(self):
-        pass
-"""
 
 
 def parse_args():
@@ -29,38 +24,11 @@ def parse_args():
     parser.add_argument("--libpath", type=str, required=True)
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--cwd", type=str, required=True)
-    parser.add_argument("--freeze-physics", type=parse_bool, default=False)
-    parser.add_argument("--pack-resources", type=parse_bool, default=False)
+    parser.add_argument("--seed-mode", type=str, default="rand")
+    parser.add_argument("--seed-value", type=int, default=None)
+    parser.add_argument("--freeze-physics", action="store_true")
+    parser.add_argument("--pack-resources", action="store_true")
     return parser.parse_args(args)
-
-
-def parse_bool(raw):
-    if isinstance(raw, bool):
-        return raw
-    value = str(raw).strip().lower()
-    if value in ("true", "1", "yes", "y", "on"):
-        return True
-    if value in ("false", "0", "no", "n", "off"):
-        return False
-    raise ValueError("expected boolean value")
-
-
-def load_scene_class(script_path):
-    spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    import rv
-
-    scene_classes = []
-    for _, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, rv.Scene) and obj is not rv.Scene:
-            scene_classes.append(obj)
-
-    if len(scene_classes) != 1:
-        raise RuntimeError(CLASS_COUNT_ERROR_MESSAGE.strip())
-
-    return scene_classes[0]
 
 
 def set_json_prop(id_data, key, value):
@@ -77,6 +45,8 @@ def attach_scene_metadata(scene_instance, script_path, cwd):
         "cwd": cwd,
         "resolution": scene_instance.resolution,
         "time_limit": scene_instance.time_limit,
+        "seed": scene_instance.seed,
+        "seed_mode": scene_instance.seed_mode,
         "passes": sorted(pass_.value for pass_ in scene_instance.passes),
         "tags": sorted(scene_instance.tags),
         "semantic_channels": sorted(scene_instance.semantic_channels),
@@ -95,13 +65,14 @@ def attach_scene_metadata(scene_instance, script_path, cwd):
 
 def freeze_rigidbody_simulation():
     scene = bpy.context.scene
+    depsgraph = bpy.context.evaluated_depsgraph_get()
     frozen = []
 
     for obj in list(scene.objects):
         if getattr(obj, "rigid_body", None) is None:
             continue
 
-        matrix = obj.matrix_world.copy()
+        matrix = obj.evaluated_get(depsgraph).matrix_world.copy()
         bpy.ops.object.select_all(action="DESELECT")
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
@@ -130,7 +101,9 @@ def freeze_rigidbody_simulation():
 
 
 def attach_object_metadata(scene_instance):
-    wrappers = list(scene_instance.objects) + list(scene_instance.lights)
+    wrappers = list(scene_instance.generated_objects) + list(
+        scene_instance.generated_lights
+    )
     seen = set()
 
     for wrapper in wrappers:
@@ -149,7 +122,7 @@ def attach_object_metadata(scene_instance):
 
 
 def attach_material_metadata(scene_instance):
-    for material in scene_instance.materials:
+    for material in scene_instance.generated_materials:
         bpy_material = material._resolved_material
         if bpy_material is None:
             continue
@@ -174,18 +147,17 @@ def pack_resources():
 def main():
     args = parse_args()
 
-    sys.path.insert(0, args.libpath)
-    sys.path.insert(0, args.cwd)
-    os.chdir(args.cwd)
-
-    scene_class = load_scene_class(args.script)
+    bootstrap_runtime(args.libpath, args.cwd)
 
     import rv
+    import rv.internal as rvi
 
-    rv.begin_run(purge_orphans=True)
+    scene_class = rvi._internal_load_scene_class(args.script)
+    rvi._internal_begin_run(purge_orphans=True)
     scene_instance = scene_class(output_dir=None)
-    scene_instance.generate()
-    scene_instance._post_gen()
+    seed = rvi._internal_resolve_seed(args.seed_mode, args.seed_value)
+    rvi._internal_run_scene_generate(scene_instance, seed, args.seed_mode)
+    scene_instance._internal_post_gen()
 
     if args.freeze_physics:
         freeze_rigidbody_simulation()
@@ -196,7 +168,7 @@ def main():
     attach_object_metadata(scene_instance)
     attach_material_metadata(scene_instance)
     save_scene(args.output)
-    rv.end_run(purge_orphans=False)
+    rvi._internal_end_run(purge_orphans=False)
 
 
 if __name__ == "__main__":

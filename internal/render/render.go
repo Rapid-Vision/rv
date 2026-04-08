@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/Rapid-Vision/rv/internal/logs"
+	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
 )
 
@@ -29,6 +30,7 @@ type RenderOptions struct {
 	MinSamples            *int
 	NoiseThresholdEnabled *bool
 	NoiseThreshold        *float64
+	Seed                  seed.Config
 }
 
 type RenderResult struct {
@@ -52,6 +54,8 @@ type datasetRenderParms struct {
 	MinSamples            *int     `json:"min_samples,omitempty"`
 	NoiseThresholdEnabled *bool    `json:"noise_threshold_enabled,omitempty"`
 	NoiseThreshold        *float64 `json:"noise_threshold,omitempty"`
+	SeedMode              string   `json:"seed_mode,omitempty"`
+	SeedValue             *int64   `json:"seed_value,omitempty"`
 }
 
 func normalizedGPUBackend(value string) string {
@@ -62,6 +66,8 @@ func normalizedGPUBackend(value string) string {
 }
 
 func Render(opts RenderOptions) (RenderResult, error) {
+	opts.Seed = seed.Normalize(opts.Seed)
+
 	scriptPath := opts.ScriptPath
 	imgNum := opts.ImageNum
 	procs := opts.Procs
@@ -119,11 +125,12 @@ func Render(opts RenderOptions) (RenderResult, error) {
 
 	for i := 0; i < procs; i += 1 {
 		part := utils.SplitTaskBetweenProcs(imgNum, procs, i)
+		seedBase := renderSeedBase(imgNum, procs, i)
 
 		// Start Blender
 		cmd := exec.Command(
 			blenderPath,
-			buildBlenderRenderArgs(opts, libPath, seqOutDir, part)...,
+			buildBlenderRenderArgs(opts, libPath, seqOutDir, part, seedBase)...,
 		)
 		cmd.Env = utils.BlenderCommandEnv()
 		cmd.Stdout = os.Stdout
@@ -177,7 +184,8 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	}, nil
 }
 
-func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string, part int) []string {
+func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string, part int, seedBase int) []string {
+	opts.Seed = seed.Normalize(opts.Seed)
 	gpuBackend := normalizedGPUBackend(opts.GPUBackend)
 	args := []string{
 		filepath.Join(libPath, "template.blend"),
@@ -193,6 +201,11 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		"--output", seqOutDir,
 		"--cwd", opts.Cwd,
 		"--gpu-backend", gpuBackend,
+		"--seed-mode", string(opts.Seed.Mode),
+		"--seed-base", fmt.Sprintf("%d", seedBase),
+	}
+	if opts.Seed.Mode == seed.FixedMode {
+		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))
 	}
 
 	if opts.TimeLimit != nil {
@@ -205,7 +218,11 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		args = append(args, "--min-samples", fmt.Sprintf("%d", *opts.MinSamples))
 	}
 	if opts.NoiseThresholdEnabled != nil {
-		args = append(args, "--noise-threshold-enabled", fmt.Sprintf("%t", *opts.NoiseThresholdEnabled))
+		if *opts.NoiseThresholdEnabled {
+			args = append(args, "--noise-threshold-enabled")
+		} else {
+			args = append(args, "--no-noise-threshold-enabled")
+		}
 	}
 	if opts.NoiseThreshold != nil {
 		args = append(args, "--noise-threshold", fmt.Sprintf("%g", *opts.NoiseThreshold))
@@ -214,11 +231,24 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 	return args
 }
 
+func renderSeedBase(imageNum int, procs int, procIndex int) int {
+	base := 0
+	for i := 0; i < procIndex; i++ {
+		base += utils.SplitTaskBetweenProcs(imageNum, procs, i)
+	}
+	return base
+}
+
 func validateOptionalRenderOptions(opts RenderOptions) error {
 	switch normalizedGPUBackend(opts.GPUBackend) {
 	case "auto", "optix", "cuda", "hip", "oneapi", "metal", "cpu":
 	default:
 		return errors.New("--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu")
+	}
+	switch opts.Seed.Mode {
+	case "", seed.RandomMode, seed.SeqMode, seed.FixedMode:
+	default:
+		return errors.New("invalid seed mode")
 	}
 	if opts.TimeLimit != nil && *opts.TimeLimit <= 0 {
 		return errors.New("--time-limit must be > 0")
@@ -292,8 +322,13 @@ func writeDatasetMetadata(seqOutDir string, opts RenderOptions) error {
 			MinSamples:            opts.MinSamples,
 			NoiseThresholdEnabled: opts.NoiseThresholdEnabled,
 			NoiseThreshold:        opts.NoiseThreshold,
+			SeedMode:              string(seed.Normalize(opts.Seed).Mode),
 		},
 		SampleFiles: sampleFiles,
+	}
+	normalizedSeed := seed.Normalize(opts.Seed)
+	if normalizedSeed.Mode == seed.FixedMode {
+		meta.RenderParams.SeedValue = &normalizedSeed.Value
 	}
 
 	f, err := os.Create(filepath.Join(seqOutDir, "_meta.json"))

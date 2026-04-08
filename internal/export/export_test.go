@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/Rapid-Vision/rv/internal/seed"
 )
 
 func TestBuildBlenderExportArgs(t *testing.T) {
@@ -16,6 +18,7 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 			OutputPath:    "/tmp/out/scene.blend",
 			FreezePhysics: true,
 			PackResources: true,
+			Seed:          seed.Config{Mode: seed.FixedMode, Value: 33},
 		},
 		"/tmp/lib",
 	)
@@ -31,13 +34,18 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 		{"--libpath", "/tmp/lib"},
 		{"--output", "/tmp/out/scene.blend"},
 		{"--cwd", "/tmp/work"},
-		{"--freeze-physics", "true"},
-		{"--pack-resources", "true"},
+		{"--seed-mode", "fixed"},
+		{"--seed-value", "33"},
 	}
 	for _, pair := range wantPairs {
 		idx := slices.Index(got, pair[0])
 		if idx < 0 || idx+1 >= len(got) || got[idx+1] != pair[1] {
 			t.Fatalf("missing %s %s in args: %v", pair[0], pair[1], got)
+		}
+	}
+	for _, flag := range []string{"--freeze-physics", "--pack-resources"} {
+		if !slices.Contains(got, flag) {
+			t.Fatalf("missing %s in args: %v", flag, got)
 		}
 	}
 }
