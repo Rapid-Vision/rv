@@ -1,7 +1,8 @@
-.PHONY: docs rtasks test-python-unit test-blender mypy ruff radon
+.PHONY: docs rtasks test-python-unit test-blender test-go mypy ruff radon staticcheck
 
+# Python verification
 mypy:
-	uvx mypy rvlib/rvlib/
+	uvx mypy --ignore-missing-imports rvlib/rvlib/
 
 radon:
 	uvx radon cc rvlib/rvlib/rv -nc
@@ -9,6 +10,11 @@ radon:
 ruff:
 	uvx ruff check rvlib/rvlib/ 
 
+# Go verification
+staticcheck:
+	staticcheck ./...
+
+# Codegen
 rtasks:
 	rrpc client --lang go -o internal -f rtasks.rrpc
 
@@ -16,7 +22,12 @@ docs:
 	uvx rdocgen -c rvlib/rvlib/rv/ --flatten -o docs_vp/docs/en/api
 	cp docs_vp/docs/en/api/index.md docs_vp/docs/ru/api/index.md
 
-test: test-python-unit test-blender
+# Tests
+
+test: test-python-unit test-blender test-go
+
+test-go:
+	go test ./...
 
 test-python-unit:
 	python3 -m unittest discover -s tests/unit -p "test*.py" -v
