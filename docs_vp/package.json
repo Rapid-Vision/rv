@@ -12,9 +12,9 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "docs:dev": "vitepress dev",
-    "docs:build": "vitepress build",
-    "docs:preview": "vitepress preview",
-    "docs:publish": "pnpm run docs:build && gh-pages -d .vitepress/dist --nojekyll"
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "publish": "pnpm run build && gh-pages -d .vitepress/dist --nojekyll"
   }
 }

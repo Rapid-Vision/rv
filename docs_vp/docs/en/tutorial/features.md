@@ -61,9 +61,18 @@ rock = rock_loader.create_instance()
 
 This is the recommended workflow for artist-made assets, procedural Blender setups, and scenes you want to reuse across multiple dataset scripts. See [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py).
 
-## Drive Blender node setups with object properties
+## Building shader graph
+
+`rv` can also build Blender shader graphs directly from code, which makes it possible to define materials procedurally from Python instead of preparing every node setup by hand.
+
+<<<@/snippets/8_shader_graph.py{python:line-numbers}
+
+This feature is still in development. Most shader nodes are not available yet, so for now it should be treated as experimental.
+
+## Parametrize the scene 
 
 Synthetic data usually needs variability. In `rv`, the preferred way to expose that variability is to keep procedural logic in Blender and drive it from Python using object properties.
+
 
 ### Material nodes
 
