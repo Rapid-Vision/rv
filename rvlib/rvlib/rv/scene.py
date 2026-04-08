@@ -313,6 +313,18 @@ class Scene(ABC, _Serializable):
         self.time_limit = time_limit
         return self
 
+    @property
+    def generated_objects(self) -> tuple["Object", ...]:
+        return tuple(self._objects)
+
+    @property
+    def generated_materials(self) -> tuple["Material", ...]:
+        return tuple(self._materials)
+
+    @property
+    def generated_lights(self) -> tuple["Light", ...]:
+        return tuple(self._lights)
+
     def set_passes(self, *passes: tuple[RenderPass | list[RenderPass], ...]):
         self.passes = _combine_arglist_set(passes)
         return self

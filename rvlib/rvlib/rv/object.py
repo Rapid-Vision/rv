@@ -695,7 +695,8 @@ class Object(_Serializable):
         if self.obj.rigid_body is None:
             return self
 
-        matrix = self.obj.matrix_world.copy()
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        matrix = self.obj.evaluated_get(depsgraph).matrix_world.copy()
         self._select_for_shading_ops()
         bpy.ops.rigidbody.object_remove()
         if keep_transform:

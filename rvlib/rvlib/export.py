@@ -65,13 +65,14 @@ def attach_scene_metadata(scene_instance, script_path, cwd):
 
 def freeze_rigidbody_simulation():
     scene = bpy.context.scene
+    depsgraph = bpy.context.evaluated_depsgraph_get()
     frozen = []
 
     for obj in list(scene.objects):
         if getattr(obj, "rigid_body", None) is None:
             continue
 
-        matrix = obj.matrix_world.copy()
+        matrix = obj.evaluated_get(depsgraph).matrix_world.copy()
         bpy.ops.object.select_all(action="DESELECT")
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
@@ -100,7 +101,9 @@ def freeze_rigidbody_simulation():
 
 
 def attach_object_metadata(scene_instance):
-    wrappers = list(scene_instance.objects) + list(scene_instance.lights)
+    wrappers = list(scene_instance.generated_objects) + list(
+        scene_instance.generated_lights
+    )
     seen = set()
 
     for wrapper in wrappers:
@@ -119,7 +122,7 @@ def attach_object_metadata(scene_instance):
 
 
 def attach_material_metadata(scene_instance):
-    for material in scene_instance.materials:
+    for material in scene_instance.generated_materials:
         bpy_material = material._resolved_material
         if bpy_material is None:
             continue
