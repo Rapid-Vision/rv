@@ -1,12 +1,9 @@
 """
-Module for describing `rv` scenes.
+Package for describing `rv` scenes.
 
 - Preview a scene with `rv preview <scene.py>`.
 - Render a dataset with `rv render <scene.py>`.
 
-User-facing names are listed in `__all__`.
-Runner-only helpers remain importable as underscored module attributes for the
-`rvlib` runtime, but they are intentionally excluded from `__all__`.
 """
 
 import bpy
