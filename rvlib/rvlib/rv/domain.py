@@ -2,7 +2,7 @@ import math
 import random
 import warnings
 from mathutils import Vector
-from typing import Callable, Literal, Protocol
+from typing import Callable, Literal, Protocol, Union
 
 import mathutils
 
@@ -348,7 +348,9 @@ class _CustomShape:
         dimension: int,
         contains_point_fn: Callable[[mathutils.Vector, float], bool],
         aabb_fn: Callable[[float], AABB],
-        sample_point_fn: Callable[[random.Random, float], mathutils.Vector] | None = None,
+        sample_point_fn: Union[
+            Callable[[random.Random, float], mathutils.Vector], None
+        ] = None,
     ) -> None:
         self.data = data
         self.dimension = dimension
@@ -466,9 +468,11 @@ class Domain:
         dimension: int,
         contains_point: Callable[[mathutils.Vector, float], bool],
         aabb: Callable[[float], AABB],
-        sample_point: Callable[[random.Random, float], mathutils.Vector] | None = None,
+        sample_point: Union[
+            Callable[[random.Random, float], mathutils.Vector], None
+        ] = None,
         kind: str = "custom",
-        data: dict | None = None,
+        data: Union[dict, None] = None,
     ) -> "Domain":
         if dimension not in {2, 3}:
             raise ValueError("dimension must be 2 or 3.")

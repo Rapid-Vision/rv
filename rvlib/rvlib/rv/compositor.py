@@ -1,4 +1,4 @@
-import typing
+from typing import Any, Union
 
 import bpy
 
@@ -25,8 +25,8 @@ def _configure_semantic_aovs(layer, semantic_channels: SemanticChannelSet) -> No
 
 
 def _configure_compositor(
-    output_dir: str | None,
-    semantic_channels: SemanticChannelSet | None = None,
+    output_dir: Union[str, None],
+    semantic_channels: Union[SemanticChannelSet, None] = None,
     semantic_mask_threshold: float = 0.5,
 ) -> None:
     """
@@ -98,7 +98,7 @@ def _configure_compositor(
     index_ma = _find_socket_by_name(render_layers.outputs, "Material Index")
     index_sockets = [index_ob, index_ma]
 
-    semantic_outputs: dict[str, typing.Any] = {}
+    semantic_outputs: dict[str, Any] = {}
     semantic_names = {
         _normalize_socket_name(_semantic_aov_name(channel))
         for channel in (semantic_channels or set())
@@ -264,7 +264,7 @@ def _ensure_group_output_socket(tree, socket_name: str):
     )
 
 
-def _reset_file_output_node(node, output_dir: str | None):
+def _reset_file_output_node(node, output_dir: Union[str, None]):
     node.file_output_items.clear()
     if output_dir is not None:
         node.directory = output_dir

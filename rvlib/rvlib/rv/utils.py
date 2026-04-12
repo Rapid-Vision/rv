@@ -2,6 +2,7 @@ import importlib.util
 import inspect
 import random
 import uuid
+from typing import Union
 
 import bpy
 
@@ -71,7 +72,7 @@ def _ensure_active_run() -> None:
         _ACTIVE_RUN_ID = uuid.uuid4().hex
 
 
-def _mark_material_tree(material, visited: set[int] | None = None) -> None:
+def _mark_material_tree(material, visited: Union[set[int], None] = None) -> None:
     if material is None:
         return
     _mark_owned(material)
@@ -80,7 +81,7 @@ def _mark_material_tree(material, visited: set[int] | None = None) -> None:
         _mark_node_tree(node_tree, visited)
 
 
-def _mark_node_tree(node_tree, visited: set[int] | None = None) -> None:
+def _mark_node_tree(node_tree, visited: Union[set[int], None] = None) -> None:
     if node_tree is None:
         return
     if visited is None:
@@ -249,7 +250,7 @@ def _internal_load_scene_class(script_path: str):
 
 
 def _internal_run_scene_generate(
-    scene_instance, seed: int | None, seed_mode: str | None = None
+    scene_instance, seed: Union[int, None], seed_mode: Union[str, None] = None
 ) -> None:
     scene_instance.seed = seed
     scene_instance.seed_mode = seed_mode
@@ -275,7 +276,10 @@ def _internal_run_scene_generate(
 
 
 def _internal_resolve_seed(
-    seed_mode: str, seed_value: int | None = None, seed_base: int = 0, index: int = 0
+    seed_mode: str,
+    seed_value: Union[int, None] = None,
+    seed_base: int = 0,
+    index: int = 0,
 ) -> int:
     if seed_mode in ("rand", "random"):
         return random.SystemRandom().randrange(0, 2**63)
@@ -401,7 +405,9 @@ def _internal_print_cycles_device_info() -> None:
     print(f"[rv] devices={serialized_devices}")
 
 
-def _internal_set_time_limit(scene_instance, time_limit: float | None) -> None:
+def _internal_set_time_limit(
+    scene_instance, time_limit: Union[float, None]
+) -> None:
     if time_limit is None:
         return
     if time_limit <= 0:

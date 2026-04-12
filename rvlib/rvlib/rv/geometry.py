@@ -4,6 +4,7 @@ import math
 import mathutils
 import random
 from itertools import combinations
+from typing import Union
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
@@ -378,8 +379,8 @@ def _object_world_radius(obj: bpy.types.Object, dimension: int) -> float:
 
 def _build_bvh_from_object(
     obj: bpy.types.Object,
-    transform: mathutils.Matrix | None = None,
-) -> BVHTree | None:
+    transform: Union[mathutils.Matrix, None] = None,
+) -> Union[BVHTree, None]:
     depsgraph = bpy.context.evaluated_depsgraph_get()
     obj_eval = obj.evaluated_get(depsgraph)
     if obj_eval.type != "MESH":

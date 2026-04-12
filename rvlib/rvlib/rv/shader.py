@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields, is_dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 import bpy
 
@@ -10,7 +10,9 @@ from .utils import _as_rgba
 
 X_SHIFT = 300
 Y_PADDING = 60
-def _coerce_expr(value: "ShaderValueLike", expected_type: str | None = None) -> "Expr":
+def _coerce_expr(
+    value: "ShaderValueLike", expected_type: Union[str, None] = None
+) -> "Expr":
     if isinstance(value, Expr):
         return value
     if isinstance(value, (int, float)):
@@ -108,7 +110,7 @@ class ShaderExpr(Expr):
     value_type = "SHADER"
 
 
-ShaderValueLike = Expr | int | float | tuple[float, ...] | list[float]
+ShaderValueLike = Union[Expr, int, float, tuple[float, ...], list[float]]
 
 
 def _serialize_shader_meta(value: Any) -> Any:
@@ -272,16 +274,16 @@ class NormalMap(NormalExpr):
 
 @dataclass(frozen=True)
 class PrincipledBSDF(ShaderExpr):
-    base_color: ShaderValueLike | None = None
-    metallic: ShaderValueLike | None = None
-    roughness: ShaderValueLike | None = None
-    specular: ShaderValueLike | None = None
-    normal: ShaderValueLike | None = None
-    emission_color: ShaderValueLike | None = None
-    emission_strength: ShaderValueLike | None = None
-    alpha: ShaderValueLike | None = None
-    transmission: ShaderValueLike | None = None
-    ior: ShaderValueLike | None = None
+    base_color: Union[ShaderValueLike, None] = None
+    metallic: Union[ShaderValueLike, None] = None
+    roughness: Union[ShaderValueLike, None] = None
+    specular: Union[ShaderValueLike, None] = None
+    normal: Union[ShaderValueLike, None] = None
+    emission_color: Union[ShaderValueLike, None] = None
+    emission_strength: Union[ShaderValueLike, None] = None
+    alpha: Union[ShaderValueLike, None] = None
+    transmission: Union[ShaderValueLike, None] = None
+    ior: Union[ShaderValueLike, None] = None
 
     def __post_init__(self):
         for field_name, socket_type in (
@@ -354,7 +356,7 @@ class ShaderMaterial(Material):
         self.shader = shader
         self.properties = {}
 
-    def set_params(self, shader: ShaderExpr | None = None):
+    def set_params(self, shader: Union[ShaderExpr, None] = None):
         if shader is not None:
             self.shader = shader
         return self
@@ -424,7 +426,9 @@ class _ShaderGraphCompiler:
     def link(self, expr: Expr, socket: bpy.types.NodeSocket) -> None:
         self.node_tree.links.new(self.compile(expr), socket)
 
-    def connect_optional(self, socket: bpy.types.NodeSocket, expr: Expr | None) -> None:
+    def connect_optional(
+        self, socket: bpy.types.NodeSocket, expr: Union[Expr, None]
+    ) -> None:
         if expr is None:
             return
         self.link(expr, socket)

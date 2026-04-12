@@ -154,7 +154,7 @@ class MaterialFactory:
         return BasicMaterial(name=name)
 
     def imported(
-        self, blendfile: str, material_name: str | None = None
+        self, blendfile: str, material_name: Union[str, None] = None
     ) -> "ImportedMaterial":
         path = str(pathlib.Path(blendfile).expanduser())
         return ImportedMaterial(filepath=path, material_name=material_name)
@@ -165,7 +165,7 @@ class AssetFactory:
         self.scene = scene
 
     def object(
-        self, blendfile: str, import_name: str | None = None
+        self, blendfile: str, import_name: Union[str, None] = None
     ) -> "ObjectLoader":
         path = str(pathlib.Path(blendfile).expanduser())
         if import_name is None:
@@ -184,7 +184,7 @@ class AssetFactory:
         )
 
     def objects(
-        self, blendfile: str, import_names: list[str] | None = None
+        self, blendfile: str, import_names: Union[list[str], None] = None
     ) -> list["ObjectLoader"]:
         path = str(pathlib.Path(blendfile).expanduser())
         objects = _load_all_objects(path)
@@ -251,9 +251,9 @@ class _SpatialHash:
 class Scene(ABC, _Serializable):
     resolution: Resolution = (640, 640)
     time_limit: float = 3.0
-    passes: RenderPassSet | None = None
+    passes: Union[RenderPassSet, None] = None
     output_dir: Optional[str]
-    subdir: str | None
+    subdir: Union[str, None]
     camera: "Camera"
     world: "World"
     tags: TagSet
@@ -266,17 +266,17 @@ class Scene(ABC, _Serializable):
     _lights: set["Light"]
     semantic_channels: SemanticChannelSet
     semantic_mask_threshold: float = 0.5
-    seed: int | None = None
-    seed_mode: str | None = None
+    seed: Union[int, None] = None
+    seed_mode: Union[str, None] = None
     object_index_counter: int = 0
     material_index_counter: int = 0
     light_index_counter: int = 0
 
     @abstractmethod
-    def generate(self, seed: int | None = None) -> None:
+    def generate(self, seed: Union[int, None] = None) -> None:
         pass
 
-    def __init__(self, output_dir: str | None = None) -> None:
+    def __init__(self, output_dir: Union[str, None] = None) -> None:
         super().__init__()
         self.passes = set()
         self.output_dir = output_dir
@@ -325,11 +325,15 @@ class Scene(ABC, _Serializable):
     def generated_lights(self) -> tuple["Light", ...]:
         return tuple(self._lights)
 
-    def set_passes(self, *passes: tuple[RenderPass | list[RenderPass], ...]):
+    def set_passes(
+        self, *passes: tuple[Union[RenderPass, list[RenderPass]], ...]
+    ):
         self.passes = _combine_arglist_set(passes)
         return self
 
-    def enable_semantic_channels(self, *channels: tuple[str | list[str], ...]) -> "Scene":
+    def enable_semantic_channels(
+        self, *channels: tuple[Union[str, list[str]], ...]
+    ) -> "Scene":
         for channel in _combine_arglist_set(channels):
             self.semantic_channels.add(_normalize_semantic_channel(channel))
         return self
@@ -399,11 +403,11 @@ class Scene(ABC, _Serializable):
         *,
         method: Literal["auto", "fast", "exact"] = "auto",
         gap: float = 0.0,
-        scale: float | Float2 = 1.0,
+        scale: Union[float, Float2] = 1.0,
         rotation: Literal["yaw", "free"] = "yaw",
         yaw: Float2 = (0.0, 360.0),
         margin: float = 0.0,
-        seed: int | None = None,
+        seed: Union[int, None] = None,
         unique_data: bool = False,
         on_create=None,
         max_attempts_per_object: int = 100,
