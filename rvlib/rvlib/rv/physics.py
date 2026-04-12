@@ -1,4 +1,5 @@
 import bpy
+from typing import Union
 from .utils import _require_blender_attr
 
 
@@ -12,9 +13,9 @@ def _configure_rigidbody_world(
     settle_frames: int,
     substeps: int,
     time_scale: float,
-    solver_iterations: int | None = None,
-    use_split_impulse: bool | None = None,
-    split_impulse_penetration_threshold: float | None = None,
+    solver_iterations: Union[int, None] = None,
+    use_split_impulse: Union[bool, None] = None,
+    split_impulse_penetration_threshold: Union[float, None] = None,
 ) -> tuple[int, int]:
     _ensure_rigidbody_world()
     scene = bpy.context.scene
@@ -65,9 +66,9 @@ def _simulate_rigidbody(
     settle_frames: int,
     substeps: int,
     time_scale: float,
-    solver_iterations: int | None = None,
-    use_split_impulse: bool | None = None,
-    split_impulse_penetration_threshold: float | None = None,
+    solver_iterations: Union[int, None] = None,
+    use_split_impulse: Union[bool, None] = None,
+    split_impulse_penetration_threshold: Union[float, None] = None,
 ) -> tuple[int, int]:
     start_frame, end_frame = _configure_rigidbody_world(
         settle_frames=settle_frames,
@@ -86,9 +87,9 @@ def simulate_physics(
     frames: int = 20,
     substeps: int = 10,
     time_scale: float = 1.0,
-    solver_iterations: int | None = None,
-    use_split_impulse: bool | None = None,
-    split_impulse_penetration_threshold: float | None = None,
+    solver_iterations: Union[int, None] = None,
+    use_split_impulse: Union[bool, None] = None,
+    split_impulse_penetration_threshold: Union[float, None] = None,
 ) -> None:
     """
     Simulate current Blender rigid-body world for a fixed number of frames.

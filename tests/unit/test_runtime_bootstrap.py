@@ -25,7 +25,7 @@ class RuntimeBootstrapTests(unittest.TestCase):
 
                 self.assertEqual(sys.path[0], cwd)
                 self.assertEqual(sys.path[1], libpath)
-                self.assertEqual(os.getcwd(), cwd)
+                self.assertEqual(os.getcwd(), os.path.realpath(cwd))
             finally:
                 sys.path[:] = old_sys_path
                 os.chdir(old_cwd)

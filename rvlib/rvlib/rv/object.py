@@ -2,8 +2,7 @@ from dataclasses import dataclass
 import math
 import numbers
 import random
-import typing
-from typing import Any, Literal, Self, Union
+from typing import Any, Literal, Self, Sequence, Union
 
 import bpy
 import mathutils
@@ -30,6 +29,7 @@ from .utils import (
     _mark_object_tree,
     _require_blender_attr,
 )
+
 
 @dataclass(frozen=True, slots=True)
 class ObjectStats:
@@ -97,7 +97,7 @@ class ObjectLoader:
         self,
         obj,
         scene: "Scene",
-        source_wrapper: "Object" | None = None,
+        source_wrapper: Union["Object", None] = None,
     ) -> None:
         self.obj = obj
         self.scene = scene
@@ -120,7 +120,7 @@ class ObjectLoader:
 
     def create_instance(
         self,
-        name: str | None = None,
+        name: Union[str, None] = None,
         register_object: bool = True,
         linked_data: bool = True,
     ) -> "Object":
@@ -153,7 +153,7 @@ class Object(_Serializable):
     properties: dict
     modifier_parameters: list[dict[str, JSONSerializable]]
 
-    index: int | None
+    index: Union[int, None]
 
     def __init__(
         self, obj: bpy.types.Object, scene: "Scene", register_object: bool = True
@@ -201,7 +201,7 @@ class Object(_Serializable):
 
     def copy(
         self,
-        name: str | None = None,
+        name: Union[str, None] = None,
         linked_data: bool = True,
         register_object: bool = True,
     ) -> "Object":
@@ -223,7 +223,7 @@ class Object(_Serializable):
 
     def set_location(
         self,
-        location: Union[mathutils.Vector, typing.Sequence[float]],
+        location: Union[mathutils.Vector, Sequence[float]],
     ):
         """
         Set the location of the object in 3D space.
@@ -273,7 +273,7 @@ class Object(_Serializable):
 
     def set_scale(
         self,
-        scale: Union[mathutils.Vector, typing.Sequence[float], float, int],
+        scale: Union[mathutils.Vector, Sequence[float], float, int],
     ):
         """
         Set the scale of the object.
@@ -308,7 +308,7 @@ class Object(_Serializable):
         self,
         input_name: str,
         value: Any,
-        modifier_name: str | None = None,
+        modifier_name: Union[str, None] = None,
     ):
         """
         Set an exposed Geometry Nodes modifier input.
@@ -385,7 +385,7 @@ class Object(_Serializable):
 
     def set_tags(
         self,
-        *tags: str | list[str],
+        *tags: Union[str, list[str]],
     ):
         """
         Set object's tags.
@@ -397,7 +397,7 @@ class Object(_Serializable):
 
     def add_tags(
         self,
-        *tags: str | list[str],
+        *tags: Union[str, list[str]],
     ):
         """
         Add tags to the object.
@@ -416,9 +416,9 @@ class Object(_Serializable):
         Orients the current object to point at another object, with an optional rotation around the direction vector.
         """
         bpy.context.view_layer.update()
-        direction = _get_object_world_location(
-            rv_obj.obj
-        ) - _get_object_world_location(self.obj)
+        direction = _get_object_world_location(rv_obj.obj) - _get_object_world_location(
+            self.obj
+        )
         rot_quat = direction.to_track_quat("-Z", "Y")
         if angle != 0.0:
             axis = direction.normalized()
@@ -601,11 +601,11 @@ class Object(_Serializable):
         linear_damping: float = 0.04,
         angular_damping: float = 0.1,
         use_margin: bool = True,
-        collision_margin: float | None = None,
-        use_deactivation: bool | None = None,
-        deactivate_linear_velocity: float | None = None,
-        deactivate_angular_velocity: float | None = None,
-        start_deactivated: bool | None = None,
+        collision_margin: Union[float, None] = None,
+        use_deactivation: Union[bool, None] = None,
+        deactivate_linear_velocity: Union[float, None] = None,
+        deactivate_angular_velocity: Union[float, None] = None,
+        start_deactivated: Union[bool, None] = None,
     ) -> "Object":
         """
         Add or update rigid-body settings for this object.

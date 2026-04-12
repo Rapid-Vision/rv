@@ -1,6 +1,6 @@
 import math
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from mathutils import Vector
 
@@ -46,7 +46,7 @@ def _normalize_scatter_source(
     )
 
 
-def _normalize_scatter_scale(scale: float | Float2) -> Float2:
+def _normalize_scatter_scale(scale: Union[float, Float2]) -> Float2:
     if isinstance(scale, (int, float)) and not isinstance(scale, bool):
         value = float(scale)
         if value <= 0:
@@ -84,7 +84,7 @@ def _validate_scatter_common(
     gap: float,
     yaw: Float2,
     rotation: str,
-    scale: float | Float2,
+    scale: Union[float, Float2],
     max_attempts_per_object: int,
     margin: float,
 ) -> ScatterValidationResult:
@@ -120,7 +120,7 @@ def _validate_scatter_common(
 
 
 def _init_scatter_stats(
-    requested: int, domain_kind: str, strategy: str, seed: int | None
+    requested: int, domain_kind: str, strategy: str, seed: Union[int, None]
 ) -> dict:
     return {
         "requested": requested,

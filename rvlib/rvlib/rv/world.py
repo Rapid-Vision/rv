@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import math
-from typing import Self
+from typing import Self, Union
 
 import bpy
 
@@ -34,8 +34,8 @@ class BasicWorld(World):
     `World` class representing a single color environmental lighting.
     """
 
-    color: ColorRGBA | None = None
-    strength: float | None = None
+    color: Union[ColorRGBA, None] = None
+    strength: Union[float, None] = None
 
     def __init__(self):
         pass
@@ -60,7 +60,9 @@ class BasicWorld(World):
             node_background.inputs["Strength"].default_value = self.strength
 
     def set_params(
-        self, color: ColorRGBA | None = None, strength: float | None = None
+        self,
+        color: Union[ColorRGBA, None] = None,
+        strength: Union[float, None] = None,
     ):
         if color is not None:
             self.color = color
@@ -76,12 +78,12 @@ class SkyWorld(World):
     For more information, view [official blender docs](https://docs.blender.org/manual/en/latest/render/shader_nodes/textures/sky.html).
     """
 
-    strength: float | None = None
-    sun_size: float | None = None
-    sun_intensity: float | None = None
-    sun_elevation: float | None = None
-    rotation_z: float | None = None
-    altitude: float | None = None
+    strength: Union[float, None] = None
+    sun_size: Union[float, None] = None
+    sun_intensity: Union[float, None] = None
+    sun_elevation: Union[float, None] = None
+    rotation_z: Union[float, None] = None
+    altitude: Union[float, None] = None
     air: float = 0.1
     aerosol_density: float = 0.01
     ozone: float = 10.0
@@ -128,14 +130,14 @@ class SkyWorld(World):
 
     def set_params(
         self,
-        strength: float | None = None,
-        sun_size: float | None = None,
-        sun_intensity: float | None = None,
-        sun_elevation: float | None = None,
-        rotation_z: float | None = None,
-        air: float | None = None,
-        aerosol_density: float | None = None,
-        ozone: float | None = None,
+        strength: Union[float, None] = None,
+        sun_size: Union[float, None] = None,
+        sun_intensity: Union[float, None] = None,
+        sun_elevation: Union[float, None] = None,
+        rotation_z: Union[float, None] = None,
+        air: Union[float, None] = None,
+        aerosol_density: Union[float, None] = None,
+        ozone: Union[float, None] = None,
     ):
         if strength is not None:
             self.strength = strength
@@ -162,8 +164,8 @@ class HDRIWorld(World):
     """
 
     hdri_path: str
-    strength: float | None = None
-    rotation_z: float | None = None
+    strength: Union[float, None] = None
+    rotation_z: Union[float, None] = None
 
     def __init__(self, hdri_path: str):
         self.hdri_path = hdri_path
@@ -207,9 +209,9 @@ class HDRIWorld(World):
 
     def set_params(
         self,
-        hdri_path: str | None = None,
-        strength: float | None = None,
-        rotation_z: float | None = None,
+        hdri_path: Union[str, None] = None,
+        strength: Union[float, None] = None,
+        rotation_z: Union[float, None] = None,
     ):
         if hdri_path is not None:
             self.hdri_path = hdri_path
@@ -226,10 +228,10 @@ class ImportedWorld(World):
     """
 
     filepath: str
-    world_name: str | None = None
+    world_name: Union[str, None] = None
     params: dict
 
-    def __init__(self, filepath: str, world_name: str | None = None):
+    def __init__(self, filepath: str, world_name: Union[str, None] = None):
         self.filepath = filepath
         self.world_name = world_name
         self.params = dict()

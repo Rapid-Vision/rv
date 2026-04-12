@@ -11,6 +11,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from typing import Union
 
 
 _BLOCKED_ENV_KEYS = {
@@ -58,7 +59,9 @@ def _remove_path_entry(raw_path: str, target: str) -> str:
     return os.pathsep.join(filtered)
 
 
-def _sanitized_blender_env(env: dict[str, str] | None = None) -> dict[str, str]:
+def _sanitized_blender_env(
+    env: Union[dict[str, str], None] = None
+) -> dict[str, str]:
     if env is None:
         env = os.environ
 

@@ -1,4 +1,5 @@
 import bpy
+from typing import Union
 
 from .compositor import _configure_semantic_aovs
 from .passes import PASS_MAP
@@ -32,7 +33,7 @@ def _set_time_limit(time_limit: float):
 
 
 def _configure_passes(
-    passes: RenderPassSet, semantic_channels: SemanticChannelSet | None = None
+    passes: RenderPassSet, semantic_channels: Union[SemanticChannelSet, None] = None
 ):
     """
     Enable/disable Cycles render-passes according to the `passes` list.

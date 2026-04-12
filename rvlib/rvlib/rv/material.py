@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Self
+from typing import Any, Self, Union
 
 import bpy
 
@@ -15,11 +15,11 @@ class Material(ABC, _Serializable):
     A material descriptor is converted to a real Blender material when assigned to an object.
     """
 
-    name: str | None
-    index: int | None
-    _resolved_material: bpy.types.Material | None
+    name: Union[str, None]
+    index: Union[int, None]
+    _resolved_material: Union[bpy.types.Material, None]
 
-    def __init__(self, name: str | None = None) -> None:
+    def __init__(self, name: Union[str, None] = None) -> None:
         super().__init__()
         self.name = name
         self.index = None
@@ -84,15 +84,15 @@ class BasicMaterial(Material):
     Material descriptor backed by Blender's Principled BSDF shader.
     """
 
-    base_color: ColorRGBA | None
-    roughness: float | None
-    metallic: float | None
-    specular: float | None
-    emission_color: ColorRGBA | None
-    emission_strength: float | None
-    alpha: float | None
-    transmission: float | None
-    ior: float | None
+    base_color: Union[ColorRGBA, None]
+    roughness: Union[float, None]
+    metallic: Union[float, None]
+    specular: Union[float, None]
+    emission_color: Union[ColorRGBA, None]
+    emission_strength: Union[float, None]
+    alpha: Union[float, None]
+    transmission: Union[float, None]
+    ior: Union[float, None]
     properties: dict
 
     def __init__(self, name: str = "Material"):
@@ -111,14 +111,14 @@ class BasicMaterial(Material):
     def set_params(
         self,
         base_color: OptionalColor = None,
-        roughness: float | None = None,
-        metallic: float | None = None,
-        specular: float | None = None,
+        roughness: Union[float, None] = None,
+        metallic: Union[float, None] = None,
+        specular: Union[float, None] = None,
         emission_color: OptionalColor = None,
-        emission_strength: float | None = None,
-        alpha: float | None = None,
-        transmission: float | None = None,
-        ior: float | None = None,
+        emission_strength: Union[float, None] = None,
+        alpha: Union[float, None] = None,
+        transmission: Union[float, None] = None,
+        ior: Union[float, None] = None,
     ):
         if base_color is not None:
             self.base_color = _as_rgba(base_color)
@@ -192,10 +192,10 @@ class ImportedMaterial(Material):
     """
 
     filepath: str
-    material_name: str | None
+    material_name: Union[str, None]
     params: dict
 
-    def __init__(self, filepath: str, material_name: str | None = None):
+    def __init__(self, filepath: str, material_name: Union[str, None] = None):
         super().__init__(name=material_name)
         self.filepath = filepath
         self.material_name = material_name

@@ -38,6 +38,7 @@ __pycache__
 # Editor/IDE
 # .idea/
 .vscode/
+.codex
 
 # Blender backup files
 *.blend1

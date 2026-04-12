@@ -1,4 +1,5 @@
 import bpy
+from typing import Union
 
 
 def _normalize_modifier_input_name(name: str) -> str:
@@ -73,8 +74,8 @@ def _resolve_modifier_input_key(modifier, input_name: str) -> str:
 
 def _resolve_nodes_modifier(
     obj: bpy.types.Object,
-    input_name: str | None = None,
-    modifier_name: str | None = None,
+    input_name: Union[str, None] = None,
+    modifier_name: Union[str, None] = None,
 ):
     modifiers = list(getattr(obj, "modifiers", []))
     if modifier_name is not None:
