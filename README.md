@@ -149,5 +149,17 @@ Run Blender integration tests:
 make test-blender
 ```
 
+Run rendering regression tests:
+
+```bash
+make test-regression
+```
+
+Regenerate regression goldens intentionally:
+
+```bash
+make regen-regression
+```
+
 The Blender test command resolves Blender the same way as `rv` runtime:
 `BLENDER_PATH`, then `blender` from `PATH`, then OS fallback locations.

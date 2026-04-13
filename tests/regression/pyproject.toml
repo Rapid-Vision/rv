@@ -1,0 +1,17 @@
+[project]
+name = "regression"
+version = "0.1.0"
+description = "Regression runner for rendering example scenes."
+requires-python = ">=3.14"
+dependencies = [
+    "numpy>=2.3.0",
+    "opencv-python>=4.13.0.92",
+    "OpenEXR>=3.4.2",
+]
+
+[tool.uv]
+package = false
+
+[build-system]
+requires = ["uv_build>=0.10.0,<0.11.0"]
+build-backend = "uv_build"

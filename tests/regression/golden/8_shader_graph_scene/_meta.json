@@ -1,0 +1,250 @@
+{
+    "custom_meta": {},
+    "resolution": [
+        192,
+        192
+    ],
+    "time_limit": 30.0,
+    "seed": 42,
+    "seed_mode": "fixed",
+    "passes": [],
+    "tags": [],
+    "semantic_channels": [],
+    "semantic_mask_threshold": 0.5,
+    "objects": [
+        {
+            "custom_meta": {},
+            "index": 4,
+            "name": "Focus",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                0.75
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 1,
+            "name": "Camera",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                3.0,
+                -3.0,
+                1.7999999523162842
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "fov_degrees": 39.597755335771296
+        },
+        {
+            "custom_meta": {},
+            "index": 2,
+            "name": "Sphere",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "ShaderGraphMaterial"
+            ],
+            "location": [
+                0.0,
+                0.0,
+                0.75
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 3,
+            "name": "Ground",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "GroundMaterial"
+            ],
+            "location": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    ],
+    "materials": [
+        {
+            "custom_meta": {},
+            "type": "ShaderMaterial",
+            "index": 1,
+            "name": "ShaderGraphMaterial",
+            "shader": {
+                "type": "PrincipledBSDF",
+                "base_color": {
+                    "type": "BinaryMath",
+                    "operation": "ADD",
+                    "left": {
+                        "type": "BinaryMath",
+                        "operation": "MULTIPLY",
+                        "left": {
+                            "type": "TextureImage",
+                            "path": "base.jpg",
+                            "colorspace": "sRGB",
+                            "interpolation": "Linear",
+                            "projection": "FLAT"
+                        },
+                        "right": {
+                            "type": "ColorValue",
+                            "value": [
+                                0.7,
+                                0.7,
+                                0.7,
+                                1.0
+                            ]
+                        }
+                    },
+                    "right": {
+                        "type": "ColorValue",
+                        "value": [
+                            0.1,
+                            0.1,
+                            0.1,
+                            1.0
+                        ]
+                    }
+                },
+                "metallic": {
+                    "type": "Value",
+                    "value": 0.05
+                },
+                "roughness": {
+                    "type": "Value",
+                    "value": 0.35
+                },
+                "specular": null,
+                "normal": {
+                    "type": "NormalMap",
+                    "color": {
+                        "type": "TextureImage",
+                        "path": "normal.png",
+                        "colorspace": "Non-Color",
+                        "interpolation": "Linear",
+                        "projection": "FLAT"
+                    },
+                    "strength": {
+                        "type": "Value",
+                        "value": 0.2
+                    },
+                    "space": "TANGENT"
+                },
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 2,
+            "name": "GroundMaterial",
+            "params": {
+                "base_color": [
+                    0.12,
+                    0.12,
+                    0.12,
+                    1.0
+                ],
+                "roughness": 0.9,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        }
+    ],
+    "lights": [
+        {
+            "custom_meta": {},
+            "index": 1,
+            "name": "Key",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                2.0,
+                -2.0,
+                3.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "light_type": "POINT",
+            "power": 80.0,
+            "color": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "cast_shadow": true,
+            "specular_factor": 1.0,
+            "radius": 0.0
+        }
+    ]
+}

@@ -1,0 +1,342 @@
+{
+    "custom_meta": {},
+    "resolution": [
+        192,
+        192
+    ],
+    "time_limit": 30.0,
+    "seed": 42,
+    "seed_mode": "fixed",
+    "passes": [],
+    "tags": [],
+    "semantic_channels": [],
+    "semantic_mask_threshold": 0.5,
+    "objects": [
+        {
+            "custom_meta": {},
+            "index": 1,
+            "name": "Camera",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                5.0,
+                5.0,
+                2.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "fov_degrees": 39.597755335771296
+        },
+        {
+            "custom_meta": {},
+            "index": 7,
+            "name": "Cube.005",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.0,
+                2.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 11,
+            "name": "Plane",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 12,
+            "name": "Empty",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 4,
+            "name": "Cube.002",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                2.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 5,
+            "name": "Cube.003",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.0,
+                0.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 8,
+            "name": "Cube.006",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                2.0,
+                0.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 6,
+            "name": "Cube.004",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.0,
+                1.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 9,
+            "name": "Cube.007",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                2.0,
+                1.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 3,
+            "name": "Cube.001",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                1.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 10,
+            "name": "Cube.008",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                2.0,
+                2.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 2,
+            "name": "Cube",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                0.5
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+            ]
+        }
+    ],
+    "materials": [],
+    "lights": [
+        {
+            "custom_meta": {},
+            "index": 1,
+            "name": "Point",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                2.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "light_type": "POINT",
+            "power": 10.0,
+            "color": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "cast_shadow": true,
+            "specular_factor": 1.0,
+            "radius": 0.0
+        }
+    ]
+}

@@ -1,0 +1,381 @@
+{
+    "custom_meta": {},
+    "resolution": [
+        192,
+        192
+    ],
+    "time_limit": 30.0,
+    "seed": 42,
+    "seed_mode": "fixed",
+    "passes": [
+        "Z"
+    ],
+    "tags": [],
+    "semantic_channels": [],
+    "semantic_mask_threshold": 0.5,
+    "objects": [
+        {
+            "custom_meta": {},
+            "index": 1,
+            "name": "Camera",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                6.0,
+                -5.0,
+                3.200000047683716
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "fov_degrees": 39.597755335771296
+        },
+        {
+            "custom_meta": {},
+            "index": 7,
+            "name": "WallCube_1_0",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.326633095741272,
+                -0.4962378740310669,
+                0.599998414516449
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 11,
+            "name": "WallCube_2_1",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.325676679611206,
+                0.014125928282737732,
+                0.20000000298023224
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0000001192092896,
+                1.0,
+                1.0000001192092896
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 12,
+            "name": "WallCube_2_2",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.376354694366455,
+                0.5585021376609802,
+                0.9999996423721313
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 5,
+            "name": "WallCube_0_1",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                3.7933404445648193,
+                -0.03893843665719032,
+                0.20000000298023224
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 2,
+            "name": "Ground",
+            "tags": [
+                "ground"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 8,
+            "name": "WallCube_1_1",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                4.26630163192749,
+                -0.06842333823442459,
+                0.20000000298023224
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 6,
+            "name": "WallCube_0_2",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.3385701179504395,
+                0.5007443428039551,
+                0.19999995827674866
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 14,
+            "name": "LookAt",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.800000011920929,
+                0.0,
+                0.800000011920929
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 3,
+            "name": "Ramp",
+            "tags": [
+                "ramp"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                -2.4000000953674316,
+                0.0,
+                0.8999999761581421
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.9999999403953552,
+                1.0,
+                0.9999999403953552
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 4,
+            "name": "WallCube_0_0",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.3287949562072754,
+                -0.5078835487365723,
+                0.1999991089105606
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 10,
+            "name": "WallCube_2_0",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.3091634511947632,
+                -0.49127280712127686,
+                0.9999975562095642
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 13,
+            "name": "Ball",
+            "tags": [
+                "sphere"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                4.090640544891357,
+                1.6442997455596924,
+                0.2800000011920929
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                0.9999999403953552,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 9,
+            "name": "WallCube_1_2",
+            "tags": [
+                "wall_cube"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.3365626335144043,
+                0.49256041646003723,
+                0.599999725818634
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    ],
+    "materials": [],
+    "lights": []
+}

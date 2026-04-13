@@ -1,4 +1,4 @@
-.PHONY: docs rtasks test-python-unit test-blender test-go mypy ruff radon staticcheck
+.PHONY: docs rtasks test-python-unit test-blender test-go test-regression regen-regression mypy ruff radon staticcheck
 
 # Python verification
 mypy:
@@ -34,3 +34,9 @@ test-python-unit:
 
 test-blender:
 	python3 scripts/run_blender.py --background --factory-startup --python scripts/run_blender_tests.py
+
+test-regression:
+	cd tests/regression && uv run main.py test
+
+regen-regression:
+	cd tests/regression && uv run main.py regenerate

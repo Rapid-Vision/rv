@@ -1,0 +1,134 @@
+{
+    "custom_meta": {},
+    "resolution": [
+        192,
+        192
+    ],
+    "time_limit": 30.0,
+    "seed": 42,
+    "seed_mode": "fixed",
+    "passes": [],
+    "tags": [],
+    "semantic_channels": [],
+    "semantic_mask_threshold": 0.5,
+    "objects": [
+        {
+            "custom_meta": {},
+            "index": 2,
+            "name": "Rock.001",
+            "tags": [],
+            "properties": {
+                "highlight_color": [
+                    0.3167507528655867,
+                    0.23875146591845597,
+                    0.18892842952595293
+                ],
+                "color_base": [
+                    0.93,
+                    0.92,
+                    0.91
+                ]
+            },
+            "modifier_parameters": [
+                {
+                    "modifier_name": "GeometryNodes",
+                    "parameter_name": "seed1",
+                    "value": 639.4267984578837
+                }
+            ],
+            "materials": [
+                "Rock"
+            ],
+            "location": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 1,
+            "name": "Camera",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                1.0,
+                0.0,
+                0.20000000298023224
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "fov_degrees": 39.597755335771296
+        },
+        {
+            "custom_meta": {},
+            "index": 3,
+            "name": "Plane",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 4,
+            "name": "Empty",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                0.10000000149011612
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    ],
+    "materials": [],
+    "lights": []
+}

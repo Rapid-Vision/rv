@@ -1,0 +1,1660 @@
+{
+    "custom_meta": {
+        "scatter_runs": [
+            {
+                "requested": 30,
+                "placed": 30,
+                "attempts": 33,
+                "rejected_boundary": 0,
+                "rejected_overlap": 3,
+                "rejected_attempt_limit": 0,
+                "strategy": "exact",
+                "domain_kind": "ellipse",
+                "seed": 42
+            }
+        ]
+    },
+    "resolution": [
+        192,
+        192
+    ],
+    "time_limit": 30.0,
+    "seed": 42,
+    "seed_mode": "fixed",
+    "passes": [],
+    "tags": [],
+    "semantic_channels": [],
+    "semantic_mask_threshold": 0.5,
+    "objects": [
+        {
+            "custom_meta": {},
+            "index": 25,
+            "name": "ScatterSourceCube.021",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_20"
+            ],
+            "location": [
+                0.9238026738166809,
+                7.340297698974609,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.1637716144323349,
+                0.1637716144323349,
+                0.1637716144323349
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 2,
+            "name": "Plane",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                -1.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 16,
+            "name": "ScatterSourceCube.012",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_11"
+            ],
+            "location": [
+                6.801656723022461,
+                4.829106330871582,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.9975932240486145,
+                0.9975932240486145,
+                0.9975932240486145
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 34,
+            "name": "ScatterSourceCube.030",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_29"
+            ],
+            "location": [
+                -3.102458953857422,
+                4.202014923095703,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.6087042093276978,
+                0.6087042093276978,
+                0.6087042093276978
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 17,
+            "name": "ScatterSourceCube.013",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_12"
+            ],
+            "location": [
+                -8.674385070800781,
+                4.602040767669678,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.636768102645874,
+                0.636768102645874,
+                0.636768102645874
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 18,
+            "name": "ScatterSourceCube.014",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_13"
+            ],
+            "location": [
+                -7.540161609649658,
+                -1.070228099822998,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.7135393023490906,
+                0.7135393023490906,
+                0.7135393023490906
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 32,
+            "name": "ScatterSourceCube.028",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_27"
+            ],
+            "location": [
+                -9.706159591674805,
+                -3.162654161453247,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.9718384146690369,
+                0.9718384146690369,
+                0.9718384146690369
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 14,
+            "name": "ScatterSourceCube.010",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_9"
+            ],
+            "location": [
+                -11.59394645690918,
+                -3.12410044670105,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.9218224883079529,
+                0.9218224883079529,
+                0.9218224883079529
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 8,
+            "name": "ScatterSourceCube.004",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_3"
+            ],
+            "location": [
+                0.40610918402671814,
+                -2.866994857788086,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.29378238320350647,
+                0.29378238320350647,
+                0.29378238320350647
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 6,
+            "name": "ScatterSourceCube.002",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_1"
+            ],
+            "location": [
+                6.0172648429870605,
+                2.4105684757232666,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.12860441207885742,
+                0.12860441207885742,
+                0.12860441207885742
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 30,
+            "name": "ScatterSourceCube.026",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_25"
+            ],
+            "location": [
+                9.399893760681152,
+                -6.4256510734558105,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.5332225561141968,
+                0.5332225561141968,
+                0.5332225561141968
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 26,
+            "name": "ScatterSourceCube.022",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_21"
+            ],
+            "location": [
+                -9.432528495788574,
+                0.9704228043556213,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.3186975121498108,
+                0.3186975121498108,
+                0.3186975121498108
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 13,
+            "name": "ScatterSourceCube.009",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_8"
+            ],
+            "location": [
+                7.27898645401001,
+                -6.616787910461426,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.7161528468132019,
+                0.7161528468132019,
+                0.7161528468132019
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 15,
+            "name": "ScatterSourceCube.011",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_10"
+            ],
+            "location": [
+                0.2381296455860138,
+                6.741691589355469,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.33839213848114014,
+                0.33839213848114014,
+                0.33839213848114014
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 27,
+            "name": "ScatterSourceCube.023",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_22"
+            ],
+            "location": [
+                4.682471752166748,
+                -0.28044965863227844,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.7060281038284302,
+                0.7060281038284302,
+                0.7060281038284302
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 7,
+            "name": "ScatterSourceCube.003",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_2"
+            ],
+            "location": [
+                -11.427660942077637,
+                -4.307081699371338,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.2983965575695038,
+                0.2983965575695038,
+                0.2983965575695038
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 10,
+            "name": "ScatterSourceCube.006",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_5"
+            ],
+            "location": [
+                -0.9041309952735901,
+                -1.8486460447311401,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.6196169257164001,
+                0.6196169257164001,
+                0.6196169257164001
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 22,
+            "name": "ScatterSourceCube.018",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_17"
+            ],
+            "location": [
+                6.7873215675354,
+                -4.205923080444336,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.33855095505714417,
+                0.33855095505714417,
+                0.33855095505714417
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 21,
+            "name": "ScatterSourceCube.017",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_16"
+            ],
+            "location": [
+                5.9786834716796875,
+                -8.145468711853027,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.7587168216705322,
+                0.7587168216705322,
+                0.7587168216705322
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 11,
+            "name": "ScatterSourceCube.007",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_6"
+            ],
+            "location": [
+                -13.116661071777344,
+                2.3719396591186523,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.44211360812187195,
+                0.44211360812187195,
+                0.44211360812187195
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 4,
+            "name": "ScatterSourceCube",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                -1000.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 24,
+            "name": "ScatterSourceCube.020",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_19"
+            ],
+            "location": [
+                0.8771983981132507,
+                4.1905364990234375,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.629477858543396,
+                0.629477858543396,
+                0.629477858543396
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 29,
+            "name": "ScatterSourceCube.025",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_24"
+            ],
+            "location": [
+                13.715042114257812,
+                -0.03709985688328743,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.14552949368953705,
+                0.14552949368953705,
+                0.14552949368953705
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 28,
+            "name": "ScatterSourceCube.024",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_23"
+            ],
+            "location": [
+                4.0899834632873535,
+                2.9732918739318848,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.5826571583747864,
+                0.5826571583747864,
+                0.5826571583747864
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 9,
+            "name": "ScatterSourceCube.005",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_4"
+            ],
+            "location": [
+                -14.415298461914062,
+                -2.0035173892974854,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.7567586302757263,
+                0.7567586302757263,
+                0.7567586302757263
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 1,
+            "name": "Camera",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                24.0,
+                -24.0,
+                16.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "fov_degrees": 39.597755335771296
+        },
+        {
+            "custom_meta": {},
+            "index": 5,
+            "name": "ScatterSourceCube.001",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_0"
+            ],
+            "location": [
+                -1.1099056005477905,
+                4.199594020843506,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.1225096806883812,
+                0.1225096806883812,
+                0.1225096806883812
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 33,
+            "name": "ScatterSourceCube.029",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_28"
+            ],
+            "location": [
+                -13.823493957519531,
+                -0.408298522233963,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.1511916220188141,
+                0.1511916220188141,
+                0.1511916220188141
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 12,
+            "name": "ScatterSourceCube.008",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_7"
+            ],
+            "location": [
+                6.090006351470947,
+                6.7607340812683105,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.6482179164886475,
+                0.6482179164886475,
+                0.6482179164886475
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 19,
+            "name": "ScatterSourceCube.015",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_14"
+            ],
+            "location": [
+                0.802544116973877,
+                -6.394556045532227,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.9746993184089661,
+                0.9746993184089661,
+                0.9746993184089661
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 31,
+            "name": "ScatterSourceCube.027",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_26"
+            ],
+            "location": [
+                -4.221932888031006,
+                -7.26319694519043,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.3567242920398712,
+                0.3567242920398712,
+                0.3567242920398712
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 3,
+            "name": "Empty",
+            "tags": [],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [],
+            "location": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 20,
+            "name": "ScatterSourceCube.016",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_15"
+            ],
+            "location": [
+                8.54015064239502,
+                0.018412623554468155,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.5773183107376099,
+                0.5773183107376099,
+                0.5773183107376099
+            ]
+        },
+        {
+            "custom_meta": {},
+            "index": 23,
+            "name": "ScatterSourceCube.019",
+            "tags": [
+                "parametric"
+            ],
+            "properties": {},
+            "modifier_parameters": [],
+            "materials": [
+                "CubeMat_18"
+            ],
+            "location": [
+                -4.330474853515625,
+                -4.847264766693115,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                0.4590930640697479,
+                0.4590930640697479,
+                0.4590930640697479
+            ]
+        }
+    ],
+    "materials": [
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 17,
+            "name": "CubeMat_16",
+            "params": {
+                "base_color": [
+                    0.12576051152044132,
+                    0.6597508227473674,
+                    0.9468486797049909,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 8,
+            "name": "CubeMat_7",
+            "params": {
+                "base_color": [
+                    0.3794554417576478,
+                    0.9895233506365952,
+                    0.6399997598540929,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 1,
+            "name": "CubeMat_0",
+            "params": {
+                "base_color": [
+                    0.6766994874229113,
+                    0.8921795677048454,
+                    0.08693883262941615,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 10,
+            "name": "CubeMat_9",
+            "params": {
+                "base_color": [
+                    0.4992312594922773,
+                    0.8846831538867025,
+                    0.6428518702004242,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 13,
+            "name": "CubeMat_12",
+            "params": {
+                "base_color": [
+                    0.2514141199818132,
+                    0.5532258962152875,
+                    0.9424308613798098,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 6,
+            "name": "CubeMat_5",
+            "params": {
+                "base_color": [
+                    0.28938796360210717,
+                    0.0797919769236275,
+                    0.23279088636103018,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 15,
+            "name": "CubeMat_14",
+            "params": {
+                "base_color": [
+                    0.6253001935664175,
+                    0.8416693481724671,
+                    0.5076628819776342,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 27,
+            "name": "CubeMat_26",
+            "params": {
+                "base_color": [
+                    0.6618713119507452,
+                    0.4866714116543295,
+                    0.18989786726763713,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 11,
+            "name": "CubeMat_10",
+            "params": {
+                "base_color": [
+                    0.5845859902235405,
+                    0.897822883602477,
+                    0.39940050514039727,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 20,
+            "name": "CubeMat_19",
+            "params": {
+                "base_color": [
+                    0.6311029572700989,
+                    0.22894178381115438,
+                    0.905420013006128,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 21,
+            "name": "CubeMat_20",
+            "params": {
+                "base_color": [
+                    0.132311848725025,
+                    0.935514240580671,
+                    0.5710430933252845,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 30,
+            "name": "CubeMat_29",
+            "params": {
+                "base_color": [
+                    0.3141838627955761,
+                    0.2656145125313538,
+                    0.13087828212745645,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 4,
+            "name": "CubeMat_3",
+            "params": {
+                "base_color": [
+                    0.3589793804846284,
+                    0.3439557224789711,
+                    0.26452086722201307,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 22,
+            "name": "CubeMat_21",
+            "params": {
+                "base_color": [
+                    0.6589827495146631,
+                    0.3542975665895538,
+                    0.41110227604973804,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 9,
+            "name": "CubeMat_8",
+            "params": {
+                "base_color": [
+                    0.03210024390403776,
+                    0.3154530480590819,
+                    0.26774087597570273,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 3,
+            "name": "CubeMat_2",
+            "params": {
+                "base_color": [
+                    0.8058192518328079,
+                    0.6981393949882269,
+                    0.3402505165179919,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 23,
+            "name": "CubeMat_22",
+            "params": {
+                "base_color": [
+                    0.33930260539496315,
+                    0.8616725363527911,
+                    0.24865633392028563,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 7,
+            "name": "CubeMat_6",
+            "params": {
+                "base_color": [
+                    0.3552707002275215,
+                    0.6701751743776934,
+                    0.7018203134585513,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 5,
+            "name": "CubeMat_4",
+            "params": {
+                "base_color": [
+                    0.552040631273227,
+                    0.8294046642529949,
+                    0.6185197523642461,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 24,
+            "name": "CubeMat_23",
+            "params": {
+                "base_color": [
+                    0.8744859540705799,
+                    0.07538488837428936,
+                    0.8080222447317026,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 16,
+            "name": "CubeMat_15",
+            "params": {
+                "base_color": [
+                    0.9290986162646171,
+                    0.8787218778231842,
+                    0.8316655293611794,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 25,
+            "name": "CubeMat_24",
+            "params": {
+                "base_color": [
+                    0.9263669830081276,
+                    0.8486957344143055,
+                    0.16631111060391401,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 26,
+            "name": "CubeMat_25",
+            "params": {
+                "base_color": [
+                    0.002155378351426429,
+                    0.39042175758781317,
+                    0.9265180735593334,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 28,
+            "name": "CubeMat_27",
+            "params": {
+                "base_color": [
+                    0.05716527290748308,
+                    0.5841775944589712,
+                    0.5028503829195136,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 12,
+            "name": "CubeMat_11",
+            "params": {
+                "base_color": [
+                    0.8611029096666658,
+                    0.15284131934826106,
+                    0.15998200172245025,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 2,
+            "name": "CubeMat_1",
+            "params": {
+                "base_color": [
+                    0.561245062938613,
+                    0.7160196129224035,
+                    0.7013249735902359,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 18,
+            "name": "CubeMat_17",
+            "params": {
+                "base_color": [
+                    0.5392960887794583,
+                    0.7299310690899762,
+                    0.2011510633896959,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 29,
+            "name": "CubeMat_28",
+            "params": {
+                "base_color": [
+                    0.06796086337575724,
+                    0.8618192019701294,
+                    0.40377555131827747,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 19,
+            "name": "CubeMat_18",
+            "params": {
+                "base_color": [
+                    0.45148614139112975,
+                    0.24790561366600794,
+                    0.06402589632634492,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        },
+        {
+            "custom_meta": {},
+            "type": "BasicMaterial",
+            "index": 14,
+            "name": "CubeMat_13",
+            "params": {
+                "base_color": [
+                    0.11155217359587644,
+                    0.434765250669105,
+                    0.45372370632920644,
+                    1.0
+                ],
+                "roughness": 0.4,
+                "metallic": null,
+                "specular": null,
+                "emission_color": null,
+                "emission_strength": null,
+                "alpha": null,
+                "transmission": null,
+                "ior": null
+            },
+            "properties": {}
+        }
+    ],
+    "lights": []
+}
