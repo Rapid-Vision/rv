@@ -34,6 +34,87 @@ if TYPE_CHECKING:
     from .scene import Scene
 
 
+_RIGIDBODY_SHAPE_MAP = {
+    "box": "BOX",
+    "sphere": "SPHERE",
+    "hull": "CONVEX_HULL",
+    "mesh": "MESH",
+    "capsule": "CAPSULE",
+    "cylinder": "CYLINDER",
+    "cone": "CONE",
+}
+
+
+def _validate_rigidbody_options(
+    obj: bpy.types.Object,
+    mode: str,
+    mesh_source: str,
+    collision_margin: Union[float, None],
+    deactivate_linear_velocity: Union[float, None],
+    deactivate_angular_velocity: Union[float, None],
+) -> str:
+    if mode not in _RIGIDBODY_SHAPE_MAP:
+        raise ValueError(
+            "mode must be one of: box, sphere, hull, mesh, capsule, cylinder, cone."
+        )
+    if mesh_source not in {"BASE", "DEFORM", "FINAL"}:
+        raise ValueError("mesh_source must be one of: BASE, DEFORM, FINAL.")
+    if collision_margin is not None and float(collision_margin) < 0:
+        raise ValueError("collision_margin must be >= 0.")
+    if (
+        deactivate_linear_velocity is not None
+        and float(deactivate_linear_velocity) < 0
+    ):
+        raise ValueError("deactivate_linear_velocity must be >= 0.")
+    if (
+        deactivate_angular_velocity is not None
+        and float(deactivate_angular_velocity) < 0
+    ):
+        raise ValueError("deactivate_angular_velocity must be >= 0.")
+    if obj.type != "MESH":
+        raise TypeError("Rigid body is supported only for mesh objects.")
+    return _RIGIDBODY_SHAPE_MAP[mode]
+
+
+def _resolve_collision_margin(
+    rv_obj: "Object", collision_margin: Union[float, None]
+) -> float:
+    if collision_margin is not None:
+        return float(collision_margin)
+    return max(0.0, min(rv_obj.get_dimensions("world")) * 0.01)
+
+
+def _apply_optional_rigidbody_settings(
+    rb,
+    use_deactivation: Union[bool, None],
+    deactivate_linear_velocity: Union[float, None],
+    deactivate_angular_velocity: Union[float, None],
+    start_deactivated: Union[bool, None],
+) -> None:
+    if use_deactivation is not None:
+        _require_blender_attr(rb, "use_deactivation", "rigid body deactivation")
+        rb.use_deactivation = bool(use_deactivation)
+    if deactivate_linear_velocity is not None:
+        _require_blender_attr(
+            rb,
+            "deactivate_linear_velocity",
+            "rigid body deactivate_linear_velocity",
+        )
+        rb.deactivate_linear_velocity = float(deactivate_linear_velocity)
+    if deactivate_angular_velocity is not None:
+        _require_blender_attr(
+            rb,
+            "deactivate_angular_velocity",
+            "rigid body deactivate_angular_velocity",
+        )
+        rb.deactivate_angular_velocity = float(deactivate_angular_velocity)
+    if start_deactivated is not None:
+        _require_blender_attr(
+            rb, "use_start_deactivated", "rigid body start_deactivated"
+        )
+        rb.use_start_deactivated = bool(start_deactivated)
+
+
 @dataclass(frozen=True, slots=True)
 class ObjectStats:
     """
@@ -615,35 +696,14 @@ class Object(_Serializable):
         """
         Add or update rigid-body settings for this object.
         """
-        shape_map = {
-            "box": "BOX",
-            "sphere": "SPHERE",
-            "hull": "CONVEX_HULL",
-            "mesh": "MESH",
-            "capsule": "CAPSULE",
-            "cylinder": "CYLINDER",
-            "cone": "CONE",
-        }
-        if mode not in shape_map:
-            raise ValueError(
-                "mode must be one of: box, sphere, hull, mesh, capsule, cylinder, cone."
-            )
-        if mesh_source not in {"BASE", "DEFORM", "FINAL"}:
-            raise ValueError("mesh_source must be one of: BASE, DEFORM, FINAL.")
-        if collision_margin is not None and float(collision_margin) < 0:
-            raise ValueError("collision_margin must be >= 0.")
-        if (
-            deactivate_linear_velocity is not None
-            and float(deactivate_linear_velocity) < 0
-        ):
-            raise ValueError("deactivate_linear_velocity must be >= 0.")
-        if (
-            deactivate_angular_velocity is not None
-            and float(deactivate_angular_velocity) < 0
-        ):
-            raise ValueError("deactivate_angular_velocity must be >= 0.")
-        if self.obj.type != "MESH":
-            raise TypeError("Rigid body is supported only for mesh objects.")
+        collision_shape = _validate_rigidbody_options(
+            self.obj,
+            mode,
+            mesh_source,
+            collision_margin,
+            deactivate_linear_velocity,
+            deactivate_angular_velocity,
+        )
         _ensure_rigidbody_world()
         self._select_for_shading_ops()
         if self.obj.rigid_body is None:
@@ -651,7 +711,7 @@ class Object(_Serializable):
 
         rb = self.obj.rigid_body
         rb.type = body_type
-        rb.collision_shape = shape_map[mode]
+        rb.collision_shape = collision_shape
         _require_blender_attr(rb, "mesh_source", "rigid body mesh_source")
         rb.mesh_source = mesh_source
         rb.mass = max(float(mass), 1e-6)
@@ -662,32 +722,14 @@ class Object(_Serializable):
         _require_blender_attr(rb, "use_margin", "rigid body collision margins")
         rb.use_margin = bool(use_margin)
         _require_blender_attr(rb, "collision_margin", "rigid body collision margins")
-        if collision_margin is None:
-            rb.collision_margin = max(0.0, min(self.get_dimensions("world")) * 0.01)
-        else:
-            rb.collision_margin = float(collision_margin)
-        if use_deactivation is not None:
-            _require_blender_attr(rb, "use_deactivation", "rigid body deactivation")
-            rb.use_deactivation = bool(use_deactivation)
-        if deactivate_linear_velocity is not None:
-            _require_blender_attr(
-                rb,
-                "deactivate_linear_velocity",
-                "rigid body deactivate_linear_velocity",
-            )
-            rb.deactivate_linear_velocity = float(deactivate_linear_velocity)
-        if deactivate_angular_velocity is not None:
-            _require_blender_attr(
-                rb,
-                "deactivate_angular_velocity",
-                "rigid body deactivate_angular_velocity",
-            )
-            rb.deactivate_angular_velocity = float(deactivate_angular_velocity)
-        if start_deactivated is not None:
-            _require_blender_attr(
-                rb, "use_start_deactivated", "rigid body start_deactivated"
-            )
-            rb.use_start_deactivated = bool(start_deactivated)
+        rb.collision_margin = _resolve_collision_margin(self, collision_margin)
+        _apply_optional_rigidbody_settings(
+            rb,
+            use_deactivation,
+            deactivate_linear_velocity,
+            deactivate_angular_velocity,
+            start_deactivated,
+        )
         return self
 
     def remove_rigidbody(

@@ -289,6 +289,46 @@ def _internal_iter_cycles_devices(preferences):
     return []
 
 
+def _refresh_cycles_devices(preferences) -> None:
+    refresh_devices = getattr(preferences, "refresh_devices", None)
+    if callable(refresh_devices):
+        refresh_devices()
+
+
+def _normalize_requested_backend(requested_backend: str) -> str:
+    requested = requested_backend.strip().lower()
+    if requested not in _INTERNAL_VALID_GPU_BACKENDS:
+        raise ValueError(
+            "--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu"
+        )
+    return requested
+
+
+def _auto_select_backend(available_types: set[str]) -> str:
+    for backend in ("OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"):
+        if backend in available_types:
+            return backend.lower()
+    return "cpu"
+
+
+def _enable_cycles_backend(preferences, selected_type: str) -> None:
+    preferences.compute_device_type = selected_type
+    _refresh_cycles_devices(preferences)
+
+    enabled_gpu = False
+    for device in _internal_iter_cycles_devices(preferences):
+        is_matching_gpu = device.type == selected_type
+        if hasattr(device, "use"):
+            device.use = is_matching_gpu
+        if is_matching_gpu:
+            enabled_gpu = True
+
+    if not enabled_gpu:
+        raise RuntimeError(
+            f"Requested GPU backend {selected_type} found no enabled devices"
+        )
+
+
 def _internal_configure_cycles_backend(requested_backend: str) -> str:
     scene = bpy.context.scene
     scene.cycles.device = "GPU"
@@ -298,26 +338,14 @@ def _internal_configure_cycles_backend(requested_backend: str) -> str:
     except KeyError as exc:
         raise RuntimeError("Cycles add-on preferences are unavailable") from exc
 
-    refresh_devices = getattr(preferences, "refresh_devices", None)
-    if callable(refresh_devices):
-        refresh_devices()
-
-    requested = requested_backend.strip().lower()
-    if requested not in _INTERNAL_VALID_GPU_BACKENDS:
-        raise ValueError(
-            "--gpu-backend must be one of auto, optix, cuda, hip, oneapi, metal, cpu"
-        )
+    _refresh_cycles_devices(preferences)
+    requested = _normalize_requested_backend(requested_backend)
 
     available_types = {
         device.type for device in _internal_iter_cycles_devices(preferences)
     }
     if requested == "auto":
-        for backend in ("OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"):
-            if backend in available_types:
-                requested = backend.lower()
-                break
-        else:
-            requested = "cpu"
+        requested = _auto_select_backend(available_types)
 
     if requested == "cpu":
         scene.cycles.device = "CPU"
@@ -331,21 +359,7 @@ def _internal_configure_cycles_backend(requested_backend: str) -> str:
             f"Available device types: {', '.join(available)}"
         )
 
-    preferences.compute_device_type = selected_type
-    if callable(refresh_devices):
-        refresh_devices()
-
-    enabled_gpu = False
-    for device in _internal_iter_cycles_devices(preferences):
-        is_matching_gpu = device.type == selected_type
-        if hasattr(device, "use"):
-            device.use = is_matching_gpu
-        if is_matching_gpu:
-            enabled_gpu = True
-
-    if not enabled_gpu:
-        raise RuntimeError(f"Requested GPU backend {selected_type} found no enabled devices")
-
+    _enable_cycles_backend(preferences, selected_type)
     scene.cycles.device = "GPU"
     return selected_type
 

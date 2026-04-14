@@ -249,6 +249,91 @@ class _SpatialHash:
         return result
 
 
+def _estimate_scatter_radii(
+    loaders: list["ObjectLoader"], domain: Domain, scale_max: float
+) -> tuple[dict[int, float], float]:
+    base_radii: dict[int, float] = {}
+    max_scaled_radius = 0.0
+    for idx, loader in enumerate(loaders):
+        radius = _estimate_loader_radius(loader, domain.dimension)
+        base_radii[idx] = radius
+        max_scaled_radius = max(max_scaled_radius, radius * scale_max)
+    return base_radii, max_scaled_radius
+
+
+def _maybe_reject_exact_overlap(
+    loader: "ObjectLoader",
+    neighbors: list[int],
+    placed_infos: list[dict],
+    scale: float,
+    rot,
+    pos,
+) -> bool:
+    temp_obj = loader.create_instance(register_object=False)
+    temp_obj.set_scale(scale).set_rotation(rot).set_location(pos)
+    try:
+        neighbor_objs = [placed_infos[idx]["object"].obj for idx in neighbors]
+        return _mesh_object_overlaps_any(temp_obj.obj, neighbor_objs)
+    finally:
+        _remove_blender_object(temp_obj.obj)
+
+
+def _try_scatter_object(
+    loader: "ObjectLoader",
+    base_radius: float,
+    grid: _SpatialHash,
+    placed: list["Object"],
+    placed_infos: list[dict],
+    stats: dict,
+    rng: random.Random,
+    domain: Domain,
+    resolved_method: str,
+    rotation: Literal["yaw", "free"],
+    yaw_min: float,
+    yaw_max: float,
+    scale_min: float,
+    scale_max: float,
+    gap: float,
+    margin: float,
+    unique_data: bool,
+    on_create,
+):
+    scale = rng.uniform(scale_min, scale_max)
+    pos = domain.sample_point(rng)
+    if not domain.contains_point(pos, margin=margin):
+        stats["rejected_boundary"] += 1
+        return False
+
+    rot = _sample_rotation_quaternion(
+        rng=rng,
+        domain_dimension=domain.dimension,
+        rotation_mode=rotation,
+        yaw_min=yaw_min,
+        yaw_max=yaw_max,
+    )
+    radius = base_radius * scale
+    neighbors = grid.neighbors(pos)
+    if _overlaps_by_radius(
+        pos, radius, neighbors, placed_infos, domain.dimension, gap
+    ):
+        stats["rejected_overlap"] += 1
+        return False
+    if resolved_method == "exact" and _maybe_reject_exact_overlap(
+        loader, neighbors, placed_infos, scale, rot, pos
+    ):
+        stats["rejected_overlap"] += 1
+        return False
+
+    obj = loader.create_instance(linked_data=not unique_data)
+    obj.set_scale(scale).set_rotation(rot).set_location(pos)
+    if on_create is not None:
+        on_create(obj, rng, len(placed))
+    placed.append(obj)
+    placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj})
+    grid.insert(pos, len(placed_infos) - 1)
+    return True
+
+
 class Scene(ABC, _Serializable):
     resolution: Resolution = (640, 640)
     time_limit: float = 3.0
@@ -428,12 +513,9 @@ class Scene(ABC, _Serializable):
         )
         resolved_method = _normalize_scatter_method(method, domain, rotation)
         rng = random.Random(seed)
-        base_radii: dict[int, float] = {}
-        max_scaled_radius = 0.0
-        for idx, loader in enumerate(loaders):
-            radius = _estimate_loader_radius(loader, domain.dimension)
-            base_radii[idx] = radius
-            max_scaled_radius = max(max_scaled_radius, radius * scale_max)
+        base_radii, max_scaled_radius = _estimate_scatter_radii(
+            loaders, domain, scale_max
+        )
         cell_size = max(1e-6, (2.0 * max_scaled_radius) + gap)
         grid = _SpatialHash(cell_size=cell_size, dimension=domain.dimension)
         placed: list[Object] = []
@@ -445,35 +527,28 @@ class Scene(ABC, _Serializable):
             placed_one = False
             for _attempt in range(max_attempts_per_object):
                 stats["attempts"] += 1
-                scale = rng.uniform(scale_min, scale_max)
-                pos = domain.sample_point(rng)
-                if not domain.contains_point(pos, margin=margin):
-                    stats["rejected_boundary"] += 1
-                    continue
-                rot = _sample_rotation_quaternion(rng=rng, domain_dimension=domain.dimension, rotation_mode=rotation, yaw_min=yaw_min, yaw_max=yaw_max)
-                radius = base_radii[loader_idx] * scale
-                neighbors = grid.neighbors(pos)
-                if _overlaps_by_radius(pos, radius, neighbors, placed_infos, domain.dimension, gap):
-                    stats["rejected_overlap"] += 1
-                    continue
-                if resolved_method == "exact":
-                    temp_obj = loader.create_instance(register_object=False)
-                    temp_obj.set_scale(scale).set_rotation(rot).set_location(pos)
-                    neighbor_objs = [placed_infos[idx]["object"].obj for idx in neighbors]
-                    if _mesh_object_overlaps_any(temp_obj.obj, neighbor_objs):
-                        _remove_blender_object(temp_obj.obj)
-                        stats["rejected_overlap"] += 1
-                        continue
-                    _remove_blender_object(temp_obj.obj)
-                obj = loader.create_instance(linked_data=not unique_data)
-                obj.set_scale(scale).set_rotation(rot).set_location(pos)
-                if on_create is not None:
-                    on_create(obj, rng, len(placed))
-                placed.append(obj)
-                placed_infos.append({"position": Vector(pos), "radius": radius, "object": obj})
-                grid.insert(pos, len(placed_infos) - 1)
-                placed_one = True
-                break
+                if _try_scatter_object(
+                    loader,
+                    base_radii[loader_idx],
+                    grid,
+                    placed,
+                    placed_infos,
+                    stats,
+                    rng,
+                    domain,
+                    resolved_method,
+                    rotation,
+                    yaw_min,
+                    yaw_max,
+                    scale_min,
+                    scale_max,
+                    gap,
+                    margin,
+                    unique_data,
+                    on_create,
+                ):
+                    placed_one = True
+                    break
             if not placed_one:
                 stats["rejected_attempt_limit"] += 1
         _finalize_scatter_stats(self, stats=stats, placed=placed, requested=count)

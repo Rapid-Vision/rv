@@ -1,6 +1,10 @@
-.PHONY: docs rtasks test-python-unit test-blender test-go mypy ruff radon staticcheck golangci-lint
+.PHONY: docs rtasks test-python-unit test-blender test-go lint lint-py lint-go mypy ruff radon staticcheck golangci-lint
 
-# Python verification
+lint: lint-py lint-go
+
+# Python lint
+lint-py: mypy radon ruff
+
 mypy:
 	uvx mypy --ignore-missing-imports rvlib/rvlib/
 
@@ -10,7 +14,9 @@ radon:
 ruff:
 	uvx ruff check rvlib/rvlib/ 
 
-# Go verification
+# Go lint
+lint-go: staticcheck golangci-lint
+
 staticcheck:
 	staticcheck ./...
 
