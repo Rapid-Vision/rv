@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields, is_dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Self, Union, cast
 
 import bpy
 
@@ -181,8 +181,7 @@ class BinaryMath(Expr):
     left: Expr
     right: Expr
 
-    @property
-    def value_type(self) -> str:
+    def _value_type(self) -> str:
         if self.left.value_type != self.right.value_type:
             raise TypeError(
                 f"Incompatible shader math types: {self.left.value_type} and {self.right.value_type}."
@@ -195,13 +194,14 @@ class BinaryMath(Expr):
         return (self.left, self.right)
 
     def compile(self, compiler: "_ShaderGraphCompiler") -> bpy.types.NodeSocket:
-        if self.value_type == "VALUE":
+        value_type = self._value_type()
+        if value_type == "VALUE":
             node = compiler.new_node("ShaderNodeMath", self)
             node.operation = self.operation
             compiler.link(self.left, node.inputs[0])
             compiler.link(self.right, node.inputs[1])
             return node.outputs[0]
-        if self.value_type == "RGBA":
+        if value_type == "RGBA":
             node = compiler.new_node("ShaderNodeMix", self)
             node.data_type = "RGBA"
             node.blend_type = self.operation
@@ -209,18 +209,19 @@ class BinaryMath(Expr):
             compiler.link(self.left, node.inputs["A"])
             compiler.link(self.right, node.inputs["B"])
             return node.outputs["Result"]
-        if self.value_type == "VECTOR":
+        if value_type == "VECTOR":
             node = compiler.new_node("ShaderNodeVectorMath", self)
             node.operation = self.operation
             compiler.link(self.left, node.inputs[0])
             compiler.link(self.right, node.inputs[1])
             return node.outputs[0]
-        raise TypeError(f"Unsupported shader math type: {self.value_type}.")
+        raise TypeError(f"Unsupported shader math type: {value_type}.")
 
     def node_height(self) -> int:
-        if self.value_type == "RGBA":
+        value_type = self._value_type()
+        if value_type == "RGBA":
             return 220
-        if self.value_type == "VECTOR":
+        if value_type == "VECTOR":
             return 200
         return 160
 
@@ -259,13 +260,13 @@ class NormalMap(NormalExpr):
         )
 
     def _child_exprs(self) -> tuple[Expr, ...]:
-        return (self.color, self.strength)
+        return (cast(Expr, self.color), cast(Expr, self.strength))
 
     def compile(self, compiler: "_ShaderGraphCompiler") -> bpy.types.NodeSocket:
         node = compiler.new_node("ShaderNodeNormalMap", self)
         node.space = self.space
-        compiler.link(self.color, node.inputs["Color"])
-        compiler.link(self.strength, node.inputs["Strength"])
+        compiler.link(cast(Expr, self.color), node.inputs["Color"])
+        compiler.link(cast(Expr, self.strength), node.inputs["Strength"])
         return node.outputs["Normal"]
 
     def node_height(self) -> int:
@@ -322,25 +323,31 @@ class PrincipledBSDF(ShaderExpr):
         ):
             value = getattr(self, field_name)
             if value is not None:
-                children.append(value)
+                children.append(cast(Expr, value))
         return tuple(children)
 
     def compile(self, compiler: "_ShaderGraphCompiler") -> bpy.types.NodeSocket:
         node = compiler.new_node("ShaderNodeBsdfPrincipled", self)
-        compiler.connect_optional(node.inputs["Base Color"], self.base_color)
-        compiler.connect_optional(node.inputs["Metallic"], self.metallic)
-        compiler.connect_optional(node.inputs["Roughness"], self.roughness)
-        compiler.connect_optional(node.inputs["Specular IOR Level"], self.specular)
-        compiler.connect_optional(node.inputs["Normal"], self.normal)
-        compiler.connect_optional(node.inputs["Emission Color"], self.emission_color)
         compiler.connect_optional(
-            node.inputs["Emission Strength"], self.emission_strength
+            node.inputs["Base Color"], cast(Expr, self.base_color)
         )
-        compiler.connect_optional(node.inputs["Alpha"], self.alpha)
+        compiler.connect_optional(node.inputs["Metallic"], cast(Expr, self.metallic))
+        compiler.connect_optional(node.inputs["Roughness"], cast(Expr, self.roughness))
         compiler.connect_optional(
-            node.inputs["Transmission Weight"], self.transmission
+            node.inputs["Specular IOR Level"], cast(Expr, self.specular)
         )
-        compiler.connect_optional(node.inputs["IOR"], self.ior)
+        compiler.connect_optional(node.inputs["Normal"], cast(Expr, self.normal))
+        compiler.connect_optional(
+            node.inputs["Emission Color"], cast(Expr, self.emission_color)
+        )
+        compiler.connect_optional(
+            node.inputs["Emission Strength"], cast(Expr, self.emission_strength)
+        )
+        compiler.connect_optional(node.inputs["Alpha"], cast(Expr, self.alpha))
+        compiler.connect_optional(
+            node.inputs["Transmission Weight"], cast(Expr, self.transmission)
+        )
+        compiler.connect_optional(node.inputs["IOR"], cast(Expr, self.ior))
         return node.outputs["BSDF"]
 
     def node_height(self) -> int:
@@ -356,7 +363,7 @@ class ShaderMaterial(Material):
         self.shader = shader
         self.properties = {}
 
-    def set_params(self, shader: Union[ShaderExpr, None] = None):
+    def set_params(self, shader: Union[ShaderExpr, None] = None) -> Self:  # type: ignore[override]
         if shader is not None:
             self.shader = shader
         return self
@@ -431,7 +438,7 @@ class _ShaderGraphCompiler:
     ) -> None:
         if expr is None:
             return
-        self.link(expr, socket)
+        self.link(cast(Expr, expr), socket)
 
     def _place_node(self, node: bpy.types.Node, expr: Expr) -> None:
         x_depth = expr.x_depth

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import math
 import numbers
-from typing import TYPE_CHECKING, Any, Literal, Self, Sequence, Union
+from typing import TYPE_CHECKING, Any, Literal, Self, Sequence, Union, cast
 
 import bpy
 import mathutils
@@ -57,8 +57,8 @@ class ObjectStats:
             "type": self.type,
             "dimensions_world": self.dimensions_world,
             "dimensions_local": self.dimensions_local,
-            "bounds_world": self.bounds_world,
-            "bounds_local": self.bounds_local,
+            "bounds_world": cast(JSONSerializable, self.bounds_world),
+            "bounds_local": cast(JSONSerializable, self.bounds_local),
             "scale": self.scale,
         }
 
@@ -288,6 +288,8 @@ class Object(_Serializable):
             self.obj.scale = scale
         elif isinstance(scale, numbers.Real) and not isinstance(scale, bool):
             self.obj.scale = mathutils.Vector((scale, scale, scale))
+        elif not isinstance(scale, (list, tuple)):
+            raise TypeError()
         elif len(scale) == 3:
             self.obj.scale = mathutils.Vector(scale)
         else:

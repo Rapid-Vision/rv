@@ -2,7 +2,7 @@ import math
 import random
 import warnings
 from mathutils import Vector
-from typing import Callable, Literal, Protocol, Union
+from typing import Callable, Literal, Protocol, Union, cast
 
 import mathutils
 
@@ -409,7 +409,7 @@ def _build_shape(kind: str, data: dict, dimension: int) -> _DomainShape:
     except KeyError as exc:
         raise ValueError(f"Unsupported domain kind: {kind}") from exc
 
-    shape = shape_cls(data)
+    shape = cast(_DomainShape, shape_cls(data))
     if shape.dimension != dimension:
         raise ValueError(f"Invalid dimension {dimension} for domain kind: {kind}")
     return shape

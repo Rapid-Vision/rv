@@ -252,7 +252,7 @@ class _SpatialHash:
 class Scene(ABC, _Serializable):
     resolution: Resolution = (640, 640)
     time_limit: float = 3.0
-    passes: Union[RenderPassSet, None] = None
+    passes: RenderPassSet
     output_dir: Optional[str]
     subdir: Union[str, None]
     camera: "Camera"

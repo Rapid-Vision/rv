@@ -113,7 +113,7 @@ class BasicMaterial(Material):
         self.ior = None
         self.properties = dict()
 
-    def set_params(
+    def set_params(  # type: ignore[override]
         self,
         base_color: OptionalColor = None,
         roughness: Union[float, None] = None,
@@ -124,7 +124,7 @@ class BasicMaterial(Material):
         alpha: Union[float, None] = None,
         transmission: Union[float, None] = None,
         ior: Union[float, None] = None,
-    ):
+    ) -> Self:
         if base_color is not None:
             self.base_color = _as_rgba(base_color)
         if roughness is not None:
@@ -206,7 +206,7 @@ class ImportedMaterial(Material):
         self.material_name = material_name
         self.params = dict()
 
-    def set_params(self, **kwargs):
+    def set_params(self, **kwargs: Any):
         self.params.update(kwargs)
         return self
 

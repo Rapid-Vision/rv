@@ -8,7 +8,14 @@ if TYPE_CHECKING:
 
 
 JSONSerializable: TypeAlias = Union[
-    str, int, float, bool, None, list["JSONSerializable"], dict[str, "JSONSerializable"]
+    str,
+    int,
+    float,
+    bool,
+    None,
+    list["JSONSerializable"],
+    tuple["JSONSerializable", ...],
+    dict[str, "JSONSerializable"],
 ]
 
 Resolution: TypeAlias = tuple[int, int]
