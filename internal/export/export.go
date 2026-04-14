@@ -53,14 +53,17 @@ func Export(opts Options) error {
 	}
 
 	generatorCtx, cancelGenerator := context.WithCancel(context.Background())
-	defer cancelGenerator()
 	generatorService, err := generator.Start(generatorCtx)
 	if err != nil {
+		cancelGenerator()
 		logs.Warn.Printf("Generator service unavailable; scenes using self.generators will fail: %v\n", err)
 		opts.GeneratorPort = 0
 	} else {
-		defer generatorService.Wait()
 		opts.GeneratorPort = generatorService.Port()
+		defer func() {
+			cancelGenerator()
+			generatorService.Wait()
+		}()
 	}
 
 	cmd := exec.Command(blenderPath, buildBlenderExportArgs(opts, libPath)...)

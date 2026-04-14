@@ -101,14 +101,17 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	logs.Info.Println("librv path: ", libPath)
 
 	generatorCtx, cancelGenerator := context.WithCancel(context.Background())
-	defer cancelGenerator()
 	generatorService, err := generator.Start(generatorCtx)
 	if err != nil {
+		cancelGenerator()
 		logs.Warn.Printf("Generator service unavailable; scenes using self.generators will fail: %v\n", err)
 		opts.GeneratorPort = 0
 	} else {
-		defer generatorService.Wait()
 		opts.GeneratorPort = generatorService.Port()
+		defer func() {
+			cancelGenerator()
+			generatorService.Wait()
+		}()
 	}
 
 	seqOutDir, err := utils.GetSequentialOutputDir(outputDir)
@@ -248,7 +251,7 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 
 func renderSeedBase(imageNum int, procs int, procIndex int) int {
 	base := 0
-	for i := 0; i < procIndex; i++ {
+	for i := range procIndex {
 		base += utils.SplitTaskBetweenProcs(imageNum, procs, i)
 	}
 	return base
