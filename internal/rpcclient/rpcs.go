@@ -16,8 +16,7 @@ type StatusResult struct {
 func (c *RPCClient) Status(ctx context.Context) (StatusModel, error) {
 	var zero StatusModel
 	var res StatusResult
-	var payload any
-	payload = nil
+	var payload any = nil
 	if err := c.doRequest(ctx, "/rpc/status", payload, &res); err != nil {
 		return zero, err
 	}
@@ -33,8 +32,7 @@ type HealthResult struct {
 func (c *RPCClient) Health(ctx context.Context) (HealthStatusModel, error) {
 	var zero HealthStatusModel
 	var res HealthResult
-	var payload any
-	payload = nil
+	var payload any = nil
 	if err := c.doRequest(ctx, "/rpc/health", payload, &res); err != nil {
 		return zero, err
 	}
@@ -53,8 +51,7 @@ type ListTasksResult struct {
 func (c *RPCClient) ListTasks(ctx context.Context, params ListTasksParams) ([]TaskModel, error) {
 	var zero []TaskModel
 	var res ListTasksResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/list_tasks", payload, &res); err != nil {
 		return zero, err
 	}
@@ -72,8 +69,7 @@ type ShowTaskResult struct {
 func (c *RPCClient) ShowTask(ctx context.Context, params ShowTaskParams) (TaskModel, error) {
 	var zero TaskModel
 	var res ShowTaskResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/show_task", payload, &res); err != nil {
 		return zero, err
 	}
@@ -93,8 +89,7 @@ type ShowTaskHistoryResult struct {
 func (c *RPCClient) ShowTaskHistory(ctx context.Context, params ShowTaskHistoryParams) ([]HistoryModel, error) {
 	var zero []HistoryModel
 	var res ShowTaskHistoryResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/show_task_history", payload, &res); err != nil {
 		return zero, err
 	}
@@ -114,8 +109,7 @@ type SubmitTaskResult struct {
 func (c *RPCClient) SubmitTask(ctx context.Context, params SubmitTaskParams) (TaskModel, error) {
 	var zero TaskModel
 	var res SubmitTaskResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/submit_task", payload, &res); err != nil {
 		return zero, err
 	}
@@ -128,8 +122,7 @@ type DeleteTaskParams struct {
 }
 
 func (c *RPCClient) DeleteTask(ctx context.Context, params DeleteTaskParams) error {
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/delete_task", payload, nil); err != nil {
 		return err
 	}
@@ -142,8 +135,7 @@ type UnclaimTaskParams struct {
 }
 
 func (c *RPCClient) UnclaimTask(ctx context.Context, params UnclaimTaskParams) error {
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/unclaim_task", payload, nil); err != nil {
 		return err
 	}
@@ -161,8 +153,7 @@ type DeclareWorkerResult struct {
 func (c *RPCClient) DeclareWorker(ctx context.Context, params DeclareWorkerParams) (WorkerModel, error) {
 	var zero WorkerModel
 	var res DeclareWorkerResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/declare_worker", payload, &res); err != nil {
 		return zero, err
 	}
@@ -180,8 +171,7 @@ type ListWorkersResult struct {
 func (c *RPCClient) ListWorkers(ctx context.Context, params ListWorkersParams) ([]WorkerModel, error) {
 	var zero []WorkerModel
 	var res ListWorkersResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/list_workers", payload, &res); err != nil {
 		return zero, err
 	}
@@ -199,8 +189,7 @@ type RequestTaskResult struct {
 func (c *RPCClient) RequestTask(ctx context.Context, params RequestTaskParams) (TaskDispatchModel, error) {
 	var zero TaskDispatchModel
 	var res RequestTaskResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/request_task", payload, &res); err != nil {
 		return zero, err
 	}
@@ -223,8 +212,7 @@ type SubmitResultResult struct {
 func (c *RPCClient) SubmitResult(ctx context.Context, params SubmitResultParams) (TaskModel, error) {
 	var zero TaskModel
 	var res SubmitResultResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/submit_result", payload, &res); err != nil {
 		return zero, err
 	}
@@ -246,8 +234,7 @@ type UpdateTaskTimeoutResult struct {
 func (c *RPCClient) UpdateTaskTimeout(ctx context.Context, params UpdateTaskTimeoutParams) (TaskModel, error) {
 	var zero TaskModel
 	var res UpdateTaskTimeoutResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/update_task_timeout", payload, &res); err != nil {
 		return zero, err
 	}
@@ -271,8 +258,7 @@ type UpdateTaskProgressResult struct {
 func (c *RPCClient) UpdateTaskProgress(ctx context.Context, params UpdateTaskProgressParams) (TaskModel, error) {
 	var zero TaskModel
 	var res UpdateTaskProgressResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/update_task_progress", payload, &res); err != nil {
 		return zero, err
 	}
@@ -291,8 +277,7 @@ type UpdateWorkerStatusResult struct {
 func (c *RPCClient) UpdateWorkerStatus(ctx context.Context, params UpdateWorkerStatusParams) (WorkerModel, error) {
 	var zero WorkerModel
 	var res UpdateWorkerStatusResult
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/update_worker_status", payload, &res); err != nil {
 		return zero, err
 	}
@@ -305,8 +290,7 @@ type StopWorkerParams struct {
 }
 
 func (c *RPCClient) StopWorker(ctx context.Context, params StopWorkerParams) error {
-	var payload any
-	payload = params
+	var payload any = params
 	if err := c.doRequest(ctx, "/rpc/stop_worker", payload, nil); err != nil {
 		return err
 	}
