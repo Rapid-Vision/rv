@@ -1,4 +1,4 @@
-.PHONY: docs rtasks test-python-unit test-blender test-go mypy ruff radon staticcheck
+.PHONY: docs rtasks test-python-unit test-blender test-go mypy ruff radon staticcheck golangci-lint
 
 # Python verification
 mypy:
@@ -13,6 +13,9 @@ ruff:
 # Go verification
 staticcheck:
 	staticcheck ./...
+
+golangci-lint:
+	golangci-lint run
 
 # Codegen
 rtasks:

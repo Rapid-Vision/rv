@@ -20,7 +20,7 @@ func WatchFile(ctx context.Context, path string, callback func()) error {
 	if err != nil {
 		return err
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	if err = w.Add(dir); err != nil {
 		return err

@@ -183,7 +183,7 @@ func isWindowsAbsPath(path string) bool {
 		return false
 	}
 	drive := path[0]
-	if !((drive >= 'a' && drive <= 'z') || (drive >= 'A' && drive <= 'Z')) {
+	if (drive < 'a' || drive > 'z') && (drive < 'A' || drive > 'Z') {
 		return false
 	}
 	if path[1] != ':' {
@@ -204,7 +204,7 @@ func downloadHTTP(ctx context.Context, source string, dstPath string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download failed with status: %s", resp.Status)
 	}
@@ -213,7 +213,7 @@ func downloadHTTP(ctx context.Context, source string, dstPath string) error {
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = io.Copy(dstFile, resp.Body)
 	return err
@@ -248,13 +248,13 @@ func downloadS3(ctx context.Context, parsed *url.URL, dstPath string, opts Stage
 	if err != nil {
 		return fmt.Errorf("s3 get object failed: %w", err)
 	}
-	defer obj.Close()
+	defer func() { _ = obj.Close() }()
 
 	dstFile, err := os.Create(dstPath)
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = io.Copy(dstFile, obj)
 	return err
@@ -275,13 +275,13 @@ func copyLocalFile(source string, dstPath string) error {
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	dstFile, err := os.Create(dstPath)
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = io.Copy(dstFile, srcFile)
 	return err
