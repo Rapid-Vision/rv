@@ -109,13 +109,20 @@ func Preview(opts Options) {
 	// Handle Ctrl-C
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	waitCh := utils.WaitCmd(cmd)
 
 	// Wait for either Blender exit or signal
 	select {
 	case <-sigCh:
 		logs.Info.Println("Interrupt received — terminating Blender…")
 		_ = cmd.Process.Signal(syscall.SIGTERM)
-	case err = <-utils.WaitCmd(cmd):
+		err = <-waitCh
+		if err != nil {
+			logs.Info.Println("Blender exited with error:", err)
+		} else {
+			logs.Info.Println("Blender exited.")
+		}
+	case err = <-waitCh:
 		if err != nil {
 			logs.Info.Println("Blender exited with error:", err)
 		} else {
