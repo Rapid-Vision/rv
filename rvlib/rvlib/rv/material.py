@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Any, Self, Union
+from typing import TYPE_CHECKING, Any, Self, Union
 
 import bpy
 
 from .object import _Serializable
 from .types import ColorRGBA, OptionalColor
 from .utils import _as_rgba, _mark_material_tree
+
+if TYPE_CHECKING:
+    from .scene import Scene
 
 
 class Material(ABC, _Serializable):
@@ -64,6 +67,8 @@ class Material(ABC, _Serializable):
             }
         )
         return res
+
+
 def _normalize_semantic_channel(channel: str) -> str:
     normalized = "".join(ch.lower() if ch.isalnum() else "_" for ch in channel).strip(
         "_"

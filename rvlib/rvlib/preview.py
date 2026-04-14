@@ -15,7 +15,7 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
-from runtime_bootstrap import bootstrap_runtime
+from runtime_bootstrap import bootstrap_runtime  # noqa: E402
 
 
 def parse_args():
@@ -127,7 +127,6 @@ def run_script(
     time_limit=None,
     seed=None,
 ):
-    import rv
     import rv.internal as rvi
 
     scene_class = rvi._internal_load_scene_class(script_path)
@@ -261,8 +260,7 @@ ARGS = parse_args()
 
 bootstrap_runtime(ARGS.libpath, ARGS.cwd)
 
-import rv
-import rv.internal as rvi
+import rv.internal as rvi  # noqa: E402
 
 RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
 rvi._configure_generator_runtime(ARGS.generator_port, ARGS.cwd)

@@ -9,7 +9,7 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
-from runtime_bootstrap import bootstrap_runtime
+from runtime_bootstrap import bootstrap_runtime  # noqa: E402
 
 EXPORT_SCHEMA_VERSION = 1
 
@@ -150,7 +150,6 @@ def main():
 
     bootstrap_runtime(args.libpath, args.cwd)
 
-    import rv
     import rv.internal as rvi
 
     rvi._configure_generator_runtime(args.generator_port, args.cwd)

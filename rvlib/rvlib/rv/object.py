@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 import math
 import numbers
-import random
-from typing import Any, Literal, Self, Sequence, Union
+from typing import TYPE_CHECKING, Any, Literal, Self, Sequence, Union
 
 import bpy
 import mathutils
@@ -29,6 +28,10 @@ from .utils import (
     _mark_object_tree,
     _require_blender_attr,
 )
+
+if TYPE_CHECKING:
+    from .material import Material
+    from .scene import Scene
 
 
 @dataclass(frozen=True, slots=True)
