@@ -77,13 +77,14 @@ func TestValidateOptions(t *testing.T) {
 func TestBuildBlenderPreviewArgs(t *testing.T) {
 	libPath := "/lib/rvlib"
 	opts := Options{
-		PreviewFiles: true,
-		PreviewOut:   "/tmp/preview_out",
-		NoWindow:     true,
-		Resolution:   [2]int{1280, 720},
-		GPUBackend:   "optix",
-		TimeLimit:    floatPtr(2.5),
-		Seed:         seed.Config{Mode: seed.FixedMode, Value: 17},
+		PreviewFiles:  true,
+		PreviewOut:    "/tmp/preview_out",
+		NoWindow:      true,
+		Resolution:    [2]int{1280, 720},
+		GPUBackend:    "optix",
+		TimeLimit:     floatPtr(2.5),
+		Seed:          seed.Config{Mode: seed.FixedMode, Value: 17},
+		GeneratorPort: 9911,
 	}
 	args := buildBlenderPreviewArgs(opts, "/work/scene.py", "/work", libPath, 12345)
 
@@ -111,6 +112,8 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 	assertContains(t, args, "optix")
 	assertContains(t, args, "--seed-mode")
 	assertContains(t, args, "fixed")
+	assertContains(t, args, "--generator-port")
+	assertContains(t, args, "9911")
 	assertContains(t, args, "--seed-value")
 	assertContains(t, args, "17")
 	assertContains(t, args, "--time-limit")

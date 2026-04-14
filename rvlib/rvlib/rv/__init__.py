@@ -12,6 +12,7 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 from .domain import Domain
+from .generators import GeneratorFactory, GeneratorHandle
 from .material import BasicMaterial, ImportedMaterial, Material
 from .object import (
     AreaLight,
@@ -72,6 +73,8 @@ __all__ = [
     "ColorRGB",
     "ColorRGBA",
     "Domain",
+    "GeneratorFactory",
+    "GeneratorHandle",
     "Float2",
     "Float3",
     "Float4",

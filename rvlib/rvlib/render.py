@@ -35,6 +35,7 @@ def parse_args():
     )
     parser.add_argument("--noise-threshold", type=float, default=None)
     parser.add_argument("--cwd", type=str)
+    parser.add_argument("--generator-port", type=int, default=0)
 
     return parser.parse_args(args)
 
@@ -141,6 +142,7 @@ import rv
 import rv.internal as rvi
 
 RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
+rvi._configure_generator_runtime(ARGS.generator_port, ARGS.cwd)
 
 for i in range(ARGS.number):
     seed = rvi._internal_resolve_seed(

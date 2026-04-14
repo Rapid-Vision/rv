@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Rapid-Vision/rv/internal/generator"
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
@@ -31,6 +33,7 @@ type RenderOptions struct {
 	NoiseThresholdEnabled *bool
 	NoiseThreshold        *float64
 	Seed                  seed.Config
+	GeneratorPort         int
 }
 
 type RenderResult struct {
@@ -96,6 +99,17 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	}
 
 	logs.Info.Println("librv path: ", libPath)
+
+	generatorCtx, cancelGenerator := context.WithCancel(context.Background())
+	defer cancelGenerator()
+	generatorService, err := generator.Start(generatorCtx)
+	if err != nil {
+		logs.Warn.Printf("Generator service unavailable; scenes using self.generators will fail: %v\n", err)
+		opts.GeneratorPort = 0
+	} else {
+		defer generatorService.Wait()
+		opts.GeneratorPort = generatorService.Port()
+	}
 
 	seqOutDir, err := utils.GetSequentialOutputDir(outputDir)
 	if err != nil {
@@ -203,6 +217,7 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		"--gpu-backend", gpuBackend,
 		"--seed-mode", string(opts.Seed.Mode),
 		"--seed-base", fmt.Sprintf("%d", seedBase),
+		"--generator-port", fmt.Sprintf("%d", opts.GeneratorPort),
 	}
 	if opts.Seed.Mode == seed.FixedMode {
 		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))

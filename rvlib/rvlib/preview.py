@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument("--seed-mode", type=str, default="rand")
     parser.add_argument("--seed-value", type=int, default=None)
     parser.add_argument("--time-limit", type=float, default=None)
+    parser.add_argument("--generator-port", type=int, default=0)
 
     return parser.parse_args(args)
 
@@ -264,6 +265,7 @@ import rv
 import rv.internal as rvi
 
 RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
+rvi._configure_generator_runtime(ARGS.generator_port, ARGS.cwd)
 
 if ARGS.no_window and not ARGS.preview_files:
     raise ValueError("--no-window requires --preview-files")

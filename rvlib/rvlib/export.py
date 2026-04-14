@@ -28,6 +28,7 @@ def parse_args():
     parser.add_argument("--seed-value", type=int, default=None)
     parser.add_argument("--freeze-physics", action="store_true")
     parser.add_argument("--pack-resources", action="store_true")
+    parser.add_argument("--generator-port", type=int, default=0)
     return parser.parse_args(args)
 
 
@@ -152,6 +153,7 @@ def main():
     import rv
     import rv.internal as rvi
 
+    rvi._configure_generator_runtime(args.generator_port, args.cwd)
     scene_class = rvi._internal_load_scene_class(args.script)
     rvi._internal_begin_run(purge_orphans=True)
     scene_instance = scene_class(output_dir=None)

@@ -1,12 +1,15 @@
 package export
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
+	"github.com/Rapid-Vision/rv/internal/generator"
+	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
 )
@@ -18,6 +21,7 @@ type Options struct {
 	FreezePhysics bool
 	PackResources bool
 	Seed          seed.Config
+	GeneratorPort int
 }
 
 func Export(opts Options) error {
@@ -48,6 +52,17 @@ func Export(opts Options) error {
 		return fmt.Errorf("create output directory: %w", err)
 	}
 
+	generatorCtx, cancelGenerator := context.WithCancel(context.Background())
+	defer cancelGenerator()
+	generatorService, err := generator.Start(generatorCtx)
+	if err != nil {
+		logs.Warn.Printf("Generator service unavailable; scenes using self.generators will fail: %v\n", err)
+		opts.GeneratorPort = 0
+	} else {
+		defer generatorService.Wait()
+		opts.GeneratorPort = generatorService.Port()
+	}
+
 	cmd := exec.Command(blenderPath, buildBlenderExportArgs(opts, libPath)...)
 	cmd.Env = utils.BlenderCommandEnv()
 	cmd.Stdout = os.Stdout
@@ -74,6 +89,7 @@ func buildBlenderExportArgs(opts Options, libPath string) []string {
 		"--output", opts.OutputPath,
 		"--cwd", opts.Cwd,
 		"--seed-mode", string(opts.Seed.Mode),
+		"--generator-port", fmt.Sprintf("%d", opts.GeneratorPort),
 	}
 	if opts.Seed.Mode == seed.FixedMode {
 		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))

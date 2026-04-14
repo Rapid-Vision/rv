@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Rapid-Vision/rv/internal/generator"
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
@@ -27,6 +28,7 @@ type Options struct {
 	GPUBackend    string
 	TimeLimit     *float64
 	Seed          seed.Config
+	GeneratorPort int
 }
 
 func normalizedGPUBackend(value string) string {
@@ -73,6 +75,17 @@ func Preview(opts Options) {
 		logs.Err.Fatalln("Script path is a directory, not a file:", scriptPath)
 	}
 
+	// Context for shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	generatorService, err := generator.Start(ctx)
+	if err != nil {
+		logs.Warn.Printf("Generator service unavailable; scenes using self.generators will fail: %v\n", err)
+		opts.GeneratorPort = 0
+	} else {
+		defer generatorService.Wait()
+		opts.GeneratorPort = generatorService.Port()
+	}
+
 	// Start Blender
 	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, libPath, port)...)
 	cmd.Env = utils.BlenderCommandEnv()
@@ -83,10 +96,6 @@ func Preview(opts Options) {
 		logs.Err.Fatalln("Failed to start blender:", err)
 	}
 	logs.Info.Printf("Blender started (PID %d) on port %d\n", cmd.Process.Pid, port)
-
-	// Context for shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	client := newPreviewClient(port)
 
@@ -163,6 +172,7 @@ func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, lib
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--gpu-backend", gpuBackend,
 		"--seed-mode", string(opts.Seed.Mode),
+		"--generator-port", fmt.Sprintf("%d", opts.GeneratorPort),
 	)
 	if opts.Seed.Mode == seed.FixedMode {
 		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))

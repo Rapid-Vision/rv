@@ -21,6 +21,7 @@ from .assets import (
 from .compositor import _configure_compositor
 from .domain import Domain
 from .geometry import _mesh_object_overlaps_any, _sample_rotation_quaternion
+from .generators import GeneratorFactory
 from .material import BasicMaterial, ImportedMaterial, _normalize_semantic_channel
 from .object import (
     AreaLight,
@@ -261,6 +262,7 @@ class Scene(ABC, _Serializable):
     materials: MaterialFactory
     lights: LightFactory
     assets: AssetFactory
+    generators: GeneratorFactory
     _objects: set["Object"]
     _materials: set["Material"]
     _lights: set["Light"]
@@ -296,6 +298,7 @@ class Scene(ABC, _Serializable):
         self.materials = MaterialFactory(self)
         self.lights = LightFactory(self)
         self.assets = AssetFactory(self)
+        self.generators = GeneratorFactory(self)
 
         _get_generated_collection()
         bpy.ops.object.camera_add()

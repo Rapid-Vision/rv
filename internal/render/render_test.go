@@ -8,14 +8,15 @@ import (
 
 func TestBuildBlenderRenderArgs_SeedFlags(t *testing.T) {
 	opts := RenderOptions{
-		ScriptPath: "/work/scene.py",
-		Cwd:        "/work",
-		ImageNum:   4,
-		Procs:      2,
-		Resolution: [2]int{640, 480},
-		OutputDir:  "/tmp/out",
-		GPUBackend: "cuda",
-		Seed:       seed.Config{Mode: seed.FixedMode, Value: 123},
+		ScriptPath:    "/work/scene.py",
+		Cwd:           "/work",
+		ImageNum:      4,
+		Procs:         2,
+		Resolution:    [2]int{640, 480},
+		OutputDir:     "/tmp/out",
+		GPUBackend:    "cuda",
+		Seed:          seed.Config{Mode: seed.FixedMode, Value: 123},
+		GeneratorPort: 9090,
 	}
 
 	args := buildBlenderRenderArgs(opts, "/lib/rvlib", "/tmp/out/1", 2, 5)
@@ -26,6 +27,8 @@ func TestBuildBlenderRenderArgs_SeedFlags(t *testing.T) {
 	assertContains(t, args, "123")
 	assertContains(t, args, "--seed-base")
 	assertContains(t, args, "5")
+	assertContains(t, args, "--generator-port")
+	assertContains(t, args, "9090")
 }
 
 func TestRenderSeedBase(t *testing.T) {

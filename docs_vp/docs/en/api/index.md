@@ -2,35 +2,40 @@
 
 Project: `rv`
 
+## Modules
+
+_Module links omitted in flattened output._
+
+## Module: `__init__`
+
+### File: `__init__.py`
+
 Package for describing `rv` scenes.
 
 - Preview a scene with `rv preview <scene.py>`.
 - Render a dataset with `rv render <scene.py>`.
 
-## Modules
+## Module: `assets`
 
-- [domain](#module-domain)
-- [material](#module-material)
-- [object](#module-object)
-- [passes](#module-passes)
-- [physics](#module-physics)
-- [scene](#module-scene)
-- [shader](#module-shader)
-- [world](#module-world)
+### File: `assets.py`
 
-## Module: `domain` {#module-domain}
+## Module: `compositor`
 
-File: `domain.py`
+### File: `compositor.py`
 
-### Classes
+## Module: `domain`
 
-#### `class Domain` {#class-domain}
+### File: `domain.py`
+
+#### Classes
+
+##### `class Domain` {#class-domain}
 Scatter domain descriptor used by scene scattering methods.
 
 ::: details Methods
 
 ---
-##### `kind`
+###### `kind`
 
 **Signature**
 
@@ -46,7 +51,7 @@ def kind(self) -> str
 
 ---
 ---
-##### `data`
+###### `data`
 
 **Signature**
 
@@ -62,7 +67,7 @@ def data(self) -> dict
 
 ---
 ---
-##### `dimension`
+###### `dimension`
 
 **Signature**
 
@@ -78,7 +83,7 @@ def dimension(self) -> int
 
 ---
 ---
-##### `inset`
+###### `inset`
 
 **Signature**
 
@@ -94,7 +99,7 @@ def inset(self, margin: float) -> 'Domain'
 
 ---
 ---
-##### `rect`
+###### `rect`
 
 **Signature**
 
@@ -113,13 +118,13 @@ def rect(center: Float2=(0.0, 0.0), size: Float2=(10.0, 10.0), z: float=0.0) -> 
 
 ---
 ---
-##### `custom`
+###### `custom`
 
 **Signature**
 
 ```python
 @staticmethod
-def custom(*, dimension: int, contains_point: Callable[[mathutils.Vector, float], bool], aabb: Callable[[float], AABB], sample_point: Callable[[random.Random, float], mathutils.Vector] | None=None, kind: str='custom', data: dict | None=None) -> 'Domain'
+def custom(*, dimension: int, contains_point: Callable[[mathutils.Vector, float], bool], aabb: Callable[[float], AABB], sample_point: Union[Callable[[random.Random, float], mathutils.Vector], None]=None, kind: str='custom', data: Union[dict, None]=None) -> 'Domain'
 ```
 
 **Arguments**
@@ -127,15 +132,15 @@ def custom(*, dimension: int, contains_point: Callable[[mathutils.Vector, float]
 - **`dimension`** : `int`
 - **`contains_point`** : `Callable[[mathutils.Vector, float], bool]`
 - **`aabb`** : `Callable[[float], AABB]`
-- **`sample_point`** : `Callable[[random.Random, float], mathutils.Vector] | None`
+- **`sample_point`** : `Union[Callable[[random.Random, float], mathutils.Vector], None]`
 - **`kind`** : `str`
-- **`data`** : `dict | None`
+- **`data`** : `Union[dict, None]`
 
 **Returns**: `'Domain'`
 
 ---
 ---
-##### `ellipse`
+###### `ellipse`
 
 **Signature**
 
@@ -154,7 +159,7 @@ def ellipse(center: Float2=(0.0, 0.0), radii: Float2=(5.0, 3.0), z: float=0.0) -
 
 ---
 ---
-##### `polygon`
+###### `polygon`
 
 **Signature**
 
@@ -172,7 +177,7 @@ def polygon(points, z: float=0.0) -> 'Domain'
 
 ---
 ---
-##### `convex_polygon`
+###### `convex_polygon`
 
 **Signature**
 
@@ -190,7 +195,7 @@ def convex_polygon(points, z: float=0.0) -> 'Domain'
 
 ---
 ---
-##### `box`
+###### `box`
 
 **Signature**
 
@@ -208,7 +213,7 @@ def box(center: Float3=(0.0, 0.0, 0.0), size: Float3=(10.0, 10.0, 10.0)) -> 'Dom
 
 ---
 ---
-##### `cylinder`
+###### `cylinder`
 
 **Signature**
 
@@ -228,7 +233,7 @@ def cylinder(center: Float3=(0.0, 0.0, 0.0), radius: float=5.0, height: float=10
 
 ---
 ---
-##### `ellipsoid`
+###### `ellipsoid`
 
 **Signature**
 
@@ -246,7 +251,7 @@ def ellipsoid(center: Float3=(0.0, 0.0, 0.0), radii: Float3=(5.0, 3.0, 2.0)) -> 
 
 ---
 ---
-##### `convex_hull_2d`
+###### `convex_hull_2d`
 
 **Signature**
 
@@ -263,7 +268,7 @@ def convex_hull_2d(rv_obj: Object) -> 'Domain'
 
 ---
 ---
-##### `convex_hull_3d`
+###### `convex_hull_3d`
 
 **Signature**
 
@@ -280,7 +285,7 @@ def convex_hull_3d(rv_obj: Object) -> 'Domain'
 
 ---
 ---
-##### `convex_hull`
+###### `convex_hull`
 
 **Signature**
 
@@ -298,7 +303,7 @@ def convex_hull(rv_obj: Object, project_2d: bool=False) -> 'Domain'
 
 ---
 ---
-##### `sample_point`
+###### `sample_point`
 
 **Signature**
 
@@ -314,7 +319,7 @@ def sample_point(self, rng: random.Random) -> mathutils.Vector
 
 ---
 ---
-##### `contains_point`
+###### `contains_point`
 
 **Signature**
 
@@ -331,7 +336,7 @@ def contains_point(self, point: mathutils.Vector, margin: float=0.0) -> bool
 
 ---
 ---
-##### `contains_object`
+###### `contains_object`
 
 **Signature**
 
@@ -349,7 +354,7 @@ def contains_object(self, obj: Object, margin: float=0.0, mode: Literal['aabb', 
 
 ---
 ---
-##### `aabb`
+###### `aabb`
 
 **Signature**
 
@@ -367,13 +372,79 @@ def aabb(self) -> AABB
 
 ---
 
-## Module: `material` {#module-material}
+## Module: `generators`
 
-File: `material.py`
+### File: `generators.py`
 
-### Classes
+#### Classes
 
-#### `class Material` {#class-material}
+##### `class GeneratorHandle` {#class-generatorhandle}
+::: details Methods
+
+---
+###### `generate`
+
+**Signature**
+
+```python
+def generate(self, operation: str, **params) -> str
+```
+
+**Arguments**
+
+- **`operation`** : `str`
+- **`**params`**
+
+**Returns**: `Self`
+
+---
+:::
+
+---
+
+##### `class GeneratorFactory` {#class-generatorfactory}
+::: details Methods
+
+---
+###### `init`
+
+**Signature**
+
+```python
+def init(self, command: str) -> GeneratorHandle
+```
+
+**Arguments**
+
+- **`command`** : `str`
+
+**Returns**: `GeneratorHandle`
+
+---
+:::
+
+---
+
+## Module: `geometry`
+
+### File: `geometry.py`
+
+## Module: `internal`
+
+### File: `internal.py`
+
+Runner-only helpers for the `rvlib` runtime.
+
+These functions are intentionally separated from the public `rv` package API.
+They remain importable for bundled runners such as preview/render/export.
+
+## Module: `material`
+
+### File: `material.py`
+
+#### Classes
+
+##### `class Material` {#class-material}
 Inherits from: `ABC`, `_Serializable`
 
 Base class for material descriptors.
@@ -384,15 +455,15 @@ A material descriptor is converted to a real Blender material when assigned to a
 
 | Name | Type | Description |
 | - | - | - |
-| `name` | `str \| None` |  |
-| `index` | `int \| None` |  |
+| `name` | `Union[str, None]` |  |
+| `index` | `Union[int, None]` |  |
 
 :::
 
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 
@@ -412,7 +483,7 @@ def set_params(self, **kwargs) -> Self
 
 ---
 
-#### `class BasicMaterial` {#class-basicmaterial}
+##### `class BasicMaterial` {#class-basicmaterial}
 Inherits from: `Material`
 
 Material descriptor backed by Blender's Principled BSDF shader.
@@ -421,15 +492,15 @@ Material descriptor backed by Blender's Principled BSDF shader.
 
 | Name | Type | Description |
 | - | - | - |
-| `base_color` | `ColorRGBA \| None` |  |
-| `roughness` | `float \| None` |  |
-| `metallic` | `float \| None` |  |
-| `specular` | `float \| None` |  |
-| `emission_color` | `ColorRGBA \| None` |  |
-| `emission_strength` | `float \| None` |  |
-| `alpha` | `float \| None` |  |
-| `transmission` | `float \| None` |  |
-| `ior` | `float \| None` |  |
+| `base_color` | `Union[ColorRGBA, None]` |  |
+| `roughness` | `Union[float, None]` |  |
+| `metallic` | `Union[float, None]` |  |
+| `specular` | `Union[float, None]` |  |
+| `emission_color` | `Union[ColorRGBA, None]` |  |
+| `emission_strength` | `Union[float, None]` |  |
+| `alpha` | `Union[float, None]` |  |
+| `transmission` | `Union[float, None]` |  |
+| `ior` | `Union[float, None]` |  |
 | `properties` | `dict` |  |
 
 :::
@@ -437,31 +508,31 @@ Material descriptor backed by Blender's Principled BSDF shader.
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 
 ```python
-def set_params(self, base_color: OptionalColor=None, roughness: float | None=None, metallic: float | None=None, specular: float | None=None, emission_color: OptionalColor=None, emission_strength: float | None=None, alpha: float | None=None, transmission: float | None=None, ior: float | None=None)
+def set_params(self, base_color: OptionalColor=None, roughness: Union[float, None]=None, metallic: Union[float, None]=None, specular: Union[float, None]=None, emission_color: OptionalColor=None, emission_strength: Union[float, None]=None, alpha: Union[float, None]=None, transmission: Union[float, None]=None, ior: Union[float, None]=None)
 ```
 
 **Arguments**
 
 - **`base_color`** : `OptionalColor`
-- **`roughness`** : `float | None`
-- **`metallic`** : `float | None`
-- **`specular`** : `float | None`
+- **`roughness`** : `Union[float, None]`
+- **`metallic`** : `Union[float, None]`
+- **`specular`** : `Union[float, None]`
 - **`emission_color`** : `OptionalColor`
-- **`emission_strength`** : `float | None`
-- **`alpha`** : `float | None`
-- **`transmission`** : `float | None`
-- **`ior`** : `float | None`
+- **`emission_strength`** : `Union[float, None]`
+- **`alpha`** : `Union[float, None]`
+- **`transmission`** : `Union[float, None]`
+- **`ior`** : `Union[float, None]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `set_property`
+###### `set_property`
 
 **Signature**
 
@@ -481,7 +552,7 @@ def set_property(self, key: str, value: Any)
 
 ---
 
-#### `class ImportedMaterial` {#class-importedmaterial}
+##### `class ImportedMaterial` {#class-importedmaterial}
 Inherits from: `Material`
 
 Material descriptor that imports a material from another `.blend` file.
@@ -491,7 +562,7 @@ Material descriptor that imports a material from another `.blend` file.
 | Name | Type | Description |
 | - | - | - |
 | `filepath` | `str` |  |
-| `material_name` | `str \| None` |  |
+| `material_name` | `Union[str, None]` |  |
 | `params` | `dict` |  |
 
 :::
@@ -499,7 +570,7 @@ Material descriptor that imports a material from another `.blend` file.
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 
@@ -518,13 +589,17 @@ def set_params(self, **kwargs)
 
 ---
 
-## Module: `object` {#module-object}
+## Module: `modifiers`
 
-File: `object.py`
+### File: `modifiers.py`
 
-### Classes
+## Module: `object`
 
-#### `class ObjectStats` {#class-objectstats}
+### File: `object.py`
+
+#### Classes
+
+##### `class ObjectStats` {#class-objectstats}
 Geometric inspection snapshot for an object or loader instance.
 
 ::: details Attributes
@@ -544,7 +619,7 @@ Geometric inspection snapshot for an object or loader instance.
 ::: details Methods
 
 ---
-##### `to_dict`
+###### `to_dict`
 
 Convert to JSON-compatible dictionary for metadata serialization.
 
@@ -564,13 +639,13 @@ def to_dict(self) -> dict[str, JSONSerializable]
 
 ---
 
-#### `class ObjectLoader` {#class-objectloader}
+##### `class ObjectLoader` {#class-objectloader}
 Helper for creating object instances from a loaded Blender object source.
 
 ::: details Methods
 
 ---
-##### `set_source`
+###### `set_source`
 
 Rebind this loader to use an existing object as its instancing prototype.
 
@@ -588,19 +663,19 @@ def set_source(self, source: 'Object') -> 'ObjectLoader'
 
 ---
 ---
-##### `create_instance`
+###### `create_instance`
 
 Create a single object instance from a loader.
 
 **Signature**
 
 ```python
-def create_instance(self, name: str | None=None, register_object: bool=True, linked_data: bool=True) -> 'Object'
+def create_instance(self, name: Union[str, None]=None, register_object: bool=True, linked_data: bool=True) -> 'Object'
 ```
 
 **Arguments**
 
-- **`name`** : `str | None`
+- **`name`** : `Union[str, None]`
 - **`register_object`** : `bool`
 - **`linked_data`** : `bool`
 
@@ -611,7 +686,7 @@ def create_instance(self, name: str | None=None, register_object: bool=True, lin
 
 ---
 
-#### `class Object` {#class-object}
+##### `class Object` {#class-object}
 Inherits from: `_Serializable`
 
 Wrapper around a Blender object with chainable transformation and metadata helpers.
@@ -625,14 +700,14 @@ Wrapper around a Blender object with chainable transformation and metadata helpe
 | `tags` | `TagSet` |  |
 | `properties` | `dict` |  |
 | `modifier_parameters` | `list[dict[str, JSONSerializable]]` |  |
-| `index` | `int \| None` |  |
+| `index` | `Union[int, None]` |  |
 
 :::
 
 ::: details Methods
 
 ---
-##### `as_loader`
+###### `as_loader`
 
 Create an `ObjectLoader` that instances this object.
 
@@ -649,7 +724,7 @@ def as_loader(self) -> ObjectLoader
 
 ---
 ---
-##### `copy`
+###### `copy`
 
 Duplicate this object.
 
@@ -658,12 +733,12 @@ If `linked_data` is False, mesh/light/camera data is copied as well.
 **Signature**
 
 ```python
-def copy(self, name: str | None=None, linked_data: bool=True, register_object: bool=True) -> 'Object'
+def copy(self, name: Union[str, None]=None, linked_data: bool=True, register_object: bool=True) -> 'Object'
 ```
 
 **Arguments**
 
-- **`name`** : `str | None`
+- **`name`** : `Union[str, None]`
 - **`linked_data`** : `bool`
 - **`register_object`** : `bool`
 
@@ -671,25 +746,25 @@ def copy(self, name: str | None=None, linked_data: bool=True, register_object: b
 
 ---
 ---
-##### `set_location`
+###### `set_location`
 
 Set the location of the object in 3D space.
 
 **Signature**
 
 ```python
-def set_location(self, location: Union[mathutils.Vector, typing.Sequence[float]])
+def set_location(self, location: Union[mathutils.Vector, Sequence[float]])
 ```
 
 **Arguments**
 
-- **`location`** : `Union[mathutils.Vector, typing.Sequence[float]]`
+- **`location`** : `Union[mathutils.Vector, Sequence[float]]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `get_location`
+###### `get_location`
 
 Get the object location as an `(x, y, z)` tuple.
 
@@ -706,7 +781,7 @@ def get_location(self) -> Float3
 
 ---
 ---
-##### `move`
+###### `move`
 
 Translate the object by the given offsets.
 
@@ -726,7 +801,7 @@ def move(self, dx: float=0.0, dy: float=0.0, dz: float=0.0) -> 'Object'
 
 ---
 ---
-##### `set_rotation`
+###### `set_rotation`
 
 Set the rotation of the object.
 
@@ -744,7 +819,7 @@ def set_rotation(self, rotation: Union[mathutils.Euler, mathutils.Quaternion])
 
 ---
 ---
-##### `set_scale`
+###### `set_scale`
 
 Set the scale of the object.
 
@@ -754,18 +829,18 @@ If `scale` is a sequence or Vector of length 3, each axis is set individually.
 **Signature**
 
 ```python
-def set_scale(self, scale: Union[mathutils.Vector, typing.Sequence[float], float, int])
+def set_scale(self, scale: Union[mathutils.Vector, Sequence[float], float, int])
 ```
 
 **Arguments**
 
-- **`scale`** : `Union[mathutils.Vector, typing.Sequence[float], float, int]`
+- **`scale`** : `Union[mathutils.Vector, Sequence[float], float, int]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `set_property`
+###### `set_property`
 
 Set a property of the object. Properties can be used inside object's material nodes.
 
@@ -784,7 +859,7 @@ def set_property(self, key: str, value: Any)
 
 ---
 ---
-##### `set_modifier_input`
+###### `set_modifier_input`
 
 Set an exposed Geometry Nodes modifier input.
 
@@ -794,20 +869,20 @@ modifier that exposes the requested input.
 **Signature**
 
 ```python
-def set_modifier_input(self, input_name: str, value: Any, modifier_name: str | None=None)
+def set_modifier_input(self, input_name: str, value: Any, modifier_name: Union[str, None]=None)
 ```
 
 **Arguments**
 
 - **`input_name`** : `str`
 - **`value`** : `Any`
-- **`modifier_name`** : `str | None`
+- **`modifier_name`** : `Union[str, None]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `set_material`
+###### `set_material`
 
 Set object material in the given slot.
 
@@ -826,7 +901,7 @@ def set_material(self, material: 'Material', slot: int=0)
 
 ---
 ---
-##### `add_material`
+###### `add_material`
 
 Append material to object's material slots.
 
@@ -844,7 +919,7 @@ def add_material(self, material: 'Material')
 
 ---
 ---
-##### `clear_materials`
+###### `clear_materials`
 
 Remove all materials from object.
 
@@ -861,7 +936,7 @@ def clear_materials(self)
 
 ---
 ---
-##### `set_tags`
+###### `set_tags`
 
 Set object's tags.
 
@@ -870,18 +945,18 @@ Tags are used to represent object class for training a computer vision model. Ob
 **Signature**
 
 ```python
-def set_tags(self, *tags: str | list[str])
+def set_tags(self, *tags: Union[str, list[str]])
 ```
 
 **Arguments**
 
-- **`*tags`** : `str | list[str]`
+- **`*tags`** : `Union[str, list[str]]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `add_tags`
+###### `add_tags`
 
 Add tags to the object.
 
@@ -890,18 +965,18 @@ Tags are used to represent object class for training a computer vision model. Ob
 **Signature**
 
 ```python
-def add_tags(self, *tags: str | list[str])
+def add_tags(self, *tags: Union[str, list[str]])
 ```
 
 **Arguments**
 
-- **`*tags`** : `str | list[str]`
+- **`*tags`** : `Union[str, list[str]]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `point_at`
+###### `point_at`
 
 Orients the current object to point at another object, with an optional rotation around the direction vector.
 
@@ -920,7 +995,7 @@ def point_at(self, rv_obj: 'Object', angle: float=0.0)
 
 ---
 ---
-##### `rotate_around_axis`
+###### `rotate_around_axis`
 
 Rotate object around an axis.
 
@@ -939,7 +1014,7 @@ def rotate_around_axis(self, axis: mathutils.Vector, angle: float)
 
 ---
 ---
-##### `set_shading`
+###### `set_shading`
 
 Set shading to flat, smooth, or auto.
 
@@ -957,7 +1032,7 @@ def set_shading(self, shading: Literal['flat', 'smooth', 'auto'])
 
 ---
 ---
-##### `show_debug_axes`
+###### `show_debug_axes`
 
 Show debug axes that can be seen in the `preview` mode.
 
@@ -975,7 +1050,7 @@ def show_debug_axes(self, show=True)
 
 ---
 ---
-##### `show_debug_name`
+###### `show_debug_name`
 
 Show object's name that can be seen in the `preview` mode.
 
@@ -993,7 +1068,7 @@ def show_debug_name(self, show)
 
 ---
 ---
-##### `hide`
+###### `hide`
 
 Hide object from render output while controlling preview visibility.
 
@@ -1011,7 +1086,7 @@ def hide(self, view: Literal['wireframe', 'none']='wireframe')
 
 ---
 ---
-##### `get_dimensions`
+###### `get_dimensions`
 
 Get object dimensions (axis-aligned extents) in world or local space.
 
@@ -1029,7 +1104,7 @@ def get_dimensions(self, space: Literal['world', 'local']='world') -> Float3
 
 ---
 ---
-##### `inspect`
+###### `inspect`
 
 Inspect geometric stats for this object.
 
@@ -1047,7 +1122,7 @@ def inspect(self, applied_scale: bool=True) -> ObjectStats
 
 ---
 ---
-##### `get_bounds`
+###### `get_bounds`
 
 Get axis-aligned bounds in world or local space.
 
@@ -1065,14 +1140,14 @@ def get_bounds(self, space: Literal['world', 'local']='world') -> dict[str, Floa
 
 ---
 ---
-##### `add_rigidbody`
+###### `add_rigidbody`
 
 Add or update rigid-body settings for this object.
 
 **Signature**
 
 ```python
-def add_rigidbody(self, mode: Literal['box', 'sphere', 'hull', 'mesh', 'capsule', 'cylinder', 'cone']='hull', mesh_source: Literal['BASE', 'DEFORM', 'FINAL']='FINAL', body_type: Literal['ACTIVE', 'PASSIVE']='ACTIVE', mass: float=1.0, friction: float=0.5, restitution: float=0.0, linear_damping: float=0.04, angular_damping: float=0.1, use_margin: bool=True, collision_margin: float | None=None, use_deactivation: bool | None=None, deactivate_linear_velocity: float | None=None, deactivate_angular_velocity: float | None=None, start_deactivated: bool | None=None) -> 'Object'
+def add_rigidbody(self, mode: Literal['box', 'sphere', 'hull', 'mesh', 'capsule', 'cylinder', 'cone']='hull', mesh_source: Literal['BASE', 'DEFORM', 'FINAL']='FINAL', body_type: Literal['ACTIVE', 'PASSIVE']='ACTIVE', mass: float=1.0, friction: float=0.5, restitution: float=0.0, linear_damping: float=0.04, angular_damping: float=0.1, use_margin: bool=True, collision_margin: Union[float, None]=None, use_deactivation: Union[bool, None]=None, deactivate_linear_velocity: Union[float, None]=None, deactivate_angular_velocity: Union[float, None]=None, start_deactivated: Union[bool, None]=None) -> 'Object'
 ```
 
 **Arguments**
@@ -1086,17 +1161,17 @@ def add_rigidbody(self, mode: Literal['box', 'sphere', 'hull', 'mesh', 'capsule'
 - **`linear_damping`** : `float`
 - **`angular_damping`** : `float`
 - **`use_margin`** : `bool`
-- **`collision_margin`** : `float | None`
-- **`use_deactivation`** : `bool | None`
-- **`deactivate_linear_velocity`** : `float | None`
-- **`deactivate_angular_velocity`** : `float | None`
-- **`start_deactivated`** : `bool | None`
+- **`collision_margin`** : `Union[float, None]`
+- **`use_deactivation`** : `Union[bool, None]`
+- **`deactivate_linear_velocity`** : `Union[float, None]`
+- **`deactivate_angular_velocity`** : `Union[float, None]`
+- **`start_deactivated`** : `Union[bool, None]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `remove_rigidbody`
+###### `remove_rigidbody`
 
 Remove rigid body from this object if present.
 
@@ -1117,7 +1192,7 @@ def remove_rigidbody(self, keep_transform: bool=True) -> 'Object'
 
 ---
 
-#### `class Camera` {#class-camera}
+##### `class Camera` {#class-camera}
 Inherits from: `Object`
 
 `Object` specialization with camera-specific controls.
@@ -1125,7 +1200,7 @@ Inherits from: `Object`
 ::: details Methods
 
 ---
-##### `set_fov`
+###### `set_fov`
 
 Sets the field of view (FOV) for the object's camera in degrees.
 
@@ -1146,7 +1221,7 @@ def set_fov(self, angle: float)
 
 ---
 
-#### `class Light` {#class-light}
+##### `class Light` {#class-light}
 Inherits from: `Object`
 
 Base object wrapper for Blender lights with chainable parameter setters.
@@ -1154,7 +1229,7 @@ Base object wrapper for Blender lights with chainable parameter setters.
 ::: details Methods
 
 ---
-##### `light_data`
+###### `light_data`
 
 Return the underlying Blender light datablock.
 
@@ -1172,7 +1247,7 @@ def light_data(self) -> bpy.types.Light
 
 ---
 ---
-##### `set_color`
+###### `set_color`
 
 Set light RGB color. Alpha (if provided) is ignored.
 
@@ -1190,7 +1265,7 @@ def set_color(self, color: Color) -> Self
 
 ---
 ---
-##### `set_power`
+###### `set_power`
 
 Set light power in Blender `energy` units.
 
@@ -1208,7 +1283,7 @@ def set_power(self, power: float) -> Self
 
 ---
 ---
-##### `set_cast_shadow`
+###### `set_cast_shadow`
 
 Enable or disable shadow casting.
 
@@ -1226,7 +1301,7 @@ def set_cast_shadow(self, enabled: bool=True) -> Self
 
 ---
 ---
-##### `set_specular_factor`
+###### `set_specular_factor`
 
 Set the light contribution to specular highlights.
 
@@ -1244,7 +1319,7 @@ def set_specular_factor(self, factor: float) -> Self
 
 ---
 ---
-##### `set_softness`
+###### `set_softness`
 
 Set softness parameter mapped to the current light type.
 
@@ -1262,7 +1337,7 @@ def set_softness(self, value: float) -> Self
 
 ---
 ---
-##### `set_params`
+###### `set_params`
 
 Set known light-data attributes or custom properties.
 
@@ -1283,7 +1358,7 @@ def set_params(self, **kwargs) -> Self
 
 ---
 
-#### `class PointLight` {#class-pointlight}
+##### `class PointLight` {#class-pointlight}
 Inherits from: `Light`
 
 Point light with radius control.
@@ -1291,7 +1366,7 @@ Point light with radius control.
 ::: details Methods
 
 ---
-##### `set_radius`
+###### `set_radius`
 
 Set point light radius.
 
@@ -1312,7 +1387,7 @@ def set_radius(self, radius: float) -> 'PointLight'
 
 ---
 
-#### `class SunLight` {#class-sunlight}
+##### `class SunLight` {#class-sunlight}
 Inherits from: `Light`
 
 Directional sun light with angular size control.
@@ -1320,7 +1395,7 @@ Directional sun light with angular size control.
 ::: details Methods
 
 ---
-##### `set_angle`
+###### `set_angle`
 
 Set sun angular size in degrees.
 
@@ -1341,7 +1416,7 @@ def set_angle(self, angle: float) -> 'SunLight'
 
 ---
 
-#### `class AreaLight` {#class-arealight}
+##### `class AreaLight` {#class-arealight}
 Inherits from: `Light`
 
 Area light with shape and size controls.
@@ -1349,7 +1424,7 @@ Area light with shape and size controls.
 ::: details Methods
 
 ---
-##### `set_shape`
+###### `set_shape`
 
 Set area light shape.
 
@@ -1367,7 +1442,7 @@ def set_shape(self, shape: Literal['SQUARE', 'RECTANGLE', 'DISK', 'ELLIPSE']) ->
 
 ---
 ---
-##### `set_size`
+###### `set_size`
 
 Set primary area light size.
 
@@ -1385,7 +1460,7 @@ def set_size(self, size: float) -> 'AreaLight'
 
 ---
 ---
-##### `set_size_xy`
+###### `set_size_xy`
 
 Set area light X and Y sizes.
 
@@ -1407,7 +1482,7 @@ def set_size_xy(self, size_x: float, size_y: float) -> 'AreaLight'
 
 ---
 
-#### `class SpotLight` {#class-spotlight}
+##### `class SpotLight` {#class-spotlight}
 Inherits from: `Light`
 
 Spot light with cone and blend controls.
@@ -1415,7 +1490,7 @@ Spot light with cone and blend controls.
 ::: details Methods
 
 ---
-##### `set_spot_size`
+###### `set_spot_size`
 
 Set spotlight cone angle in degrees.
 
@@ -1433,7 +1508,7 @@ def set_spot_size(self, angle: float) -> 'SpotLight'
 
 ---
 ---
-##### `set_blend`
+###### `set_blend`
 
 Set spotlight edge softness in the [0, 1] range.
 
@@ -1451,7 +1526,7 @@ def set_blend(self, blend: float) -> 'SpotLight'
 
 ---
 ---
-##### `set_show_cone`
+###### `set_show_cone`
 
 Show or hide the spotlight cone in viewport.
 
@@ -1472,13 +1547,13 @@ def set_show_cone(self, show: bool=True) -> 'SpotLight'
 
 ---
 
-## Module: `passes` {#module-passes}
+## Module: `passes`
 
-File: `passes.py`
+### File: `passes.py`
 
-### Enums
+#### Enums
 
-#### RenderPass {#enum-renderpass}
+##### RenderPass {#enum-renderpass}
 Enum representing the supported render passes available for export. To enable them, use `Scene.set_passes` method.
 
 For full documentation view [blender docs](https://docs.blender.org/manual/en/latest/render/layers/passes.html)
@@ -1517,13 +1592,13 @@ For full documentation view [blender docs](https://docs.blender.org/manual/en/la
 
 ---
 
-## Module: `physics` {#module-physics}
+## Module: `physics`
 
-File: `physics.py`
+### File: `physics.py`
 
-### Functions
+#### Functions
 
-#### `simulate_physics` {#function-simulate-physics}
+##### `simulate_physics` {#function-simulate-physics}
 
 Simulate current Blender rigid-body world for a fixed number of frames.
 
@@ -1532,7 +1607,7 @@ Simulate current Blender rigid-body world for a fixed number of frames.
 **Signature**
 
 ```python
-def simulate_physics(frames: int=20, substeps: int=10, time_scale: float=1.0, solver_iterations: int | None=None, use_split_impulse: bool | None=None, split_impulse_penetration_threshold: float | None=None) -> None
+def simulate_physics(frames: int=20, substeps: int=10, time_scale: float=1.0, solver_iterations: Union[int, None]=None, use_split_impulse: Union[bool, None]=None, split_impulse_penetration_threshold: Union[float, None]=None) -> None
 ```
 
 **Arguments**
@@ -1540,25 +1615,33 @@ def simulate_physics(frames: int=20, substeps: int=10, time_scale: float=1.0, so
 - **`frames`** : `int`
 - **`substeps`** : `int`
 - **`time_scale`** : `float`
-- **`solver_iterations`** : `int | None`
-- **`use_split_impulse`** : `bool | None`
-- **`split_impulse_penetration_threshold`** : `float | None`
+- **`solver_iterations`** : `Union[int, None]`
+- **`use_split_impulse`** : `Union[bool, None]`
+- **`split_impulse_penetration_threshold`** : `Union[float, None]`
 
 **Returns**: `None`
 
 :::
 
-## Module: `scene` {#module-scene}
+## Module: `render`
 
-File: `scene.py`
+### File: `render.py`
 
-### Classes
+## Module: `scatter`
 
-#### `class ObjectFactory` {#class-objectfactory}
+### File: `scatter.py`
+
+## Module: `scene`
+
+### File: `scene.py`
+
+#### Classes
+
+##### `class ObjectFactory` {#class-objectfactory}
 ::: details Methods
 
 ---
-##### `empty`
+###### `empty`
 
 **Signature**
 
@@ -1574,7 +1657,7 @@ def empty(self, name: str='Empty') -> 'Object'
 
 ---
 ---
-##### `sphere`
+###### `sphere`
 
 **Signature**
 
@@ -1593,7 +1676,7 @@ def sphere(self, name: str='Sphere', radius: float=1.0, segments: int=32, ring_c
 
 ---
 ---
-##### `cube`
+###### `cube`
 
 **Signature**
 
@@ -1610,7 +1693,7 @@ def cube(self, name: str='Cube', size: float=2.0) -> 'Object'
 
 ---
 ---
-##### `plane`
+###### `plane`
 
 **Signature**
 
@@ -1630,11 +1713,11 @@ def plane(self, name: str='Plane', size: float=2.0) -> 'Object'
 
 ---
 
-#### `class LightFactory` {#class-lightfactory}
+##### `class LightFactory` {#class-lightfactory}
 ::: details Methods
 
 ---
-##### `point`
+###### `point`
 
 **Signature**
 
@@ -1651,7 +1734,7 @@ def point(self, name: str='Point', power: float=1000.0) -> 'PointLight'
 
 ---
 ---
-##### `sun`
+###### `sun`
 
 **Signature**
 
@@ -1668,7 +1751,7 @@ def sun(self, name: str='Sun', power: float=1.0) -> 'SunLight'
 
 ---
 ---
-##### `area`
+###### `area`
 
 **Signature**
 
@@ -1685,7 +1768,7 @@ def area(self, name: str='Area', power: float=100.0) -> 'AreaLight'
 
 ---
 ---
-##### `spot`
+###### `spot`
 
 **Signature**
 
@@ -1705,11 +1788,11 @@ def spot(self, name: str='Spot', power: float=1000.0) -> 'SpotLight'
 
 ---
 
-#### `class MaterialFactory` {#class-materialfactory}
+##### `class MaterialFactory` {#class-materialfactory}
 ::: details Methods
 
 ---
-##### `basic`
+###### `basic`
 
 **Signature**
 
@@ -1725,18 +1808,18 @@ def basic(self, name: str='Material') -> 'BasicMaterial'
 
 ---
 ---
-##### `imported`
+###### `imported`
 
 **Signature**
 
 ```python
-def imported(self, blendfile: str, material_name: str | None=None) -> 'ImportedMaterial'
+def imported(self, blendfile: str, material_name: Union[str, None]=None) -> 'ImportedMaterial'
 ```
 
 **Arguments**
 
 - **`blendfile`** : `str`
-- **`material_name`** : `str | None`
+- **`material_name`** : `Union[str, None]`
 
 **Returns**: `'ImportedMaterial'`
 
@@ -1745,39 +1828,39 @@ def imported(self, blendfile: str, material_name: str | None=None) -> 'ImportedM
 
 ---
 
-#### `class AssetFactory` {#class-assetfactory}
+##### `class AssetFactory` {#class-assetfactory}
 ::: details Methods
 
 ---
-##### `object`
+###### `object`
 
 **Signature**
 
 ```python
-def object(self, blendfile: str, import_name: str | None=None) -> 'ObjectLoader'
+def object(self, blendfile: str, import_name: Union[str, None]=None) -> 'ObjectLoader'
 ```
 
 **Arguments**
 
 - **`blendfile`** : `str`
-- **`import_name`** : `str | None`
+- **`import_name`** : `Union[str, None]`
 
 **Returns**: `'ObjectLoader'`
 
 ---
 ---
-##### `objects`
+###### `objects`
 
 **Signature**
 
 ```python
-def objects(self, blendfile: str, import_names: list[str] | None=None) -> list['ObjectLoader']
+def objects(self, blendfile: str, import_names: Union[list[str], None]=None) -> list['ObjectLoader']
 ```
 
 **Arguments**
 
 - **`blendfile`** : `str`
-- **`import_names`** : `list[str] | None`
+- **`import_names`** : `Union[list[str], None]`
 
 **Returns**: `Self`
 
@@ -1786,7 +1869,7 @@ def objects(self, blendfile: str, import_names: list[str] | None=None) -> list['
 
 ---
 
-#### `class Scene` {#class-scene}
+##### `class Scene` {#class-scene}
 Inherits from: `ABC`, `_Serializable`
 
 ::: details Attributes
@@ -1795,9 +1878,9 @@ Inherits from: `ABC`, `_Serializable`
 | - | - | - |
 | `resolution` | `Resolution` |  |
 | `time_limit` | `float` |  |
-| `passes` | `RenderPassSet \| None` |  |
+| `passes` | `Union[RenderPassSet, None]` |  |
 | `output_dir` | `Optional[str]` |  |
-| `subdir` | `str \| None` |  |
+| `subdir` | `Union[str, None]` |  |
 | `camera` | `'Camera'` |  |
 | `world` | `'World'` |  |
 | `tags` | `TagSet` |  |
@@ -1805,10 +1888,11 @@ Inherits from: `ABC`, `_Serializable`
 | `materials` | `MaterialFactory` |  |
 | `lights` | `LightFactory` |  |
 | `assets` | `AssetFactory` |  |
+| `generators` | `GeneratorFactory` |  |
 | `semantic_channels` | `SemanticChannelSet` |  |
 | `semantic_mask_threshold` | `float` |  |
-| `seed` | `int \| None` |  |
-| `seed_mode` | `str \| None` |  |
+| `seed` | `Union[int, None]` |  |
+| `seed_mode` | `Union[str, None]` |  |
 | `object_index_counter` | `int` |  |
 | `material_index_counter` | `int` |  |
 | `light_index_counter` | `int` |  |
@@ -1818,24 +1902,24 @@ Inherits from: `ABC`, `_Serializable`
 ::: details Methods
 
 ---
-##### `generate`
+###### `generate`
 
 **Signature**
 
 ```python
 @abstractmethod
-def generate(self, seed: int | None=None) -> None
+def generate(self, seed: Union[int, None]=None) -> None
 ```
 
 **Arguments**
 
-- **`seed`** : `int | None`
+- **`seed`** : `Union[int, None]`
 
 **Returns**: `None`
 
 ---
 ---
-##### `set_rendering_time_limit`
+###### `set_rendering_time_limit`
 
 **Signature**
 
@@ -1851,39 +1935,87 @@ def set_rendering_time_limit(self, time_limit: float=3.0)
 
 ---
 ---
-##### `set_passes`
+###### `generated_objects`
 
 **Signature**
 
 ```python
-def set_passes(self, *passes: tuple[RenderPass | list[RenderPass], ...])
+@property
+def generated_objects(self) -> tuple['Object', ...]
 ```
 
 **Arguments**
 
-- **`*passes`** : `tuple[RenderPass | list[RenderPass], ...]`
+
+**Returns**: `tuple['Object', ...]`
+
+---
+---
+###### `generated_materials`
+
+**Signature**
+
+```python
+@property
+def generated_materials(self) -> tuple['Material', ...]
+```
+
+**Arguments**
+
+
+**Returns**: `tuple['Material', ...]`
+
+---
+---
+###### `generated_lights`
+
+**Signature**
+
+```python
+@property
+def generated_lights(self) -> tuple['Light', ...]
+```
+
+**Arguments**
+
+
+**Returns**: `tuple['Light', ...]`
+
+---
+---
+###### `set_passes`
+
+**Signature**
+
+```python
+def set_passes(self, *passes: tuple[Union[RenderPass, list[RenderPass]], ...])
+```
+
+**Arguments**
+
+- **`*passes`** : `tuple[Union[RenderPass, list[RenderPass]], ...]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `enable_semantic_channels`
+###### `enable_semantic_channels`
 
 **Signature**
 
 ```python
-def enable_semantic_channels(self, *channels: tuple[str | list[str], ...]) -> 'Scene'
+def enable_semantic_channels(self, *channels: tuple[Union[str, list[str]], ...]) -> 'Scene'
 ```
 
 **Arguments**
 
-- **`*channels`** : `tuple[str | list[str], ...]`
+- **`*channels`** : `tuple[Union[str, list[str]], ...]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `set_semantic_mask_threshold`
+###### `set_semantic_mask_threshold`
 
 **Signature**
 
@@ -1899,7 +2031,7 @@ def set_semantic_mask_threshold(self, threshold: float) -> 'Scene'
 
 ---
 ---
-##### `set_tags`
+###### `set_tags`
 
 **Signature**
 
@@ -1915,7 +2047,7 @@ def set_tags(self, *tags) -> 'Scene'
 
 ---
 ---
-##### `add_tags`
+###### `add_tags`
 
 **Signature**
 
@@ -1931,7 +2063,7 @@ def add_tags(self, *tags) -> 'Scene'
 
 ---
 ---
-##### `inspect_object`
+###### `inspect_object`
 
 **Signature**
 
@@ -1948,12 +2080,12 @@ def inspect_object(self, loader_or_obj: Union['ObjectLoader', 'Object'], applied
 
 ---
 ---
-##### `scatter`
+###### `scatter`
 
 **Signature**
 
 ```python
-def scatter(self, source: ScatterSource, count: int, domain: 'Domain', *, method: Literal['auto', 'fast', 'exact']='auto', gap: float=0.0, scale: float | Float2=1.0, rotation: Literal['yaw', 'free']='yaw', yaw: Float2=(0.0, 360.0), margin: float=0.0, seed: int | None=None, unique_data: bool=False, on_create=None, max_attempts_per_object: int=100) -> list['Object']
+def scatter(self, source: ScatterSource, count: int, domain: 'Domain', *, method: Literal['auto', 'fast', 'exact']='auto', gap: float=0.0, scale: Union[float, Float2]=1.0, rotation: Literal['yaw', 'free']='yaw', yaw: Float2=(0.0, 360.0), margin: float=0.0, seed: Union[int, None]=None, unique_data: bool=False, on_create=None, max_attempts_per_object: int=100) -> list['Object']
 ```
 
 **Arguments**
@@ -1963,11 +2095,11 @@ def scatter(self, source: ScatterSource, count: int, domain: 'Domain', *, method
 - **`domain`** : `'Domain'`
 - **`method`** : `Literal['auto', 'fast', 'exact']`
 - **`gap`** : `float`
-- **`scale`** : `float | Float2`
+- **`scale`** : `Union[float, Float2]`
 - **`rotation`** : `Literal['yaw', 'free']`
 - **`yaw`** : `Float2`
 - **`margin`** : `float`
-- **`seed`** : `int | None`
+- **`seed`** : `Union[int, None]`
 - **`unique_data`** : `bool`
 - **`on_create`**
 - **`max_attempts_per_object`** : `int`
@@ -1979,13 +2111,13 @@ def scatter(self, source: ScatterSource, count: int, domain: 'Domain', *, method
 
 ---
 
-## Module: `shader` {#module-shader}
+## Module: `shader`
 
-File: `shader.py`
+### File: `shader.py`
 
-### Classes
+#### Classes
 
-#### `class Expr` {#class-expr}
+##### `class Expr` {#class-expr}
 ::: details Attributes
 
 | Name | Type | Description |
@@ -1997,7 +2129,7 @@ File: `shader.py`
 ::: details Methods
 
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2013,7 +2145,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2028,7 +2160,7 @@ def node_height(self) -> int
 
 ---
 ---
-##### `to_meta`
+###### `to_meta`
 
 **Signature**
 
@@ -2043,7 +2175,7 @@ def to_meta(self) -> dict[str, Any]
 
 ---
 ---
-##### `x_depth`
+###### `x_depth`
 
 **Signature**
 
@@ -2062,32 +2194,32 @@ def x_depth(self) -> int
 
 ---
 
-#### `class FloatExpr` {#class-floatexpr}
+##### `class FloatExpr` {#class-floatexpr}
 Inherits from: `Expr`
 
 ---
 
-#### `class ColorExpr` {#class-colorexpr}
+##### `class ColorExpr` {#class-colorexpr}
 Inherits from: `Expr`
 
 ---
 
-#### `class VectorExpr` {#class-vectorexpr}
+##### `class VectorExpr` {#class-vectorexpr}
 Inherits from: `Expr`
 
 ---
 
-#### `class NormalExpr` {#class-normalexpr}
+##### `class NormalExpr` {#class-normalexpr}
 Inherits from: `VectorExpr`
 
 ---
 
-#### `class ShaderExpr` {#class-shaderexpr}
+##### `class ShaderExpr` {#class-shaderexpr}
 Inherits from: `Expr`
 
 ---
 
-#### `class Value` {#class-value}
+##### `class Value` {#class-value}
 Inherits from: `FloatExpr`
 
 ::: details Attributes
@@ -2101,7 +2233,7 @@ Inherits from: `FloatExpr`
 ::: details Methods
 
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2117,7 +2249,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2135,7 +2267,7 @@ def node_height(self) -> int
 
 ---
 
-#### `class ColorValue` {#class-colorvalue}
+##### `class ColorValue` {#class-colorvalue}
 Inherits from: `ColorExpr`
 
 ::: details Attributes
@@ -2149,7 +2281,7 @@ Inherits from: `ColorExpr`
 ::: details Methods
 
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2165,7 +2297,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2183,7 +2315,7 @@ def node_height(self) -> int
 
 ---
 
-#### `class VectorValue` {#class-vectorvalue}
+##### `class VectorValue` {#class-vectorvalue}
 Inherits from: `VectorExpr`
 
 ::: details Attributes
@@ -2197,7 +2329,7 @@ Inherits from: `VectorExpr`
 ::: details Methods
 
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2213,7 +2345,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2231,7 +2363,7 @@ def node_height(self) -> int
 
 ---
 
-#### `class BinaryMath` {#class-binarymath}
+##### `class BinaryMath` {#class-binarymath}
 Inherits from: `Expr`
 
 ::: details Attributes
@@ -2247,7 +2379,7 @@ Inherits from: `Expr`
 ::: details Methods
 
 ---
-##### `value_type`
+###### `value_type`
 
 **Signature**
 
@@ -2263,7 +2395,7 @@ def value_type(self) -> str
 
 ---
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2279,7 +2411,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2297,7 +2429,7 @@ def node_height(self) -> int
 
 ---
 
-#### `class TextureImage` {#class-textureimage}
+##### `class TextureImage` {#class-textureimage}
 Inherits from: `ColorExpr`
 
 ::: details Attributes
@@ -2314,7 +2446,7 @@ Inherits from: `ColorExpr`
 ::: details Methods
 
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2330,7 +2462,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2348,7 +2480,7 @@ def node_height(self) -> int
 
 ---
 
-#### `class NormalMap` {#class-normalmap}
+##### `class NormalMap` {#class-normalmap}
 Inherits from: `NormalExpr`
 
 ::: details Attributes
@@ -2364,7 +2496,7 @@ Inherits from: `NormalExpr`
 ::: details Methods
 
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2380,7 +2512,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2398,30 +2530,30 @@ def node_height(self) -> int
 
 ---
 
-#### `class PrincipledBSDF` {#class-principledbsdf}
+##### `class PrincipledBSDF` {#class-principledbsdf}
 Inherits from: `ShaderExpr`
 
 ::: details Attributes
 
 | Name | Type | Description |
 | - | - | - |
-| `base_color` | `ShaderValueLike \| None` |  |
-| `metallic` | `ShaderValueLike \| None` |  |
-| `roughness` | `ShaderValueLike \| None` |  |
-| `specular` | `ShaderValueLike \| None` |  |
-| `normal` | `ShaderValueLike \| None` |  |
-| `emission_color` | `ShaderValueLike \| None` |  |
-| `emission_strength` | `ShaderValueLike \| None` |  |
-| `alpha` | `ShaderValueLike \| None` |  |
-| `transmission` | `ShaderValueLike \| None` |  |
-| `ior` | `ShaderValueLike \| None` |  |
+| `base_color` | `Union[ShaderValueLike, None]` |  |
+| `metallic` | `Union[ShaderValueLike, None]` |  |
+| `roughness` | `Union[ShaderValueLike, None]` |  |
+| `specular` | `Union[ShaderValueLike, None]` |  |
+| `normal` | `Union[ShaderValueLike, None]` |  |
+| `emission_color` | `Union[ShaderValueLike, None]` |  |
+| `emission_strength` | `Union[ShaderValueLike, None]` |  |
+| `alpha` | `Union[ShaderValueLike, None]` |  |
+| `transmission` | `Union[ShaderValueLike, None]` |  |
+| `ior` | `Union[ShaderValueLike, None]` |  |
 
 :::
 
 ::: details Methods
 
 ---
-##### `compile`
+###### `compile`
 
 **Signature**
 
@@ -2437,7 +2569,7 @@ def compile(self, compiler: '_ShaderGraphCompiler') -> bpy.types.NodeSocket
 
 ---
 ---
-##### `node_height`
+###### `node_height`
 
 **Signature**
 
@@ -2455,7 +2587,7 @@ def node_height(self) -> int
 
 ---
 
-#### `class ShaderMaterial` {#class-shadermaterial}
+##### `class ShaderMaterial` {#class-shadermaterial}
 Inherits from: `Material`
 
 ::: details Attributes
@@ -2470,23 +2602,23 @@ Inherits from: `Material`
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 
 ```python
-def set_params(self, shader: ShaderExpr | None=None)
+def set_params(self, shader: Union[ShaderExpr, None]=None)
 ```
 
 **Arguments**
 
-- **`shader`** : `ShaderExpr | None`
+- **`shader`** : `Union[ShaderExpr, None]`
 
 **Returns**: `Self`
 
 ---
 ---
-##### `set_property`
+###### `set_property`
 
 **Signature**
 
@@ -2506,13 +2638,25 @@ def set_property(self, key: str, value: Any)
 
 ---
 
-## Module: `world` {#module-world}
+## Module: `state`
 
-File: `world.py`
+### File: `state.py`
 
-### Classes
+## Module: `types`
 
-#### `class World` {#class-world}
+### File: `types.py`
+
+## Module: `utils`
+
+### File: `utils.py`
+
+## Module: `world`
+
+### File: `world.py`
+
+#### Classes
+
+##### `class World` {#class-world}
 Inherits from: `ABC`
 
 Base class representing world (environment ligthing).
@@ -2520,7 +2664,7 @@ Base class representing world (environment ligthing).
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 Update world-specific lighting parameters.
 
@@ -2541,7 +2685,7 @@ def set_params(self) -> Self
 
 ---
 
-#### `class BasicWorld` {#class-basicworld}
+##### `class BasicWorld` {#class-basicworld}
 Inherits from: `World`
 
 `World` class representing a single color environmental lighting.
@@ -2550,26 +2694,26 @@ Inherits from: `World`
 
 | Name | Type | Description |
 | - | - | - |
-| `color` | `ColorRGBA \| None` |  |
-| `strength` | `float \| None` |  |
+| `color` | `Union[ColorRGBA, None]` |  |
+| `strength` | `Union[float, None]` |  |
 
 :::
 
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 
 ```python
-def set_params(self, color: ColorRGBA | None=None, strength: float | None=None)
+def set_params(self, color: Union[ColorRGBA, None]=None, strength: Union[float, None]=None)
 ```
 
 **Arguments**
 
-- **`color`** : `ColorRGBA | None`
-- **`strength`** : `float | None`
+- **`color`** : `Union[ColorRGBA, None]`
+- **`strength`** : `Union[float, None]`
 
 **Returns**: `Self`
 
@@ -2578,7 +2722,7 @@ def set_params(self, color: ColorRGBA | None=None, strength: float | None=None)
 
 ---
 
-#### `class SkyWorld` {#class-skyworld}
+##### `class SkyWorld` {#class-skyworld}
 Inherits from: `World`
 
 `World` class representing a procedural sky environement.
@@ -2589,12 +2733,12 @@ For more information, view [official blender docs](https://docs.blender.org/manu
 
 | Name | Type | Description |
 | - | - | - |
-| `strength` | `float \| None` |  |
-| `sun_size` | `float \| None` |  |
-| `sun_intensity` | `float \| None` |  |
-| `sun_elevation` | `float \| None` |  |
-| `rotation_z` | `float \| None` |  |
-| `altitude` | `float \| None` |  |
+| `strength` | `Union[float, None]` |  |
+| `sun_size` | `Union[float, None]` |  |
+| `sun_intensity` | `Union[float, None]` |  |
+| `sun_elevation` | `Union[float, None]` |  |
+| `rotation_z` | `Union[float, None]` |  |
+| `altitude` | `Union[float, None]` |  |
 | `air` | `float` |  |
 | `aerosol_density` | `float` |  |
 | `ozone` | `float` |  |
@@ -2604,24 +2748,24 @@ For more information, view [official blender docs](https://docs.blender.org/manu
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 
 ```python
-def set_params(self, strength: float | None=None, sun_size: float | None=None, sun_intensity: float | None=None, sun_elevation: float | None=None, rotation_z: float | None=None, air: float | None=None, aerosol_density: float | None=None, ozone: float | None=None)
+def set_params(self, strength: Union[float, None]=None, sun_size: Union[float, None]=None, sun_intensity: Union[float, None]=None, sun_elevation: Union[float, None]=None, rotation_z: Union[float, None]=None, air: Union[float, None]=None, aerosol_density: Union[float, None]=None, ozone: Union[float, None]=None)
 ```
 
 **Arguments**
 
-- **`strength`** : `float | None`
-- **`sun_size`** : `float | None`
-- **`sun_intensity`** : `float | None`
-- **`sun_elevation`** : `float | None`
-- **`rotation_z`** : `float | None`
-- **`air`** : `float | None`
-- **`aerosol_density`** : `float | None`
-- **`ozone`** : `float | None`
+- **`strength`** : `Union[float, None]`
+- **`sun_size`** : `Union[float, None]`
+- **`sun_intensity`** : `Union[float, None]`
+- **`sun_elevation`** : `Union[float, None]`
+- **`rotation_z`** : `Union[float, None]`
+- **`air`** : `Union[float, None]`
+- **`aerosol_density`** : `Union[float, None]`
+- **`ozone`** : `Union[float, None]`
 
 **Returns**: `Self`
 
@@ -2630,7 +2774,7 @@ def set_params(self, strength: float | None=None, sun_size: float | None=None, s
 
 ---
 
-#### `class HDRIWorld` {#class-hdriworld}
+##### `class HDRIWorld` {#class-hdriworld}
 Inherits from: `World`
 
 `World` class for importing lighting from an hdri `.exr` file.
@@ -2640,27 +2784,27 @@ Inherits from: `World`
 | Name | Type | Description |
 | - | - | - |
 | `hdri_path` | `str` |  |
-| `strength` | `float \| None` |  |
-| `rotation_z` | `float \| None` |  |
+| `strength` | `Union[float, None]` |  |
+| `rotation_z` | `Union[float, None]` |  |
 
 :::
 
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 
 ```python
-def set_params(self, hdri_path: str | None=None, strength: float | None=None, rotation_z: float | None=None)
+def set_params(self, hdri_path: Union[str, None]=None, strength: Union[float, None]=None, rotation_z: Union[float, None]=None)
 ```
 
 **Arguments**
 
-- **`hdri_path`** : `str | None`
-- **`strength`** : `float | None`
-- **`rotation_z`** : `float | None`
+- **`hdri_path`** : `Union[str, None]`
+- **`strength`** : `Union[float, None]`
+- **`rotation_z`** : `Union[float, None]`
 
 **Returns**: `Self`
 
@@ -2669,7 +2813,7 @@ def set_params(self, hdri_path: str | None=None, strength: float | None=None, ro
 
 ---
 
-#### `class ImportedWorld` {#class-importedworld}
+##### `class ImportedWorld` {#class-importedworld}
 Inherits from: `World`
 
 `World` class for importing environment lighting from a `.blend` file.
@@ -2679,7 +2823,7 @@ Inherits from: `World`
 | Name | Type | Description |
 | - | - | - |
 | `filepath` | `str` |  |
-| `world_name` | `str \| None` |  |
+| `world_name` | `Union[str, None]` |  |
 | `params` | `dict` |  |
 
 :::
@@ -2687,7 +2831,7 @@ Inherits from: `World`
 ::: details Methods
 
 ---
-##### `set_params`
+###### `set_params`
 
 **Signature**
 

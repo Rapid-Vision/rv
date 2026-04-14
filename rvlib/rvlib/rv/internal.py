@@ -5,6 +5,7 @@ These functions are intentionally separated from the public `rv` package API.
 They remain importable for bundled runners such as preview/render/export.
 """
 
+from .generators import _configure_generator_runtime
 from .utils import (
     _internal_begin_run,
     _internal_configure_cycles_backend,
@@ -21,6 +22,7 @@ from .utils import (
 __all__ = [
     "_internal_begin_run",
     "_internal_configure_cycles_backend",
+    "_configure_generator_runtime",
     "_internal_end_run",
     "_internal_iter_cycles_devices",
     "_internal_load_scene_class",
