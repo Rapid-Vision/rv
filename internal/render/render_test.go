@@ -1,21 +1,25 @@
 package render
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/Rapid-Vision/rv/internal/seed"
+	"github.com/Rapid-Vision/rv/internal/utils"
 )
 
 func TestBuildBlenderRenderArgs_SeedFlags(t *testing.T) {
 	opts := RenderOptions{
-		ScriptPath: "/work/scene.py",
-		Cwd:        "/work",
-		ImageNum:   4,
-		Procs:      2,
-		Resolution: [2]int{640, 480},
-		OutputDir:  "/tmp/out",
-		GPUBackend: "cuda",
-		Seed:       seed.Config{Mode: seed.FixedMode, Value: 123},
+		ScriptPath:    "/work/scene.py",
+		Cwd:           "/work",
+		WorkDir:       "/work/generated/run-1",
+		ImageNum:      4,
+		Procs:         2,
+		Resolution:    [2]int{640, 480},
+		OutputDir:     "/tmp/out",
+		GPUBackend:    "cuda",
+		Seed:          seed.Config{Mode: seed.FixedMode, Value: 123},
+		GeneratorPort: 9090,
 	}
 
 	args := buildBlenderRenderArgs(opts, "/lib/rvlib", "/tmp/out/1", 2, 5)
@@ -26,6 +30,11 @@ func TestBuildBlenderRenderArgs_SeedFlags(t *testing.T) {
 	assertContains(t, args, "123")
 	assertContains(t, args, "--seed-base")
 	assertContains(t, args, "5")
+	assertContains(t, args, "--generator-port")
+	assertContains(t, args, "9090")
+	assertContains(t, args, "--root-dir")
+	assertContains(t, args, "--work-dir")
+	assertContains(t, args, "/work/generated/run-1")
 }
 
 func TestRenderSeedBase(t *testing.T) {
@@ -39,6 +48,42 @@ func TestRenderSeedBase(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("got = %v, want = %v", got, want)
 		}
+	}
+}
+
+func TestApplyDefaultGeneratorOptions(t *testing.T) {
+	opts := RenderOptions{
+		Cwd: "/work/project",
+	}
+
+	if err := applyDefaultGeneratorOptions(&opts); err != nil {
+		t.Fatalf("applyDefaultGeneratorOptions() error = %v", err)
+	}
+
+	if opts.GenBaseDir != filepath.Clean("/work/project/generated") {
+		t.Fatalf("GenBaseDir = %q", opts.GenBaseDir)
+	}
+	if opts.GenRetain != utils.GeneratorRetainNone {
+		t.Fatalf("GenRetain = %q", opts.GenRetain)
+	}
+}
+
+func TestApplyDefaultGeneratorOptions_PreservesProvidedValues(t *testing.T) {
+	opts := RenderOptions{
+		Cwd:        "/work/project",
+		GenBaseDir: "/custom/generated",
+		GenRetain:  utils.GeneratorRetainAll,
+	}
+
+	if err := applyDefaultGeneratorOptions(&opts); err != nil {
+		t.Fatalf("applyDefaultGeneratorOptions() error = %v", err)
+	}
+
+	if opts.GenBaseDir != "/custom/generated" {
+		t.Fatalf("GenBaseDir = %q", opts.GenBaseDir)
+	}
+	if opts.GenRetain != utils.GeneratorRetainAll {
+		t.Fatalf("GenRetain = %q", opts.GenRetain)
 	}
 }
 

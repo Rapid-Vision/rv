@@ -77,6 +77,46 @@ rv render scene.py --seed 42
 
 See [`examples/2_properties/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/2_properties/scene.py) for a simple `random.Random(seed)` workflow.
 
+## Generate helper assets outside Blender
+
+Some assets are easier to produce with a small external script than with Blender nodes alone. For example, textures with text or assets that require some non-trivial computations. `rv` provides a mechanism of generators to achive this goal.
+
+Generator is a program that receives a JSON request on `stdin` with the current scene seed, `root_dir`, `work_dir`, and any keyword parameters you pass from Python. It returns JSON on `stdout` as `{"result": ...}`.
+
+Envoke a generator like this:
+```python
+generator = self.generators.init("uv run ./gen.py")
+texture_path = generator.generate_path()
+```
+
+Use
+- `generate(...)` for any JSON-compatible result.
+- `generate_path(...)` for file-producing generators.
+- `generate_str(...)` for string results.
+- `generate_num(...)` for numeric results.
+
+This keeps the main scene script focused on scene assembly inside Blender, while small sidecar scripts can generate assets with regular Python libraries.
+
+By default, each run gets its own work directory under `<root_dir>/generated`. You can move it elsewhere with `--gen-dir`:
+
+```bash
+rv render examples/9_generator/scene.py --cwd examples/9_generator --gen-dir ./tmp/gen
+```
+
+Cleanup is controlled by `--gen-retain`:
+
+- `all`: keep every generator work directory.
+- `last`: keep only the most recent one.
+- `none`: remove all generator work directories after the command finishes.
+
+The command defaults are chosen for the common workflow:
+
+- `rv preview`: `last`, so you can inspect the latest preview artifacts.
+- `rv render`: `none`, so large batch renders do not accumulate temp files.
+- `rv export`: `all`, so exported scenes keep all referenced generated assets by default.
+
+See [`examples/9_generator/scene.py`](https://github.com/Rapid-Vision/rv/blob/main/examples/9_generator/scene.py) and [`examples/9_generator/README.md`](https://github.com/Rapid-Vision/rv/blob/main/examples/9_generator/README.md).
+
 ## Import reusable assets from `.blend` files
 
 When geometry is more complex than a few primitives, design it in Blender and import from Python. `rv` loads named objects from a `.blend` file and returns an `ObjectLoader`:

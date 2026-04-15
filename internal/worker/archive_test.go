@@ -38,7 +38,7 @@ func TestCreateDatasetArchive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open archive: %v", err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	names := make([]string, 0, len(rc.File))
 	for _, f := range rc.File {

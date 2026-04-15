@@ -22,7 +22,7 @@ func (c *previewClient) requestRerun() {
 		logs.Warn.Println("Failed to request preview rerun:", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		logs.Warn.Printf("Preview rerun request returned status %d\n", resp.StatusCode)

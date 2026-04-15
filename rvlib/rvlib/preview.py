@@ -1,5 +1,6 @@
 import os
 import bpy
+import atexit
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -10,12 +11,13 @@ import traceback
 import shutil
 import time
 import tempfile
+import uuid
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
-from runtime_bootstrap import bootstrap_runtime
+from runtime_bootstrap import bootstrap_runtime  # noqa: E402
 
 
 def parse_args():
@@ -27,7 +29,9 @@ def parse_args():
     parser.add_argument("--port", type=int, default=5757)
     parser.add_argument("--script", type=str)
     parser.add_argument("--libpath", type=str)
-    parser.add_argument("--cwd", type=str)
+    parser.add_argument("--root-dir", type=str)
+    parser.add_argument("--gen-base-dir", type=str)
+    parser.add_argument("--gen-retain", type=str, default="last")
     parser.add_argument("--preview-files", action="store_true")
     parser.add_argument("--preview-out", type=str, default=None)
     parser.add_argument("--no-window", action="store_true")
@@ -36,6 +40,7 @@ def parse_args():
     parser.add_argument("--seed-mode", type=str, default="rand")
     parser.add_argument("--seed-value", type=int, default=None)
     parser.add_argument("--time-limit", type=float, default=None)
+    parser.add_argument("--generator-port", type=int, default=0)
 
     return parser.parse_args(args)
 
@@ -53,6 +58,8 @@ RERUN_RUNNING = False
 HTTPD = None
 STOP_EVENT = threading.Event()
 RERUN_INDEX = 0
+CURRENT_WORK_DIR = None
+GENERATOR_WORK_DIR_PREFIX = "_rv_"
 
 
 def iter_files(root_dir):
@@ -117,6 +124,46 @@ def reset_preview_scene_state():
     bpy.context.view_layer.update()
 
 
+def allocate_work_dir(gen_base_dir: str) -> str:
+    os.makedirs(gen_base_dir, exist_ok=True)
+    work_dir = os.path.join(gen_base_dir, f"{GENERATOR_WORK_DIR_PREFIX}{uuid.uuid4()}")
+    os.makedirs(work_dir, exist_ok=True)
+    return work_dir
+
+
+def cleanup_generator_work_dirs(gen_base_dir: str, retain: str, keep_work_dir: str | None):
+    if not gen_base_dir or not os.path.isdir(gen_base_dir):
+        return
+
+    keep_work_dir = None if keep_work_dir is None else os.path.realpath(keep_work_dir)
+    for entry in os.scandir(gen_base_dir):
+        if not entry.is_dir():
+            continue
+        if not entry.name.startswith(GENERATOR_WORK_DIR_PREFIX):
+            continue
+
+        target = os.path.realpath(entry.path)
+        should_keep = False
+        if retain == "all":
+            should_keep = True
+        elif retain == "last":
+            should_keep = keep_work_dir is not None and target == keep_work_dir
+        elif retain == "none":
+            should_keep = False
+        else:
+            raise ValueError(
+                f"invalid --gen-retain value {retain!r}: must be one of all, last, none"
+            )
+
+        if should_keep:
+            continue
+        shutil.rmtree(target, ignore_errors=True)
+
+
+def cleanup_on_exit():
+    cleanup_generator_work_dirs(ARGS.gen_base_dir, ARGS.gen_retain, CURRENT_WORK_DIR)
+
+
 def run_script(
     script_path,
     preview_files=False,
@@ -126,7 +173,6 @@ def run_script(
     time_limit=None,
     seed=None,
 ):
-    import rv
     import rv.internal as rvi
 
     scene_class = rvi._internal_load_scene_class(script_path)
@@ -169,7 +215,7 @@ def request_rerun():
 
 
 def preview_tick():
-    global RERUN_PENDING, RERUN_RUNNING, RERUN_INDEX
+    global CURRENT_WORK_DIR, RERUN_PENDING, RERUN_RUNNING, RERUN_INDEX
 
     if RERUN_RUNNING or not RERUN_PENDING:
         return 0.1
@@ -177,6 +223,10 @@ def preview_tick():
     RERUN_RUNNING = True
     RERUN_PENDING = False
     try:
+        work_dir = allocate_work_dir(ARGS.gen_base_dir)
+        if ARGS.gen_retain in ("last", "none"):
+            cleanup_generator_work_dirs(ARGS.gen_base_dir, "last", work_dir)
+        rvi._configure_generator_runtime(ARGS.generator_port, ARGS.root_dir, work_dir)
         seed = rvi._internal_resolve_seed(
             ARGS.seed_mode, ARGS.seed_value, 0, RERUN_INDEX
         )
@@ -189,6 +239,7 @@ def preview_tick():
             time_limit=ARGS.time_limit,
             seed=seed,
         )
+        CURRENT_WORK_DIR = work_dir
         RERUN_INDEX += 1
     except Exception:
         print("ERROR: Failed to execute preview run")
@@ -258,10 +309,16 @@ def run_headless_loop():
 
 ARGS = parse_args()
 
-bootstrap_runtime(ARGS.libpath, ARGS.cwd)
+if ARGS.root_dir is None:
+    raise ValueError("--root-dir is required")
+if ARGS.gen_base_dir is None:
+    raise ValueError("--gen-base-dir is required")
+if ARGS.gen_retain not in {"all", "last", "none"}:
+    raise ValueError("--gen-retain must be one of all, last, none")
 
-import rv
-import rv.internal as rvi
+bootstrap_runtime(ARGS.libpath, ARGS.root_dir)
+
+import rv.internal as rvi  # noqa: E402
 
 RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
 
@@ -284,3 +341,4 @@ else:
     bpy.app.timers.register(preview_tick)
 
 print("Blender is running with an embedded HTTP server.")
+atexit.register(cleanup_on_exit)

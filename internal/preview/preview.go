@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Rapid-Vision/rv/internal/generator"
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
@@ -20,6 +22,8 @@ import (
 type Options struct {
 	ScriptPathArg string
 	CwdArg        string
+	GenDirArg     string
+	GenRetain     utils.GeneratorRetention
 	PreviewFiles  bool
 	PreviewOut    string
 	NoWindow      bool
@@ -27,6 +31,7 @@ type Options struct {
 	GPUBackend    string
 	TimeLimit     *float64
 	Seed          seed.Config
+	GeneratorPort int
 }
 
 func normalizedGPUBackend(value string) string {
@@ -43,6 +48,13 @@ func Preview(opts Options) {
 	}
 	scriptPath := paths.ScriptPath
 	cwdAbs := paths.Cwd
+	generatorPaths, err := utils.ResolveGeneratorPaths(cwdAbs, opts.GenDirArg)
+	if err != nil {
+		logs.Err.Fatalln("Failed to resolve generator paths:", err)
+	}
+	if opts.GenRetain == "" {
+		logs.Err.Fatalln("Invalid preview options: generator retention is required")
+	}
 
 	if err := validateOptions(opts); err != nil {
 		logs.Err.Fatalln("Invalid preview options:", err)
@@ -73,8 +85,19 @@ func Preview(opts Options) {
 		logs.Err.Fatalln("Script path is a directory, not a file:", scriptPath)
 	}
 
+	// Context for shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	generatorService, err := generator.Start(ctx)
+	if err != nil {
+		logs.Warn.Printf("Generator service unavailable; scenes using self.generators will fail: %v\n", err)
+		opts.GeneratorPort = 0
+	} else {
+		defer generatorService.Wait()
+		opts.GeneratorPort = generatorService.Port()
+	}
+
 	// Start Blender
-	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, libPath, port)...)
+	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, generatorPaths.GenBaseDir, libPath, port)...)
 	cmd.Env = utils.BlenderCommandEnv()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -84,10 +107,6 @@ func Preview(opts Options) {
 	}
 	logs.Info.Printf("Blender started (PID %d) on port %d\n", cmd.Process.Pid, port)
 
-	// Context for shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	client := newPreviewClient(port)
 
 	// Watcher goroutine
@@ -96,17 +115,28 @@ func Preview(opts Options) {
 			logs.Warn.Println("Watch error:", err)
 		}
 	}()
+	if stdinSupportsCommands(os.Stdin) {
+		logs.Info.Println("Press Enter to refresh preview.")
+		go readPreviewCommands(ctx, client.requestRerun)
+	}
 
 	// Handle Ctrl-C
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	waitCh := utils.WaitCmd(cmd)
 
 	// Wait for either Blender exit or signal
 	select {
 	case <-sigCh:
 		logs.Info.Println("Interrupt received — terminating Blender…")
 		_ = cmd.Process.Signal(syscall.SIGTERM)
-	case err = <-utils.WaitCmd(cmd):
+		err = <-waitCh
+		if err != nil {
+			logs.Info.Println("Blender exited with error:", err)
+		} else {
+			logs.Info.Println("Blender exited.")
+		}
+	case err = <-waitCh:
 		if err != nil {
 			logs.Info.Println("Blender exited with error:", err)
 		} else {
@@ -115,6 +145,38 @@ func Preview(opts Options) {
 	}
 
 	cancel()
+}
+
+func stdinSupportsCommands(file *os.File) bool {
+	if file == nil {
+		return false
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func readPreviewCommands(ctx context.Context, requestRerun func()) {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		lineCh := make(chan error, 1)
+		go func() {
+			_, err := reader.ReadString('\n')
+			lineCh <- err
+		}()
+
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-lineCh:
+			if err != nil {
+				return
+			}
+			requestRerun()
+		}
+	}
 }
 
 func validateOptions(opts Options) error {
@@ -140,7 +202,7 @@ func validateOptions(opts Options) error {
 	return nil
 }
 
-func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, libPath string, port int) []string {
+func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, genBaseDir string, libPath string, port int) []string {
 	opts.Seed = seed.Normalize(opts.Seed)
 	gpuBackend := normalizedGPUBackend(opts.GPUBackend)
 	args := []string{
@@ -159,10 +221,13 @@ func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, lib
 		"--port", fmt.Sprintf("%d", port),
 		"--script", scriptPath,
 		"--libpath", libPath,
-		"--cwd", cwdAbs,
+		"--root-dir", cwdAbs,
+		"--gen-base-dir", genBaseDir,
+		"--gen-retain", string(opts.GenRetain),
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--gpu-backend", gpuBackend,
 		"--seed-mode", string(opts.Seed.Mode),
+		"--generator-port", fmt.Sprintf("%d", opts.GeneratorPort),
 	)
 	if opts.Seed.Mode == seed.FixedMode {
 		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))

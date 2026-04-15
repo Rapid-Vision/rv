@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Any, Self, Union
+from typing import TYPE_CHECKING, Any, Self, Union
 
 import bpy
 
 from .object import _Serializable
 from .types import ColorRGBA, OptionalColor
 from .utils import _as_rgba, _mark_material_tree
+
+if TYPE_CHECKING:
+    from .scene import Scene
 
 
 class Material(ABC, _Serializable):
@@ -64,6 +67,8 @@ class Material(ABC, _Serializable):
             }
         )
         return res
+
+
 def _normalize_semantic_channel(channel: str) -> str:
     normalized = "".join(ch.lower() if ch.isalnum() else "_" for ch in channel).strip(
         "_"
@@ -108,7 +113,7 @@ class BasicMaterial(Material):
         self.ior = None
         self.properties = dict()
 
-    def set_params(
+    def set_params(  # type: ignore[override]
         self,
         base_color: OptionalColor = None,
         roughness: Union[float, None] = None,
@@ -119,7 +124,7 @@ class BasicMaterial(Material):
         alpha: Union[float, None] = None,
         transmission: Union[float, None] = None,
         ior: Union[float, None] = None,
-    ):
+    ) -> Self:
         if base_color is not None:
             self.base_color = _as_rgba(base_color)
         if roughness is not None:
@@ -201,7 +206,7 @@ class ImportedMaterial(Material):
         self.material_name = material_name
         self.params = dict()
 
-    def set_params(self, **kwargs):
+    def set_params(self, **kwargs: Any):
         self.params.update(kwargs)
         return self
 

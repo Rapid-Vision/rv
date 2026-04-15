@@ -16,9 +16,9 @@ class HullScatterScene(rv.Scene):
         )
         domain = rv.Domain.convex_hull_3d(container)
 
-        source_cube = self.objects.cube(name="ScatterSourceCube", size=1.0).set_location(
-            (0, 0, -1000)
-        )
+        source_cube = self.objects.cube(
+            name="ScatterSourceCube", size=1.0
+        ).set_location((0, 0, -1000))
         sphere_loader = source_cube.as_loader()
         placed = self.scatter(
             source=sphere_loader,

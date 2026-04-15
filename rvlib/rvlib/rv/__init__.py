@@ -12,6 +12,7 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 from .domain import Domain
+from .generators import GeneratorFactory, GeneratorHandle
 from .material import BasicMaterial, ImportedMaterial, Material
 from .object import (
     AreaLight,
@@ -36,7 +37,7 @@ from .shader import (
     Value,
     VectorValue,
 )
-from .state import __getattr__
+from .state import __getattr__  # noqa: F401
 from .types import (
     AABB,
     CellCoords,
@@ -66,12 +67,15 @@ __all__ = [
     "BasicMaterial",
     "BasicWorld",
     "BVHTree",
+    "bpy",
     "Camera",
     "CellCoords",
     "Color",
     "ColorRGB",
     "ColorRGBA",
     "Domain",
+    "GeneratorFactory",
+    "GeneratorHandle",
     "Float2",
     "Float3",
     "Float4",
@@ -89,6 +93,7 @@ __all__ = [
     "ObjectLoaderSource",
     "ObjectStats",
     "OptionalColor",
+    "PASS_MAP",
     "PointLight",
     "Polygon2D",
     "PrincipledBSDF",
@@ -111,5 +116,6 @@ __all__ = [
     "VectorValue",
     "World",
     "NormalMap",
+    "mathutils",
     "simulate_physics",
 ]

@@ -1,7 +1,9 @@
 package preview
 
 import (
+	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/Rapid-Vision/rv/internal/seed"
@@ -77,15 +79,17 @@ func TestValidateOptions(t *testing.T) {
 func TestBuildBlenderPreviewArgs(t *testing.T) {
 	libPath := "/lib/rvlib"
 	opts := Options{
-		PreviewFiles: true,
-		PreviewOut:   "/tmp/preview_out",
-		NoWindow:     true,
-		Resolution:   [2]int{1280, 720},
-		GPUBackend:   "optix",
-		TimeLimit:    floatPtr(2.5),
-		Seed:         seed.Config{Mode: seed.FixedMode, Value: 17},
+		PreviewFiles:  true,
+		PreviewOut:    "/tmp/preview_out",
+		NoWindow:      true,
+		Resolution:    [2]int{1280, 720},
+		GPUBackend:    "optix",
+		TimeLimit:     floatPtr(2.5),
+		Seed:          seed.Config{Mode: seed.FixedMode, Value: 17},
+		GeneratorPort: 9911,
+		GenRetain:     "last",
 	}
-	args := buildBlenderPreviewArgs(opts, "/work/scene.py", "/work", libPath, 12345)
+	args := buildBlenderPreviewArgs(opts, "/work/scene.py", "/work", "/work/generated", libPath, 12345)
 
 	wantPreviewPy := filepath.Join(libPath, "preview.py")
 	wantTemplate := filepath.Join(libPath, "template.blend")
@@ -99,8 +103,12 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 	assertContains(t, args, "12345")
 	assertContains(t, args, "--script")
 	assertContains(t, args, "/work/scene.py")
-	assertContains(t, args, "--cwd")
+	assertContains(t, args, "--root-dir")
 	assertContains(t, args, "/work")
+	assertContains(t, args, "--gen-base-dir")
+	assertContains(t, args, "/work/generated")
+	assertContains(t, args, "--gen-retain")
+	assertContains(t, args, "last")
 	assertContains(t, args, "--preview-files")
 	assertContains(t, args, "--no-window")
 	assertContains(t, args, "--preview-out")
@@ -111,6 +119,8 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 	assertContains(t, args, "optix")
 	assertContains(t, args, "--seed-mode")
 	assertContains(t, args, "fixed")
+	assertContains(t, args, "--generator-port")
+	assertContains(t, args, "9911")
 	assertContains(t, args, "--seed-value")
 	assertContains(t, args, "17")
 	assertContains(t, args, "--time-limit")
@@ -119,9 +129,10 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 
 func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	args := buildBlenderPreviewArgs(
-		Options{PreviewFiles: false, NoWindow: false, Resolution: [2]int{640, 640}, Seed: seed.Config{Mode: seed.RandomMode}},
+		Options{PreviewFiles: false, NoWindow: false, Resolution: [2]int{640, 640}, Seed: seed.Config{Mode: seed.RandomMode}, GenRetain: "last"},
 		"/work/scene.py",
 		"/work",
+		"/work/generated",
 		"/lib/rvlib",
 		5757,
 	)
@@ -136,16 +147,30 @@ func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	assertNotContains(t, args, "--seed-value")
 }
 
+func TestStdinSupportsCommands(t *testing.T) {
+	if stdinSupportsCommands(nil) {
+		t.Fatal("expected nil stdin to be unsupported")
+	}
+
+	file, err := os.CreateTemp(t.TempDir(), "stdin-*")
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	if stdinSupportsCommands(file) {
+		t.Fatal("expected regular file stdin to be unsupported")
+	}
+}
+
 func floatPtr(v float64) *float64 {
 	return &v
 }
 
 func assertContains(t *testing.T, values []string, needle string) {
 	t.Helper()
-	for _, value := range values {
-		if value == needle {
-			return
-		}
+	if slices.Contains(values, needle) {
+		return
 	}
 	t.Fatalf("expected %q in %v", needle, values)
 }

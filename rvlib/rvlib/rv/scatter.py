@@ -52,6 +52,8 @@ def _normalize_scatter_scale(scale: Union[float, Float2]) -> Float2:
         if value <= 0:
             raise ValueError("scale must be > 0.")
         return (value, value)
+    if not isinstance(scale, (list, tuple)):
+        raise TypeError("scale must be a positive number or contain exactly two values.")
     if len(scale) != 2:
         raise ValueError("scale must be a positive number or contain exactly two values.")
     scale_min = float(scale[0])

@@ -7,11 +7,14 @@ import (
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/preview"
 	"github.com/Rapid-Vision/rv/internal/seed"
+	"github.com/Rapid-Vision/rv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var (
 	previewCwd        string
+	previewGenDir     string
+	previewGenRetain  string
 	previewFiles      bool
 	previewOut        string
 	previewNoWindow   bool
@@ -32,6 +35,8 @@ var previewCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(previewCmd)
 	previewCmd.Flags().StringVar(&previewCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
+	previewCmd.Flags().StringVar(&previewGenDir, "gen-dir", "", "Generator base directory (defaults to <root_dir>/generated; relative paths resolve from root_dir)")
+	previewCmd.Flags().StringVar(&previewGenRetain, "gen-retain", string(utils.GeneratorRetainLast), "Generator work-dir retention: all, last, none")
 	previewCmd.Flags().BoolVar(&previewFiles, "preview-files", false, "Save a single preview sample to files on each script change")
 	previewCmd.Flags().StringVar(&previewOut, "preview-out", "./preview_out", "Output directory for preview files")
 	previewCmd.Flags().BoolVar(&previewNoWindow, "no-window", false, "Run preview without opening Blender window (requires --preview-files)")
@@ -63,6 +68,10 @@ func runPreview(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logs.Err.Fatalln("Invalid --seed:", err)
 	}
+	genRetain, err := utils.ParseGeneratorRetention(previewGenRetain)
+	if err != nil {
+		logs.Err.Fatalln(err)
+	}
 	var timeLimit *float64
 	if cmd.Flags().Changed("time-limit") {
 		timeLimit = &previewTimeLimit
@@ -71,6 +80,8 @@ func runPreview(cmd *cobra.Command, args []string) {
 	preview.Preview(preview.Options{
 		ScriptPathArg: args[0],
 		CwdArg:        previewCwd,
+		GenDirArg:     previewGenDir,
+		GenRetain:     genRetain,
 		PreviewFiles:  previewFiles,
 		PreviewOut:    previewOutAbs,
 		NoWindow:      previewNoWindow,

@@ -1,9 +1,13 @@
 import bpy
 import json
+from typing import TYPE_CHECKING
 
 from .geometry import _object_world_radius
 from .types import JSONSerializable
 from .utils import _internal_begin_run
+
+if TYPE_CHECKING:
+    from .object import ObjectLoader
 
 
 def _remove_blender_object(obj: bpy.types.Object) -> None:

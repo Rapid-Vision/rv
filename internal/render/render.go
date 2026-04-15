@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Rapid-Vision/rv/internal/generator"
 	"github.com/Rapid-Vision/rv/internal/logs"
 	"github.com/Rapid-Vision/rv/internal/seed"
 	"github.com/Rapid-Vision/rv/internal/utils"
@@ -20,6 +22,9 @@ import (
 type RenderOptions struct {
 	ScriptPath            string
 	Cwd                   string
+	GenBaseDir            string
+	WorkDir               string
+	GenRetain             utils.GeneratorRetention
 	ImageNum              int
 	Procs                 int
 	Resolution            [2]int
@@ -31,6 +36,7 @@ type RenderOptions struct {
 	NoiseThresholdEnabled *bool
 	NoiseThreshold        *float64
 	Seed                  seed.Config
+	GeneratorPort         int
 }
 
 type RenderResult struct {
@@ -65,6 +71,20 @@ func normalizedGPUBackend(value string) string {
 	return strings.ToLower(value)
 }
 
+func applyDefaultGeneratorOptions(opts *RenderOptions) error {
+	if opts.GenBaseDir == "" {
+		generatorPaths, err := utils.ResolveGeneratorPaths(opts.Cwd, "")
+		if err != nil {
+			return fmt.Errorf("resolve generator paths: %w", err)
+		}
+		opts.GenBaseDir = generatorPaths.GenBaseDir
+	}
+	if opts.GenRetain == "" {
+		opts.GenRetain = utils.GeneratorRetainNone
+	}
+	return nil
+}
+
 func Render(opts RenderOptions) (RenderResult, error) {
 	opts.Seed = seed.Normalize(opts.Seed)
 
@@ -84,6 +104,9 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if cwdAbs == "" {
 		return RenderResult{}, errors.New("cwd is required")
 	}
+	if err := applyDefaultGeneratorOptions(&opts); err != nil {
+		return RenderResult{}, err
+	}
 
 	blenderPath, err := utils.GetBlenderPath()
 	if err != nil {
@@ -96,6 +119,20 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	}
 
 	logs.Info.Println("librv path: ", libPath)
+
+	generatorCtx, cancelGenerator := context.WithCancel(context.Background())
+	generatorService, err := generator.Start(generatorCtx)
+	if err != nil {
+		cancelGenerator()
+		logs.Warn.Printf("Generator service unavailable; scenes using self.generators will fail: %v\n", err)
+		opts.GeneratorPort = 0
+	} else {
+		opts.GeneratorPort = generatorService.Port()
+		defer func() {
+			cancelGenerator()
+			generatorService.Wait()
+		}()
+	}
 
 	seqOutDir, err := utils.GetSequentialOutputDir(outputDir)
 	if err != nil {
@@ -118,6 +155,22 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if err := validateOptionalRenderOptions(opts); err != nil {
 		return RenderResult{}, err
 	}
+
+	workDir, err := utils.AllocateGeneratorWorkDir(opts.GenBaseDir)
+	if err != nil {
+		return RenderResult{}, err
+	}
+	opts.WorkDir = workDir
+	if opts.GenRetain == utils.GeneratorRetainLast || opts.GenRetain == utils.GeneratorRetainNone {
+		if err := utils.CleanupGeneratorWorkDirs(opts.GenBaseDir, utils.GeneratorRetainLast, opts.WorkDir); err != nil {
+			return RenderResult{}, err
+		}
+	}
+	defer func() {
+		if err := utils.CleanupGeneratorWorkDirs(opts.GenBaseDir, opts.GenRetain, opts.WorkDir); err != nil {
+			logs.Warn.Printf("Failed to clean generator work directories: %v\n", err)
+		}
+	}()
 
 	if imgNum < procs {
 		procs = imgNum
@@ -199,10 +252,12 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		"--number", fmt.Sprintf("%d", part),
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--output", seqOutDir,
-		"--cwd", opts.Cwd,
+		"--root-dir", opts.Cwd,
+		"--work-dir", opts.WorkDir,
 		"--gpu-backend", gpuBackend,
 		"--seed-mode", string(opts.Seed.Mode),
 		"--seed-base", fmt.Sprintf("%d", seedBase),
+		"--generator-port", fmt.Sprintf("%d", opts.GeneratorPort),
 	}
 	if opts.Seed.Mode == seed.FixedMode {
 		args = append(args, "--seed-value", fmt.Sprintf("%d", opts.Seed.Value))
@@ -233,7 +288,7 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 
 func renderSeedBase(imageNum int, procs int, procIndex int) int {
 	base := 0
-	for i := 0; i < procIndex; i++ {
+	for i := range procIndex {
 		base += utils.SplitTaskBetweenProcs(imageNum, procs, i)
 	}
 	return base
@@ -335,7 +390,7 @@ func writeDatasetMetadata(seqOutDir string, opts RenderOptions) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "    ")

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Rapid-Vision/rv/rvlib"
+	"github.com/google/uuid"
 )
 
 var blenderEnvBlockedKeys = map[string]struct{}{
@@ -30,7 +31,7 @@ func GetPort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	return l.(*net.TCPListener).Addr().(*net.TCPAddr).Port, nil
 }
 
@@ -222,6 +223,95 @@ type ExportPaths struct {
 	OutputPath string
 }
 
+type GeneratorPaths struct {
+	RootDir    string
+	GenBaseDir string
+}
+
+type GeneratorRetention string
+
+const (
+	GeneratorRetainAll     GeneratorRetention = "all"
+	GeneratorRetainLast    GeneratorRetention = "last"
+	GeneratorRetainNone    GeneratorRetention = "none"
+	generatorWorkDirPrefix                    = "_rv_"
+)
+
+func ParseGeneratorRetention(raw string) (GeneratorRetention, error) {
+	value := GeneratorRetention(strings.ToLower(strings.TrimSpace(raw)))
+	switch value {
+	case GeneratorRetainAll, GeneratorRetainLast, GeneratorRetainNone:
+		return value, nil
+	default:
+		return "", fmt.Errorf("invalid --gen-retain value %q: must be one of all, last, none", raw)
+	}
+}
+
+func AllocateGeneratorWorkDir(genBaseDir string) (string, error) {
+	if strings.TrimSpace(genBaseDir) == "" {
+		return "", errors.New("generator base directory is required")
+	}
+
+	workDir := filepath.Join(filepath.Clean(genBaseDir), generatorWorkDirPrefix+uuid.NewString())
+	if err := os.MkdirAll(workDir, 0o755); err != nil {
+		return "", fmt.Errorf("create generator work directory: %w", err)
+	}
+	return filepath.Clean(workDir), nil
+}
+
+func CleanupGeneratorWorkDirs(genBaseDir string, retain GeneratorRetention, keepWorkDir string) error {
+	genBaseDir = strings.TrimSpace(genBaseDir)
+	if genBaseDir == "" {
+		return errors.New("generator base directory is required")
+	}
+	if retain == "" {
+		return errors.New("generator retention is required")
+	}
+
+	entries, err := os.ReadDir(genBaseDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read generator base directory: %w", err)
+	}
+
+	keepWorkDir = filepath.Clean(strings.TrimSpace(keepWorkDir))
+	var errs []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if !strings.HasPrefix(entry.Name(), generatorWorkDirPrefix) {
+			continue
+		}
+
+		target := filepath.Join(genBaseDir, entry.Name())
+		shouldKeep := false
+		switch retain {
+		case GeneratorRetainAll:
+			shouldKeep = true
+		case GeneratorRetainLast:
+			shouldKeep = keepWorkDir != "" && filepath.Clean(target) == keepWorkDir
+		case GeneratorRetainNone:
+			shouldKeep = false
+		default:
+			return fmt.Errorf("unsupported generator retention: %s", retain)
+		}
+		if shouldKeep {
+			continue
+		}
+		if err := os.RemoveAll(target); err != nil {
+			errs = append(errs, fmt.Sprintf("remove %q: %v", target, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
+}
+
 func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, error) {
 	if scriptPathArg == "" {
 		return RuntimePaths{}, errors.New("script path is required")
@@ -253,6 +343,33 @@ func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, err
 	return RuntimePaths{
 		ScriptPath: filepath.Clean(scriptAbs),
 		Cwd:        filepath.Clean(cwdAbs),
+	}, nil
+}
+
+func ResolveGeneratorPaths(rootDir string, genDirArg string) (GeneratorPaths, error) {
+	if rootDir == "" {
+		return GeneratorPaths{}, errors.New("root directory is required")
+	}
+
+	rootAbs, err := filepath.Abs(rootDir)
+	if err != nil {
+		return GeneratorPaths{}, fmt.Errorf("resolve root directory: %w", err)
+	}
+
+	genDirArg = strings.TrimSpace(genDirArg)
+	genBaseDir := ""
+	if genDirArg == "" {
+		genBaseDir = filepath.Join(rootAbs, "generated")
+	} else if filepath.IsAbs(genDirArg) {
+		genBaseDir = filepath.Clean(genDirArg)
+	} else {
+		genBaseDir = filepath.Join(rootAbs, genDirArg)
+	}
+	genBaseDir = filepath.Clean(genBaseDir)
+
+	return GeneratorPaths{
+		RootDir:    filepath.Clean(rootAbs),
+		GenBaseDir: genBaseDir,
 	}, nil
 }
 
