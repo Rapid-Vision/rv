@@ -228,6 +228,24 @@ type GeneratorPaths struct {
 	GenBaseDir string
 }
 
+type GeneratorRetention string
+
+const (
+	GeneratorRetainAll  GeneratorRetention = "all"
+	GeneratorRetainLast GeneratorRetention = "last"
+	GeneratorRetainNone GeneratorRetention = "none"
+)
+
+func ParseGeneratorRetention(raw string) (GeneratorRetention, error) {
+	value := GeneratorRetention(strings.ToLower(strings.TrimSpace(raw)))
+	switch value {
+	case GeneratorRetainAll, GeneratorRetainLast, GeneratorRetainNone:
+		return value, nil
+	default:
+		return "", fmt.Errorf("invalid --gen-retain value %q: must be one of all, last, none", raw)
+	}
+}
+
 func AllocateGeneratorWorkDir(genBaseDir string) (string, error) {
 	if strings.TrimSpace(genBaseDir) == "" {
 		return "", errors.New("generator base directory is required")
@@ -238,6 +256,56 @@ func AllocateGeneratorWorkDir(genBaseDir string) (string, error) {
 		return "", fmt.Errorf("create generator work directory: %w", err)
 	}
 	return filepath.Clean(workDir), nil
+}
+
+func CleanupGeneratorWorkDirs(genBaseDir string, retain GeneratorRetention, keepWorkDir string) error {
+	genBaseDir = strings.TrimSpace(genBaseDir)
+	if genBaseDir == "" {
+		return errors.New("generator base directory is required")
+	}
+	if retain == "" {
+		return errors.New("generator retention is required")
+	}
+
+	entries, err := os.ReadDir(genBaseDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read generator base directory: %w", err)
+	}
+
+	keepWorkDir = filepath.Clean(strings.TrimSpace(keepWorkDir))
+	var errs []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		target := filepath.Join(genBaseDir, entry.Name())
+		shouldKeep := false
+		switch retain {
+		case GeneratorRetainAll:
+			shouldKeep = true
+		case GeneratorRetainLast:
+			shouldKeep = keepWorkDir != "" && filepath.Clean(target) == keepWorkDir
+		case GeneratorRetainNone:
+			shouldKeep = false
+		default:
+			return fmt.Errorf("unsupported generator retention: %s", retain)
+		}
+		if shouldKeep {
+			continue
+		}
+		if err := os.RemoveAll(target); err != nil {
+			errs = append(errs, fmt.Sprintf("remove %q: %v", target, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
 }
 
 func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, error) {

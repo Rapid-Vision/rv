@@ -24,6 +24,7 @@ type RenderOptions struct {
 	Cwd                   string
 	GenBaseDir            string
 	WorkDir               string
+	GenRetain             utils.GeneratorRetention
 	ImageNum              int
 	Procs                 int
 	Resolution            [2]int
@@ -92,6 +93,9 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if opts.GenBaseDir == "" {
 		return RenderResult{}, errors.New("generator base directory is required")
 	}
+	if opts.GenRetain == "" {
+		return RenderResult{}, errors.New("generator retention is required")
+	}
 
 	blenderPath, err := utils.GetBlenderPath()
 	if err != nil {
@@ -146,6 +150,16 @@ func Render(opts RenderOptions) (RenderResult, error) {
 		return RenderResult{}, err
 	}
 	opts.WorkDir = workDir
+	if opts.GenRetain == utils.GeneratorRetainLast || opts.GenRetain == utils.GeneratorRetainNone {
+		if err := utils.CleanupGeneratorWorkDirs(opts.GenBaseDir, utils.GeneratorRetainLast, opts.WorkDir); err != nil {
+			return RenderResult{}, err
+		}
+	}
+	defer func() {
+		if err := utils.CleanupGeneratorWorkDirs(opts.GenBaseDir, opts.GenRetain, opts.WorkDir); err != nil {
+			logs.Warn.Printf("Failed to clean generator work directories: %v\n", err)
+		}
+	}()
 
 	if imgNum < procs {
 		procs = imgNum

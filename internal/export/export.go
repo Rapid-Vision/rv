@@ -19,6 +19,7 @@ type Options struct {
 	Cwd           string
 	GenBaseDir    string
 	WorkDir       string
+	GenRetain     utils.GeneratorRetention
 	OutputPath    string
 	FreezePhysics bool
 	PackResources bool
@@ -38,6 +39,9 @@ func Export(opts Options) error {
 	}
 	if opts.GenBaseDir == "" {
 		return errors.New("generator base directory is required")
+	}
+	if opts.GenRetain == "" {
+		return errors.New("generator retention is required")
 	}
 	if filepath.Ext(opts.OutputPath) != ".blend" {
 		return errors.New("--output must end with .blend")
@@ -62,6 +66,16 @@ func Export(opts Options) error {
 		return err
 	}
 	opts.WorkDir = workDir
+	if opts.GenRetain == utils.GeneratorRetainLast || opts.GenRetain == utils.GeneratorRetainNone {
+		if err := utils.CleanupGeneratorWorkDirs(opts.GenBaseDir, utils.GeneratorRetainLast, opts.WorkDir); err != nil {
+			return err
+		}
+	}
+	defer func() {
+		if err := utils.CleanupGeneratorWorkDirs(opts.GenBaseDir, opts.GenRetain, opts.WorkDir); err != nil {
+			logs.Warn.Printf("Failed to clean generator work directories: %v\n", err)
+		}
+	}()
 
 	generatorCtx, cancelGenerator := context.WithCancel(context.Background())
 	generatorService, err := generator.Start(generatorCtx)

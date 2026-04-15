@@ -85,8 +85,9 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 		TimeLimit:     floatPtr(2.5),
 		Seed:          seed.Config{Mode: seed.FixedMode, Value: 17},
 		GeneratorPort: 9911,
+		GenRetain:     "last",
 	}
-	args := buildBlenderPreviewArgs(opts, "/work/scene.py", "/work", "/work/generated/run-1", libPath, 12345)
+	args := buildBlenderPreviewArgs(opts, "/work/scene.py", "/work", "/work/generated", libPath, 12345)
 
 	wantPreviewPy := filepath.Join(libPath, "preview.py")
 	wantTemplate := filepath.Join(libPath, "template.blend")
@@ -102,8 +103,10 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 	assertContains(t, args, "/work/scene.py")
 	assertContains(t, args, "--root-dir")
 	assertContains(t, args, "/work")
-	assertContains(t, args, "--work-dir")
-	assertContains(t, args, "/work/generated/run-1")
+	assertContains(t, args, "--gen-base-dir")
+	assertContains(t, args, "/work/generated")
+	assertContains(t, args, "--gen-retain")
+	assertContains(t, args, "last")
 	assertContains(t, args, "--preview-files")
 	assertContains(t, args, "--no-window")
 	assertContains(t, args, "--preview-out")
@@ -124,10 +127,10 @@ func TestBuildBlenderPreviewArgs(t *testing.T) {
 
 func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	args := buildBlenderPreviewArgs(
-		Options{PreviewFiles: false, NoWindow: false, Resolution: [2]int{640, 640}, Seed: seed.Config{Mode: seed.RandomMode}},
+		Options{PreviewFiles: false, NoWindow: false, Resolution: [2]int{640, 640}, Seed: seed.Config{Mode: seed.RandomMode}, GenRetain: "last"},
 		"/work/scene.py",
 		"/work",
-		"/work/generated/run-1",
+		"/work/generated",
 		"/lib/rvlib",
 		5757,
 	)

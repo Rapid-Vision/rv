@@ -92,3 +92,13 @@ func TestResolvePreviewOutputDir_DefaultRelativeToProcessCwd(t *testing.T) {
 		t.Fatalf("got = %q, want = %q", got, want)
 	}
 }
+
+func TestPreviewGenRetainDefault(t *testing.T) {
+	genRetainFlag := previewCmd.Flags().Lookup("gen-retain")
+	if genRetainFlag == nil {
+		t.Fatal("expected gen-retain flag to exist")
+	}
+	if genRetainFlag.DefValue != "last" {
+		t.Fatalf("expected default gen-retain=last, got %q", genRetainFlag.DefValue)
+	}
+}

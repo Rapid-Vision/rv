@@ -106,3 +106,13 @@ func resetRenderOptionalFlagGlobals() {
 	renderNoiseThresholdEnabled = false
 	renderNoiseThreshold = 0
 }
+
+func TestRenderGenRetainDefault(t *testing.T) {
+	genRetainFlag := renderCmd.Flags().Lookup("gen-retain")
+	if genRetainFlag == nil {
+		t.Fatal("expected gen-retain flag to exist")
+	}
+	if genRetainFlag.DefValue != "none" {
+		t.Fatalf("expected default gen-retain=none, got %q", genRetainFlag.DefValue)
+	}
+}

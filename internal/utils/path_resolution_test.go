@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -138,9 +139,6 @@ func TestResolveGeneratorPaths_ResolvesRelativeGenDirAgainstRoot(t *testing.T) {
 	if !samePath(paths.GenBaseDir, wantBase) {
 		t.Fatalf("unexpected generator base dir: got=%q want=%q", paths.GenBaseDir, wantBase)
 	}
-	if !samePath(paths.GenBaseDir, wantBase) {
-		t.Fatalf("unexpected generator base dir: got=%q want=%q", paths.GenBaseDir, wantBase)
-	}
 }
 
 func TestResolveGeneratorPaths_AllowsAbsoluteGenDir(t *testing.T) {
@@ -171,6 +169,75 @@ func TestAllocateGeneratorWorkDir_CreatesUUIDSubdir(t *testing.T) {
 	}
 	if _, err := os.Stat(workDir); err != nil {
 		t.Fatalf("stat work dir: %v", err)
+	}
+}
+
+func TestParseGeneratorRetention(t *testing.T) {
+	for _, raw := range []string{"all", "last", "none", " LAST "} {
+		if _, err := ParseGeneratorRetention(raw); err != nil {
+			t.Fatalf("parse retention %q: %v", raw, err)
+		}
+	}
+	if _, err := ParseGeneratorRetention("bad"); err == nil {
+		t.Fatal("expected invalid retention error")
+	}
+}
+
+func TestCleanupGeneratorWorkDirs_RetainAll(t *testing.T) {
+	genBaseDir := filepath.Join(t.TempDir(), "generated")
+	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, "keep"))
+	otherDir := mustMkdirAll(t, filepath.Join(genBaseDir, "other"))
+
+	if err := CleanupGeneratorWorkDirs(genBaseDir, GeneratorRetainAll, keepDir); err != nil {
+		t.Fatalf("cleanup retain all: %v", err)
+	}
+	assertExists(t, keepDir)
+	assertExists(t, otherDir)
+}
+
+func TestCleanupGeneratorWorkDirs_RetainLast(t *testing.T) {
+	genBaseDir := filepath.Join(t.TempDir(), "generated")
+	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, "keep"))
+	otherDir := mustMkdirAll(t, filepath.Join(genBaseDir, "other"))
+
+	if err := CleanupGeneratorWorkDirs(genBaseDir, GeneratorRetainLast, keepDir); err != nil {
+		t.Fatalf("cleanup retain last: %v", err)
+	}
+	assertExists(t, keepDir)
+	assertNotExists(t, otherDir)
+}
+
+func TestCleanupGeneratorWorkDirs_RetainNone(t *testing.T) {
+	genBaseDir := filepath.Join(t.TempDir(), "generated")
+	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, "keep"))
+	otherDir := mustMkdirAll(t, filepath.Join(genBaseDir, "other"))
+
+	if err := CleanupGeneratorWorkDirs(genBaseDir, GeneratorRetainNone, keepDir); err != nil {
+		t.Fatalf("cleanup retain none: %v", err)
+	}
+	assertNotExists(t, keepDir)
+	assertNotExists(t, otherDir)
+}
+
+func mustMkdirAll(t *testing.T, path string) string {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatalf("mkdir %q: %v", path, err)
+	}
+	return path
+}
+
+func assertExists(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected %q to exist: %v", path, err)
+	}
+}
+
+func assertNotExists(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected %q not to exist, got err=%v", path, err)
 	}
 }
 

@@ -16,3 +16,13 @@ func TestExportOutputFlagIsRequired(t *testing.T) {
 		t.Fatalf("expected empty default output value, got %q", outputFlag.DefValue)
 	}
 }
+
+func TestExportGenRetainDefault(t *testing.T) {
+	genRetainFlag := exportCmd.Flags().Lookup("gen-retain")
+	if genRetainFlag == nil {
+		t.Fatal("expected gen-retain flag to exist")
+	}
+	if genRetainFlag.DefValue != "all" {
+		t.Fatalf("expected default gen-retain=all, got %q", genRetainFlag.DefValue)
+	}
+}
