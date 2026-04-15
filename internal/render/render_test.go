@@ -1,9 +1,11 @@
 package render
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/Rapid-Vision/rv/internal/seed"
+	"github.com/Rapid-Vision/rv/internal/utils"
 )
 
 func TestBuildBlenderRenderArgs_SeedFlags(t *testing.T) {
@@ -46,6 +48,42 @@ func TestRenderSeedBase(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("got = %v, want = %v", got, want)
 		}
+	}
+}
+
+func TestApplyDefaultGeneratorOptions(t *testing.T) {
+	opts := RenderOptions{
+		Cwd: "/work/project",
+	}
+
+	if err := applyDefaultGeneratorOptions(&opts); err != nil {
+		t.Fatalf("applyDefaultGeneratorOptions() error = %v", err)
+	}
+
+	if opts.GenBaseDir != filepath.Clean("/work/project/generated") {
+		t.Fatalf("GenBaseDir = %q", opts.GenBaseDir)
+	}
+	if opts.GenRetain != utils.GeneratorRetainNone {
+		t.Fatalf("GenRetain = %q", opts.GenRetain)
+	}
+}
+
+func TestApplyDefaultGeneratorOptions_PreservesProvidedValues(t *testing.T) {
+	opts := RenderOptions{
+		Cwd:        "/work/project",
+		GenBaseDir: "/custom/generated",
+		GenRetain:  utils.GeneratorRetainAll,
+	}
+
+	if err := applyDefaultGeneratorOptions(&opts); err != nil {
+		t.Fatalf("applyDefaultGeneratorOptions() error = %v", err)
+	}
+
+	if opts.GenBaseDir != "/custom/generated" {
+		t.Fatalf("GenBaseDir = %q", opts.GenBaseDir)
+	}
+	if opts.GenRetain != utils.GeneratorRetainAll {
+		t.Fatalf("GenRetain = %q", opts.GenRetain)
 	}
 }
 

@@ -71,6 +71,20 @@ func normalizedGPUBackend(value string) string {
 	return strings.ToLower(value)
 }
 
+func applyDefaultGeneratorOptions(opts *RenderOptions) error {
+	if opts.GenBaseDir == "" {
+		generatorPaths, err := utils.ResolveGeneratorPaths(opts.Cwd, "")
+		if err != nil {
+			return fmt.Errorf("resolve generator paths: %w", err)
+		}
+		opts.GenBaseDir = generatorPaths.GenBaseDir
+	}
+	if opts.GenRetain == "" {
+		opts.GenRetain = utils.GeneratorRetainNone
+	}
+	return nil
+}
+
 func Render(opts RenderOptions) (RenderResult, error) {
 	opts.Seed = seed.Normalize(opts.Seed)
 
@@ -90,11 +104,8 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if cwdAbs == "" {
 		return RenderResult{}, errors.New("cwd is required")
 	}
-	if opts.GenBaseDir == "" {
-		return RenderResult{}, errors.New("generator base directory is required")
-	}
-	if opts.GenRetain == "" {
-		return RenderResult{}, errors.New("generator retention is required")
+	if err := applyDefaultGeneratorOptions(&opts); err != nil {
+		return RenderResult{}, err
 	}
 
 	blenderPath, err := utils.GetBlenderPath()
