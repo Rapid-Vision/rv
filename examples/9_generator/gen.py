@@ -19,9 +19,6 @@ def draw_centered_text(
 def main() -> None:
     request = json.loads(sys.stdin.read())
 
-    with open("r.json", "w") as fout:
-        print(json.dumps(request, indent=2), file=fout)
-
     seed = request.get("seed")
     _root_dir = request["root_dir"]
     work_dir = request["work_dir"]
