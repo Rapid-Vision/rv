@@ -19,8 +19,8 @@ export default defineConfig({
       link: '/en/',
       themeConfig: {
         nav: [
-          { text: 'Home', link: '/en/' },
           { text: 'Tutorial', link: '/en/tutorial/' },
+          { text: 'Features', link: '/en/tutorial/features/' },
           { text: 'API', link: '/en/api/' }
         ],
         sidebar: {
@@ -58,8 +58,8 @@ export default defineConfig({
       description: 'Фреймворк для процедурной генерации синтетических датасетов',
       themeConfig: {
         nav: [
-          { text: 'Главная', link: '/ru/' },
           { text: 'Туториал', link: '/ru/tutorial/' },
+          { text: 'Возможности', link: '/ru/tutorial/features/' },
           { text: 'API', link: '/ru/api/' }
         ],
         sidebar: {
