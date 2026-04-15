@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 from urllib import error, request
 
 _GENERATOR_URL: Union[str, None] = None
@@ -26,11 +26,9 @@ class GeneratorHandle:
         self.scene = scene
         self.command = str(command).strip()
 
-    def generate(self, operation: str, **params) -> str:
+    def _request(self, **params) -> Any:
         if _GENERATOR_URL is None:
             raise RuntimeError("Generator runtime is not configured.")
-        if operation is None or str(operation).strip() == "":
-            raise ValueError("generator operation is required.")
 
         seed = None
         if self.scene.seed is not None:
@@ -40,7 +38,6 @@ class GeneratorHandle:
             "command": self.command,
             "root_dir": str(_GENERATOR_ROOT_DIR),
             "work_dir": str(_GENERATOR_WORK_DIR),
-            "operation": operation,
             "params": params,
             "seed": seed,
             "seed_mode": self.scene.seed_mode,
@@ -64,10 +61,37 @@ class GeneratorHandle:
             raise RuntimeError(f"generator request failed: {exc.reason}") from exc
 
         response = json.loads(raw.decode("utf-8"))
-        path = response.get("path")
-        if not isinstance(path, str) or path.strip() == "":
-            raise RuntimeError("generator response must include a non-empty path.")
-        return path
+        if "result" not in response:
+            raise RuntimeError("generator response must include result.")
+        return response["result"]
+
+    def generate(self, **params) -> Any:
+        return self._request(**params)
+
+    def generate_path(self, **params) -> str:
+        result = self._request(**params)
+        if not isinstance(result, str) or result.strip() == "":
+            raise RuntimeError("generator result must be a non-empty path string.")
+
+        path = Path(result)
+        if not path.is_absolute():
+            path = _GENERATOR_WORK_DIR / path
+        path = path.expanduser().resolve()
+        if not path.exists():
+            raise RuntimeError(f"generated path does not exist: {path}")
+        return str(path)
+
+    def generate_str(self, **params) -> str:
+        result = self._request(**params)
+        if not isinstance(result, str):
+            raise RuntimeError("generator result must be a string.")
+        return result
+
+    def generate_num(self, **params) -> float:
+        result = self._request(**params)
+        if isinstance(result, bool) or not isinstance(result, (int, float)):
+            raise RuntimeError("generator result must be a number.")
+        return float(result)
 
 
 class GeneratorFactory:

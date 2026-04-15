@@ -5,19 +5,6 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 
-def read_request() -> dict:
-    raw = sys.stdin.read()
-    if raw.strip() == "":
-        raise ValueError("generator request is empty")
-    return json.loads(raw)
-
-
-def make_output_path(work_dir: str, seed: int | None) -> str:
-    os.makedirs(work_dir, exist_ok=True)
-    suffix = "none" if seed is None else str(seed)
-    return os.path.join(work_dir, f"seed_{suffix}.png")
-
-
 def draw_centered_text(
     draw: ImageDraw.ImageDraw, image_size: tuple[int, int], text: str, font
 ) -> None:
@@ -30,11 +17,11 @@ def draw_centered_text(
 
 
 def main() -> None:
-    request = read_request()
+    request = json.loads(sys.stdin.read())
     seed = request.get("seed")
     _root_dir = request["root_dir"]
     work_dir = request["work_dir"]
-    output_path = make_output_path(work_dir, seed)
+    output_path = os.path.join(work_dir, "texture.png")
 
     width, height = 1024, 1024
     image = Image.new("RGB", (width, height), (242, 240, 233))
@@ -55,7 +42,7 @@ def main() -> None:
     draw_centered_text(draw, (width, height), text, font)
 
     image.save(output_path)
-    json.dump({"path": output_path}, sys.stdout)
+    json.dump({"result": output_path}, sys.stdout)
 
 
 if __name__ == "__main__":

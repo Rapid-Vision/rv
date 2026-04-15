@@ -5,8 +5,8 @@ class SeedTextureScene(rv.Scene):
     def generate(self, seed):
         self.world = rv.SkyWorld().set_params(strength=0.2, sun_intensity=0.05)
 
-        generator = self.generators.init("uv run ./gen.py")
-        texture_path = generator.generate("seed_texture")
+        texture_generator = self.generators.init("uv run ./gen.py")
+        texture_path = texture_generator.generate_path()
 
         material = rv.ShaderMaterial(
             rv.PrincipledBSDF(

@@ -14,7 +14,7 @@ func TestExecuteGenerateRequestCommand(t *testing.T) {
 	workDir := filepath.Join(tmp, "generated", "run-1")
 	outputPath := filepath.Join(workDir, "texture.txt")
 
-	script := `#!/bin/sh
+script := `#!/bin/sh
 req_file="$PWD/request.json"
 cat > "$req_file"
 python3 -c '
@@ -23,8 +23,8 @@ with open("request.json", "r", encoding="utf-8") as f:
     req = json.load(f)
 path = os.path.join(req["work_dir"], "texture.txt")
 with open(path, "w", encoding="utf-8") as f:
-    f.write(req["operation"] + ":" + req["params"]["text"])
-json.dump({"path": path}, sys.stdout)
+    f.write(req["params"]["kind"] + ":" + req["params"]["text"])
+json.dump({"result": path}, sys.stdout)
 '
 `
 	if err := os.WriteFile(generatorPath, []byte(script), 0o644); err != nil {
@@ -36,8 +36,7 @@ json.dump({"path": path}, sys.stdout)
 		Command:   "sh ./gen.sh",
 		RootDir:   tmp,
 		WorkDir:   workDir,
-		Operation: "text_texture",
-		Params:    map[string]any{"text": "ABC"},
+		Params:    map[string]any{"kind": "text_texture", "text": "ABC"},
 		Seed:      &seed,
 		SeedMode:  "fixed",
 	})
@@ -49,19 +48,31 @@ json.dump({"path": path}, sys.stdout)
 	}
 }
 
-func TestParseGeneratorOutputRelativePath(t *testing.T) {
-	tmp := t.TempDir()
-	target := filepath.Join(tmp, "asset.png")
-	if err := os.WriteFile(target, []byte("ok"), 0o644); err != nil {
-		t.Fatalf("write target: %v", err)
-	}
-
-	got, err := parseGeneratorOutput([]byte(`{"path":"asset.png"}`), tmp)
+func TestParseGeneratorOutputString(t *testing.T) {
+	got, err := parseGeneratorOutput([]byte(`{"result":"asset.png"}`))
 	if err != nil {
 		t.Fatalf("parseGeneratorOutput: %v", err)
 	}
-	if got != target {
-		t.Fatalf("got %q, want %q", got, target)
+	value, ok := got.(string)
+	if !ok {
+		t.Fatalf("got type %T, want string", got)
+	}
+	if value != "asset.png" {
+		t.Fatalf("got %q, want %q", value, "asset.png")
+	}
+}
+
+func TestParseGeneratorOutputArray(t *testing.T) {
+	got, err := parseGeneratorOutput([]byte(`{"result":[1,"two",{"x":3}]}`))
+	if err != nil {
+		t.Fatalf("parseGeneratorOutput: %v", err)
+	}
+	values, ok := got.([]any)
+	if !ok {
+		t.Fatalf("got type %T, want []any", got)
+	}
+	if len(values) != 3 {
+		t.Fatalf("len = %d, want 3", len(values))
 	}
 }
 
@@ -75,7 +86,7 @@ req = json.load(sys.stdin)
 path = os.path.join(req["work_dir"], "result.txt")
 with open(path, "w", encoding="utf-8") as f:
     json.dump(req, f)
-json.dump({"path": path}, sys.stdout)
+json.dump({"result": path}, sys.stdout)
 `), 0o644); err != nil {
 		t.Fatalf("write generator: %v", err)
 	}
@@ -95,7 +106,6 @@ json.dump({"path": path}, sys.stdout)
 			Command:   "python3 ./gen.py",
 			RootDir:   tmp,
 			WorkDir:   workDir,
-			Operation: "sample",
 			Params:    map[string]any{"x": "y"},
 			Seed:      &seed,
 			SeedMode:  "fixed",
@@ -104,7 +114,11 @@ json.dump({"path": path}, sys.stdout)
 	if err != nil {
 		t.Fatalf("Request: %v", err)
 	}
-	if resp.Path != outputPath {
-		t.Fatalf("path = %q, want %q", resp.Path, outputPath)
+	resultPath, ok := resp.Result.(string)
+	if !ok {
+		t.Fatalf("result type = %T, want string", resp.Result)
+	}
+	if resultPath != outputPath {
+		t.Fatalf("result = %q, want %q", resultPath, outputPath)
 	}
 }

@@ -7,14 +7,14 @@ The scene calls:
 
 ```python
 generator = self.generators.init("uv run ./gen.py")
-texture_path = generator.generate("seed_texture")
+texture_path = generator.generate_path()
 ```
 
 `rv` passes the current scene seed plus `root_dir` and `work_dir` to `gen.py` in the
 JSON request on `stdin`. `root_dir` is the scene runtime directory, and `work_dir`
 is a per-run directory under `generated/` by default, or under `--gen-dir` when
 provided. The generator renders that seed as a single number into a PNG inside
-`work_dir` and returns the generated file path on `stdout`.
+`work_dir` and returns the generated file path in `{"result": ...}` on `stdout`.
 
 Run it from the repository root:
 

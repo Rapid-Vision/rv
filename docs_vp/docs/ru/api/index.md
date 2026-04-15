@@ -387,15 +387,62 @@ def aabb(self) -> AABB
 **Signature**
 
 ```python
-def generate(self, operation: str, **params) -> str
+def generate(self, **params) -> Any
 ```
 
 **Arguments**
 
-- **`operation`** : `str`
+- **`**params`**
+
+**Returns**: `Any`
+
+---
+---
+###### `generate_path`
+
+**Signature**
+
+```python
+def generate_path(self, **params) -> str
+```
+
+**Arguments**
+
+- **`**params`**
+
+**Returns**: `str`
+
+---
+---
+###### `generate_str`
+
+**Signature**
+
+```python
+def generate_str(self, **params) -> str
+```
+
+**Arguments**
+
 - **`**params`**
 
 **Returns**: `Self`
+
+---
+---
+###### `generate_num`
+
+**Signature**
+
+```python
+def generate_num(self, **params) -> float
+```
+
+**Arguments**
+
+- **`**params`**
+
+**Returns**: `float`
 
 ---
 :::

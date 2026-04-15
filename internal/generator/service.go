@@ -30,18 +30,16 @@ type generateRequest struct {
 	Command   string         `json:"command"`
 	RootDir   string         `json:"root_dir"`
 	WorkDir   string         `json:"work_dir"`
-	Operation string         `json:"operation"`
 	Params    map[string]any `json:"params"`
 	Seed      *int64         `json:"seed,omitempty"`
 	SeedMode  string         `json:"seed_mode,omitempty"`
 }
 
 type generateResponse struct {
-	Path string `json:"path"`
+	Result any `json:"result"`
 }
 
 type generatorStdioRequest struct {
-	Operation string         `json:"operation"`
 	Params    map[string]any `json:"params"`
 	Seed      *int64         `json:"seed,omitempty"`
 	SeedMode  string         `json:"seed_mode,omitempty"`
@@ -103,46 +101,42 @@ func (s *Service) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path, err := executeGenerateRequest(r.Context(), req)
+	result, err := executeGenerateRequest(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(generateResponse{Path: path}); err != nil {
+	if err := json.NewEncoder(w).Encode(generateResponse{Result: result}); err != nil {
 		http.Error(w, fmt.Sprintf("encode response: %v", err), http.StatusInternalServerError)
 		return
 	}
 }
 
-func executeGenerateRequest(parent context.Context, req generateRequest) (string, error) {
-	if strings.TrimSpace(req.Operation) == "" {
-		return "", errors.New("operation is required")
-	}
+func executeGenerateRequest(parent context.Context, req generateRequest) (any, error) {
 	if strings.TrimSpace(req.Command) == "" {
-		return "", errors.New("command is required")
+		return nil, errors.New("command is required")
 	}
 	if strings.TrimSpace(req.RootDir) == "" {
-		return "", errors.New("root_dir is required")
+		return nil, errors.New("root_dir is required")
 	}
 	if strings.TrimSpace(req.WorkDir) == "" {
-		return "", errors.New("work_dir is required")
+		return nil, errors.New("work_dir is required")
 	}
 
 	rootDirAbs, err := filepath.Abs(req.RootDir)
 	if err != nil {
-		return "", fmt.Errorf("resolve root_dir: %w", err)
+		return nil, fmt.Errorf("resolve root_dir: %w", err)
 	}
 	workDirAbs, err := filepath.Abs(req.WorkDir)
 	if err != nil {
-		return "", fmt.Errorf("resolve work_dir: %w", err)
+		return nil, fmt.Errorf("resolve work_dir: %w", err)
 	}
 	if err := os.MkdirAll(workDirAbs, 0o755); err != nil {
-		return "", fmt.Errorf("create work_dir: %w", err)
+		return nil, fmt.Errorf("create work_dir: %w", err)
 	}
 	payload := generatorStdioRequest{
-		Operation: req.Operation,
 		Params:    req.Params,
 		Seed:      req.Seed,
 		SeedMode:  req.SeedMode,
@@ -151,7 +145,7 @@ func executeGenerateRequest(parent context.Context, req generateRequest) (string
 	}
 	stdin, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
+		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(parent, requestTimeout)
@@ -173,20 +167,20 @@ func executeGenerateRequest(parent context.Context, req generateRequest) (string
 			errText = strings.TrimSpace(stdout.String())
 		}
 		if errText != "" {
-			return "", fmt.Errorf("generator failed: %s", errText)
+			return nil, fmt.Errorf("generator failed: %s", errText)
 		}
-		return "", fmt.Errorf("generator failed: %w", err)
+		return nil, fmt.Errorf("generator failed: %w", err)
 	}
 
-	path, err := parseGeneratorOutput(stdout.Bytes(), workDirAbs)
+	result, err := parseGeneratorOutput(stdout.Bytes())
 	if err != nil {
 		errText := strings.TrimSpace(stderr.String())
 		if errText != "" {
-			return "", fmt.Errorf("%w: %s", err, errText)
+			return nil, fmt.Errorf("%w: %s", err, errText)
 		}
-		return "", err
+		return nil, err
 	}
-	return path, nil
+	return result, nil
 }
 
 func commandShell() (string, []string) {
@@ -201,39 +195,20 @@ func commandShell() (string, []string) {
 	}
 }
 
-func parseGeneratorOutput(raw []byte, cwd string) (string, error) {
+func parseGeneratorOutput(raw []byte) (any, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
-		return "", errors.New("generator returned empty stdout")
+		return nil, errors.New("generator returned empty stdout")
 	}
 
-	var path string
-	if raw[0] == '"' {
-		if err := json.Unmarshal(raw, &path); err != nil {
-			return "", fmt.Errorf("decode generator path: %w", err)
-		}
-	} else {
-		var response generateResponse
-		if err := json.Unmarshal(raw, &response); err != nil {
-			return "", fmt.Errorf("decode generator response: %w", err)
-		}
-		path = response.Path
+	var response generateResponse
+	if err := json.Unmarshal(raw, &response); err != nil {
+		return nil, fmt.Errorf("decode generator response: %w", err)
 	}
-
-	if strings.TrimSpace(path) == "" {
-		return "", errors.New("generator response must include path")
+	if response.Result == nil {
+		return nil, errors.New("generator response must include result")
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(cwd, path)
-	}
-	path = filepath.Clean(path)
-	if _, err := os.Stat(path); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("generated path does not exist: %s", path)
-		}
-		return "", fmt.Errorf("stat generated path: %w", err)
-	}
-	return path, nil
+	return response.Result, nil
 }
 
 func Request(url string, payload any) (generateResponse, error) {
