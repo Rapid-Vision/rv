@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -114,6 +115,10 @@ func Preview(opts Options) {
 			logs.Warn.Println("Watch error:", err)
 		}
 	}()
+	if stdinSupportsCommands(os.Stdin) {
+		logs.Info.Println("Press Enter to refresh preview.")
+		go readPreviewCommands(ctx, client.requestRerun)
+	}
 
 	// Handle Ctrl-C
 	sigCh := make(chan os.Signal, 1)
@@ -140,6 +145,38 @@ func Preview(opts Options) {
 	}
 
 	cancel()
+}
+
+func stdinSupportsCommands(file *os.File) bool {
+	if file == nil {
+		return false
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func readPreviewCommands(ctx context.Context, requestRerun func()) {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		lineCh := make(chan error, 1)
+		go func() {
+			_, err := reader.ReadString('\n')
+			lineCh <- err
+		}()
+
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-lineCh:
+			if err != nil {
+				return
+			}
+			requestRerun()
+		}
+	}
 }
 
 func validateOptions(opts Options) error {

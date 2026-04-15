@@ -1,7 +1,9 @@
 package preview
 
 import (
+	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/Rapid-Vision/rv/internal/seed"
@@ -145,16 +147,30 @@ func TestBuildBlenderPreviewArgs_NoWindowModeDisabled(t *testing.T) {
 	assertNotContains(t, args, "--seed-value")
 }
 
+func TestStdinSupportsCommands(t *testing.T) {
+	if stdinSupportsCommands(nil) {
+		t.Fatal("expected nil stdin to be unsupported")
+	}
+
+	file, err := os.CreateTemp(t.TempDir(), "stdin-*")
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	if stdinSupportsCommands(file) {
+		t.Fatal("expected regular file stdin to be unsupported")
+	}
+}
+
 func floatPtr(v float64) *float64 {
 	return &v
 }
 
 func assertContains(t *testing.T, values []string, needle string) {
 	t.Helper()
-	for _, value := range values {
-		if value == needle {
-			return
-		}
+	if slices.Contains(values, needle) {
+		return
 	}
 	t.Fatalf("expected %q in %v", needle, values)
 }
