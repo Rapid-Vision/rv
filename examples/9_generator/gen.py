@@ -18,9 +18,14 @@ def draw_centered_text(
 
 def main() -> None:
     request = json.loads(sys.stdin.read())
+
+    with open("r.json", "w") as fout:
+        print(json.dumps(request, indent=2), file=fout)
+
     seed = request.get("seed")
     _root_dir = request["root_dir"]
     work_dir = request["work_dir"]
+    bg_color = request["params"]["bg_color"]
     output_path = os.path.join(work_dir, "texture.png")
 
     width, height = 1024, 1024
@@ -33,7 +38,7 @@ def main() -> None:
         radius=48,
         outline=(40, 40, 40),
         width=10,
-        fill=(252, 251, 247),
+        fill=tuple(bg_color),
     )
 
     text = str(seed)

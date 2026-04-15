@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,15 +37,19 @@ json.dump({"result": path}, sys.stdout)
 		Command:   "sh ./gen.sh",
 		RootDir:   tmp,
 		WorkDir:   workDir,
-		Params:    map[string]any{"kind": "text_texture", "text": "ABC"},
+		Params:    json.RawMessage(`{"kind":"text_texture","text":"ABC"}`),
 		Seed:      &seed,
 		SeedMode:  "fixed",
 	})
 	if err != nil {
 		t.Fatalf("executeGenerateRequest: %v", err)
 	}
-	if got != outputPath {
-		t.Fatalf("got path %q, want %q", got, outputPath)
+	var gotPath string
+	if err := json.Unmarshal(got, &gotPath); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if gotPath != outputPath {
+		t.Fatalf("got path %q, want %q", gotPath, outputPath)
 	}
 }
 
@@ -53,9 +58,9 @@ func TestParseGeneratorOutputString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseGeneratorOutput: %v", err)
 	}
-	value, ok := got.(string)
-	if !ok {
-		t.Fatalf("got type %T, want string", got)
+	var value string
+	if err := json.Unmarshal(got, &value); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
 	}
 	if value != "asset.png" {
 		t.Fatalf("got %q, want %q", value, "asset.png")
@@ -67,12 +72,23 @@ func TestParseGeneratorOutputArray(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseGeneratorOutput: %v", err)
 	}
-	values, ok := got.([]any)
-	if !ok {
-		t.Fatalf("got type %T, want []any", got)
+	var values []any
+	if err := json.Unmarshal(got, &values); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
 	}
 	if len(values) != 3 {
 		t.Fatalf("len = %d, want 3", len(values))
+	}
+}
+
+func TestParseGeneratorOutputPreservesLargeIntegerBytes(t *testing.T) {
+	got, err := parseGeneratorOutput([]byte(`{"result":{"n":9007199254740993}}`))
+	if err != nil {
+		t.Fatalf("parseGeneratorOutput: %v", err)
+	}
+	want := `{"n":9007199254740993}`
+	if string(got) != want {
+		t.Fatalf("got %s, want %s", string(got), want)
 	}
 }
 
@@ -106,7 +122,7 @@ json.dump({"result": path}, sys.stdout)
 			Command:   "python3 ./gen.py",
 			RootDir:   tmp,
 			WorkDir:   workDir,
-			Params:    map[string]any{"x": "y"},
+			Params:    json.RawMessage(`{"x":"y"}`),
 			Seed:      &seed,
 			SeedMode:  "fixed",
 		},
@@ -114,9 +130,9 @@ json.dump({"result": path}, sys.stdout)
 	if err != nil {
 		t.Fatalf("Request: %v", err)
 	}
-	resultPath, ok := resp.Result.(string)
-	if !ok {
-		t.Fatalf("result type = %T, want string", resp.Result)
+	var resultPath string
+	if err := json.Unmarshal(resp.Result, &resultPath); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
 	}
 	if resultPath != outputPath {
 		t.Fatalf("result = %q, want %q", resultPath, outputPath)

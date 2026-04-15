@@ -27,24 +27,24 @@ type Service struct {
 }
 
 type generateRequest struct {
-	Command   string         `json:"command"`
-	RootDir   string         `json:"root_dir"`
-	WorkDir   string         `json:"work_dir"`
-	Params    map[string]any `json:"params"`
-	Seed      *int64         `json:"seed,omitempty"`
-	SeedMode  string         `json:"seed_mode,omitempty"`
+	Command  string          `json:"command"`
+	RootDir  string          `json:"root_dir"`
+	WorkDir  string          `json:"work_dir"`
+	Params   json.RawMessage `json:"params"`
+	Seed     *int64          `json:"seed,omitempty"`
+	SeedMode string          `json:"seed_mode,omitempty"`
 }
 
 type generateResponse struct {
-	Result any `json:"result"`
+	Result json.RawMessage `json:"result"`
 }
 
 type generatorStdioRequest struct {
-	Params    map[string]any `json:"params"`
-	Seed      *int64         `json:"seed,omitempty"`
-	SeedMode  string         `json:"seed_mode,omitempty"`
-	RootDir   string         `json:"root_dir"`
-	WorkDir   string         `json:"work_dir"`
+	Params   json.RawMessage `json:"params"`
+	Seed     *int64          `json:"seed,omitempty"`
+	SeedMode string          `json:"seed_mode,omitempty"`
+	RootDir  string          `json:"root_dir"`
+	WorkDir  string          `json:"work_dir"`
 }
 
 func Start(ctx context.Context) (*Service, error) {
@@ -114,7 +114,7 @@ func (s *Service) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func executeGenerateRequest(parent context.Context, req generateRequest) (any, error) {
+func executeGenerateRequest(parent context.Context, req generateRequest) (json.RawMessage, error) {
 	if strings.TrimSpace(req.Command) == "" {
 		return nil, errors.New("command is required")
 	}
@@ -136,12 +136,17 @@ func executeGenerateRequest(parent context.Context, req generateRequest) (any, e
 	if err := os.MkdirAll(workDirAbs, 0o755); err != nil {
 		return nil, fmt.Errorf("create work_dir: %w", err)
 	}
+	params := req.Params
+	if len(bytes.TrimSpace(params)) == 0 {
+		params = json.RawMessage(`{}`)
+	}
+
 	payload := generatorStdioRequest{
-		Params:    req.Params,
-		Seed:      req.Seed,
-		SeedMode:  req.SeedMode,
-		RootDir:   rootDirAbs,
-		WorkDir:   workDirAbs,
+		Params:   params,
+		Seed:     req.Seed,
+		SeedMode: req.SeedMode,
+		RootDir:  rootDirAbs,
+		WorkDir:  workDirAbs,
 	}
 	stdin, err := json.Marshal(payload)
 	if err != nil {
@@ -195,7 +200,7 @@ func commandShell() (string, []string) {
 	}
 }
 
-func parseGeneratorOutput(raw []byte) (any, error) {
+func parseGeneratorOutput(raw []byte) (json.RawMessage, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
 		return nil, errors.New("generator returned empty stdout")
@@ -205,7 +210,7 @@ func parseGeneratorOutput(raw []byte) (any, error) {
 	if err := json.Unmarshal(raw, &response); err != nil {
 		return nil, fmt.Errorf("decode generator response: %w", err)
 	}
-	if response.Result == nil {
+	if len(bytes.TrimSpace(response.Result)) == 0 {
 		return nil, errors.New("generator response must include result")
 	}
 	return response.Result, nil
