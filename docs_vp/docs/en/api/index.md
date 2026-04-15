@@ -513,7 +513,7 @@ Material descriptor backed by Blender's Principled BSDF shader.
 **Signature**
 
 ```python
-def set_params(self, base_color: OptionalColor=None, roughness: Union[float, None]=None, metallic: Union[float, None]=None, specular: Union[float, None]=None, emission_color: OptionalColor=None, emission_strength: Union[float, None]=None, alpha: Union[float, None]=None, transmission: Union[float, None]=None, ior: Union[float, None]=None)
+def set_params(self, base_color: OptionalColor=None, roughness: Union[float, None]=None, metallic: Union[float, None]=None, specular: Union[float, None]=None, emission_color: OptionalColor=None, emission_strength: Union[float, None]=None, alpha: Union[float, None]=None, transmission: Union[float, None]=None, ior: Union[float, None]=None) -> Self
 ```
 
 **Arguments**
@@ -575,12 +575,12 @@ Material descriptor that imports a material from another `.blend` file.
 **Signature**
 
 ```python
-def set_params(self, **kwargs)
+def set_params(self, **kwargs: Any)
 ```
 
 **Arguments**
 
-- **`**kwargs`**
+- **`**kwargs`** : `Any`
 
 **Returns**: `Self`
 
@@ -1878,7 +1878,7 @@ Inherits from: `ABC`, `_Serializable`
 | - | - | - |
 | `resolution` | `Resolution` |  |
 | `time_limit` | `float` |  |
-| `passes` | `Union[RenderPassSet, None]` |  |
+| `passes` | `RenderPassSet` |  |
 | `output_dir` | `Optional[str]` |  |
 | `subdir` | `Union[str, None]` |  |
 | `camera` | `'Camera'` |  |
@@ -2379,22 +2379,6 @@ Inherits from: `Expr`
 ::: details Methods
 
 ---
-###### `value_type`
-
-**Signature**
-
-```python
-@property
-def value_type(self) -> str
-```
-
-**Arguments**
-
-
-**Returns**: `str`
-
----
----
 ###### `compile`
 
 **Signature**
@@ -2607,12 +2591,12 @@ Inherits from: `Material`
 **Signature**
 
 ```python
-def set_params(self, shader: Union[ShaderExpr, None]=None)
+def set_params(self, shader: Union[ShaderExpr, None]=None) -> Self
 ```
 
 **Arguments**
 
-- **`shader`** : `Union[ShaderExpr, None]`
+- **`shader`** : `Union[ShaderExpr, None]` — type: ignore[override]
 
 **Returns**: `Self`
 
