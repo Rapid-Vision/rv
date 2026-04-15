@@ -19,6 +19,7 @@
 - `go run . preview examples/1_primitives/scene.py --preview-files --no-window --preview-out ./preview_out`: run file-only preview output without opening the Blender UI.
 - `go run . render examples/1_primitives/scene.py -n 10 -p 2 -o ./out`: render a dataset to `./out`.
 - `make lint`: run Python and Go lint targets.
+- `make docs`: generate api docs. Never edit them by hand.
 
 ## Coding Style & Naming Conventions
 - Go code: keep files `gofmt`-formatted, use idiomatic package structure, and expose public identifiers in `CamelCase`.
