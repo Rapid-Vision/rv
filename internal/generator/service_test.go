@@ -11,7 +11,8 @@ import (
 func TestExecuteGenerateRequestCommand(t *testing.T) {
 	tmp := t.TempDir()
 	generatorPath := filepath.Join(tmp, "gen.sh")
-	outputPath := filepath.Join(tmp, "texture.txt")
+	workDir := filepath.Join(tmp, "generated", "run-1")
+	outputPath := filepath.Join(workDir, "texture.txt")
 
 	script := `#!/bin/sh
 req_file="$PWD/request.json"
@@ -20,7 +21,7 @@ python3 -c '
 import json, os, sys
 with open("request.json", "r", encoding="utf-8") as f:
     req = json.load(f)
-path = os.path.join(req["cwd"], "texture.txt")
+path = os.path.join(req["work_dir"], "texture.txt")
 with open(path, "w", encoding="utf-8") as f:
     f.write(req["operation"] + ":" + req["params"]["text"])
 json.dump({"path": path}, sys.stdout)
@@ -33,7 +34,8 @@ json.dump({"path": path}, sys.stdout)
 	seed := int64(42)
 	got, err := executeGenerateRequest(context.Background(), generateRequest{
 		Command:   "sh ./gen.sh",
-		Cwd:       tmp,
+		RootDir:   tmp,
+		WorkDir:   workDir,
 		Operation: "text_texture",
 		Params:    map[string]any{"text": "ABC"},
 		Seed:      &seed,
@@ -66,10 +68,11 @@ func TestParseGeneratorOutputRelativePath(t *testing.T) {
 func TestRequestRoundTrip(t *testing.T) {
 	tmp := t.TempDir()
 	generatorPath := filepath.Join(tmp, "gen.py")
-	outputPath := filepath.Join(tmp, "result.txt")
+	workDir := filepath.Join(tmp, "generated", "run-2")
+	outputPath := filepath.Join(workDir, "result.txt")
 	if err := os.WriteFile(generatorPath, []byte(`import json, os, sys
 req = json.load(sys.stdin)
-path = os.path.join(req["cwd"], "result.txt")
+path = os.path.join(req["work_dir"], "result.txt")
 with open(path, "w", encoding="utf-8") as f:
     json.dump(req, f)
 json.dump({"path": path}, sys.stdout)
@@ -90,7 +93,8 @@ json.dump({"path": path}, sys.stdout)
 		fmt.Sprintf("http://127.0.0.1:%d/v1/generate", svc.Port()),
 		generateRequest{
 			Command:   "python3 ./gen.py",
-			Cwd:       tmp,
+			RootDir:   tmp,
+			WorkDir:   workDir,
 			Operation: "sample",
 			Params:    map[string]any{"x": "y"},
 			Seed:      &seed,

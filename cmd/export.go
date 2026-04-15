@@ -11,6 +11,7 @@ import (
 var (
 	exportOutputPath    string
 	exportCwd           string
+	exportGenDir        string
 	exportFreezePhysics bool
 	exportPackResources bool
 	exportSeed          string
@@ -29,6 +30,7 @@ func init() {
 
 	exportCmd.Flags().StringVarP(&exportOutputPath, "output", "o", "", "Output .blend file path")
 	exportCmd.Flags().StringVar(&exportCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
+	exportCmd.Flags().StringVar(&exportGenDir, "gen-dir", "", "Generator base directory (defaults to <root_dir>/generated; relative paths resolve from root_dir)")
 	exportCmd.Flags().BoolVar(&exportFreezePhysics, "freeze-physics", false, "Simulate rigid-body physics to the end state and remove rigid-body simulation before saving")
 	exportCmd.Flags().BoolVar(&exportPackResources, "pack-resources", false, "Pack external resources into the saved .blend file")
 	exportCmd.Flags().StringVar(&exportSeed, "seed", string(seed.RandomMode), "Scene seed mode: rand, seq, or a concrete integer")
@@ -44,10 +46,15 @@ func runExport(_ *cobra.Command, args []string) {
 	if err != nil {
 		logs.Err.Fatalln("Invalid --seed:", err)
 	}
+	generatorPaths, err := utils.ResolveGeneratorPaths(paths.Cwd, exportGenDir)
+	if err != nil {
+		logs.Err.Fatalln("Failed to resolve generator paths:", err)
+	}
 
 	if err := export.Export(export.Options{
 		ScriptPath:    paths.ScriptPath,
 		Cwd:           paths.Cwd,
+		GenBaseDir:    generatorPaths.GenBaseDir,
 		OutputPath:    paths.OutputPath,
 		FreezePhysics: exportFreezePhysics,
 		PackResources: exportPackResources,

@@ -22,6 +22,8 @@ import (
 type RenderOptions struct {
 	ScriptPath            string
 	Cwd                   string
+	GenBaseDir            string
+	WorkDir               string
 	ImageNum              int
 	Procs                 int
 	Resolution            [2]int
@@ -87,6 +89,9 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if cwdAbs == "" {
 		return RenderResult{}, errors.New("cwd is required")
 	}
+	if opts.GenBaseDir == "" {
+		return RenderResult{}, errors.New("generator base directory is required")
+	}
 
 	blenderPath, err := utils.GetBlenderPath()
 	if err != nil {
@@ -135,6 +140,12 @@ func Render(opts RenderOptions) (RenderResult, error) {
 	if err := validateOptionalRenderOptions(opts); err != nil {
 		return RenderResult{}, err
 	}
+
+	workDir, err := utils.AllocateGeneratorWorkDir(opts.GenBaseDir)
+	if err != nil {
+		return RenderResult{}, err
+	}
+	opts.WorkDir = workDir
 
 	if imgNum < procs {
 		procs = imgNum
@@ -216,7 +227,8 @@ func buildBlenderRenderArgs(opts RenderOptions, libPath string, seqOutDir string
 		"--number", fmt.Sprintf("%d", part),
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--output", seqOutDir,
-		"--cwd", opts.Cwd,
+		"--root-dir", opts.Cwd,
+		"--work-dir", opts.WorkDir,
 		"--gpu-backend", gpuBackend,
 		"--seed-mode", string(opts.Seed.Mode),
 		"--seed-base", fmt.Sprintf("%d", seedBase),

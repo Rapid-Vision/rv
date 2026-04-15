@@ -34,7 +34,8 @@ def parse_args():
         default=None,
     )
     parser.add_argument("--noise-threshold", type=float, default=None)
-    parser.add_argument("--cwd", type=str)
+    parser.add_argument("--root-dir", type=str)
+    parser.add_argument("--work-dir", type=str)
     parser.add_argument("--generator-port", type=int, default=0)
 
     return parser.parse_args(args)
@@ -128,19 +129,21 @@ ARGS = parse_args()
 
 if ARGS.libpath is None:
     raise ValueError("--libpath is required")
-if ARGS.cwd is None:
-    raise ValueError("--cwd is required")
+if ARGS.root_dir is None:
+    raise ValueError("--root-dir is required")
+if ARGS.work_dir is None:
+    raise ValueError("--work-dir is required")
 if ARGS.number is None:
     raise ValueError("--number is required")
 if ARGS.script is None:
     raise ValueError("--script is required")
 
-bootstrap_runtime(ARGS.libpath, ARGS.cwd)
+bootstrap_runtime(ARGS.libpath, ARGS.root_dir)
 
 import rv.internal as rvi  # noqa: E402
 
 RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
-rvi._configure_generator_runtime(ARGS.generator_port, ARGS.cwd)
+rvi._configure_generator_runtime(ARGS.generator_port, ARGS.root_dir, ARGS.work_dir)
 
 for i in range(ARGS.number):
     seed = rvi._internal_resolve_seed(

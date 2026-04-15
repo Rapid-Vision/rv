@@ -11,6 +11,7 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 	opts := Options{
 		ScriptPath:    "/work/scene.py",
 		Cwd:           "/work",
+		WorkDir:       "/work/generated/run-1",
 		OutputPath:    "/tmp/out/scene.blend",
 		FreezePhysics: true,
 		PackResources: true,
@@ -25,8 +26,10 @@ func TestBuildBlenderExportArgs(t *testing.T) {
 	assertContains(t, args, filepath.Join("/lib/rvlib", "export.py"))
 	assertContains(t, args, "--script")
 	assertContains(t, args, "/work/scene.py")
-	assertContains(t, args, "--cwd")
+	assertContains(t, args, "--root-dir")
 	assertContains(t, args, "/work")
+	assertContains(t, args, "--work-dir")
+	assertContains(t, args, "/work/generated/run-1")
 	assertContains(t, args, "--output")
 	assertContains(t, args, "/tmp/out/scene.blend")
 	assertContains(t, args, "--seed-mode")

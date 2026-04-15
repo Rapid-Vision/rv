@@ -4,13 +4,15 @@ from typing import Union
 from urllib import error, request
 
 _GENERATOR_URL: Union[str, None] = None
-_GENERATOR_CWD = Path.cwd()
+_GENERATOR_ROOT_DIR = Path.cwd()
+_GENERATOR_WORK_DIR = Path.cwd()
 
 
-def _configure_generator_runtime(port: int, cwd: str) -> None:
-    global _GENERATOR_URL, _GENERATOR_CWD
+def _configure_generator_runtime(port: int, root_dir: str, work_dir: str) -> None:
+    global _GENERATOR_URL, _GENERATOR_ROOT_DIR, _GENERATOR_WORK_DIR
 
-    _GENERATOR_CWD = Path(cwd).expanduser().resolve()
+    _GENERATOR_ROOT_DIR = Path(root_dir).expanduser().resolve()
+    _GENERATOR_WORK_DIR = Path(work_dir).expanduser().resolve()
     if port <= 0:
         _GENERATOR_URL = None
         return
@@ -36,7 +38,8 @@ class GeneratorHandle:
 
         payload = {
             "command": self.command,
-            "cwd": str(_GENERATOR_CWD),
+            "root_dir": str(_GENERATOR_ROOT_DIR),
+            "work_dir": str(_GENERATOR_WORK_DIR),
             "operation": operation,
             "params": params,
             "seed": seed,

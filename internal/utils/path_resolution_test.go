@@ -112,6 +112,68 @@ func TestResolveExportPaths_WithExplicitCwd(t *testing.T) {
 	}
 }
 
+func TestResolveGeneratorPaths_DefaultsToRootGenerated(t *testing.T) {
+	rootDir := filepath.Join(t.TempDir(), "scene-root")
+	paths, err := ResolveGeneratorPaths(rootDir, "")
+	if err != nil {
+		t.Fatalf("resolve generator paths: %v", err)
+	}
+
+	if !samePath(paths.RootDir, rootDir) {
+		t.Fatalf("unexpected root dir: got=%q want=%q", paths.RootDir, rootDir)
+	}
+	if !samePath(paths.GenBaseDir, filepath.Join(rootDir, "generated")) {
+		t.Fatalf("unexpected generator base dir: got=%q", paths.GenBaseDir)
+	}
+}
+
+func TestResolveGeneratorPaths_ResolvesRelativeGenDirAgainstRoot(t *testing.T) {
+	rootDir := filepath.Join(t.TempDir(), "scene-root")
+	paths, err := ResolveGeneratorPaths(rootDir, "cache/gen")
+	if err != nil {
+		t.Fatalf("resolve generator paths: %v", err)
+	}
+
+	wantBase := filepath.Join(rootDir, "cache", "gen")
+	if !samePath(paths.GenBaseDir, wantBase) {
+		t.Fatalf("unexpected generator base dir: got=%q want=%q", paths.GenBaseDir, wantBase)
+	}
+	if !samePath(paths.GenBaseDir, wantBase) {
+		t.Fatalf("unexpected generator base dir: got=%q want=%q", paths.GenBaseDir, wantBase)
+	}
+}
+
+func TestResolveGeneratorPaths_AllowsAbsoluteGenDir(t *testing.T) {
+	tmp := t.TempDir()
+	rootDir := filepath.Join(tmp, "scene-root")
+	genDir := filepath.Join(tmp, "shared-gen")
+
+	paths, err := ResolveGeneratorPaths(rootDir, genDir)
+	if err != nil {
+		t.Fatalf("resolve generator paths: %v", err)
+	}
+
+	if !samePath(paths.GenBaseDir, genDir) {
+		t.Fatalf("unexpected generator base dir: got=%q want=%q", paths.GenBaseDir, genDir)
+	}
+}
+
+func TestAllocateGeneratorWorkDir_CreatesUUIDSubdir(t *testing.T) {
+	genBaseDir := filepath.Join(t.TempDir(), "generated")
+
+	workDir, err := AllocateGeneratorWorkDir(genBaseDir)
+	if err != nil {
+		t.Fatalf("allocate generator work dir: %v", err)
+	}
+
+	if !strings.HasPrefix(workDir, genBaseDir+string(filepath.Separator)) {
+		t.Fatalf("unexpected work dir: got=%q", workDir)
+	}
+	if _, err := os.Stat(workDir); err != nil {
+		t.Fatalf("stat work dir: %v", err)
+	}
+}
+
 func samePath(a string, b string) bool {
 	aEval, aErr := filepath.EvalSymlinks(a)
 	if aErr != nil {

@@ -28,7 +28,8 @@ type Service struct {
 
 type generateRequest struct {
 	Command   string         `json:"command"`
-	Cwd       string         `json:"cwd"`
+	RootDir   string         `json:"root_dir"`
+	WorkDir   string         `json:"work_dir"`
 	Operation string         `json:"operation"`
 	Params    map[string]any `json:"params"`
 	Seed      *int64         `json:"seed,omitempty"`
@@ -44,7 +45,8 @@ type generatorStdioRequest struct {
 	Params    map[string]any `json:"params"`
 	Seed      *int64         `json:"seed,omitempty"`
 	SeedMode  string         `json:"seed_mode,omitempty"`
-	Cwd       string         `json:"cwd"`
+	RootDir   string         `json:"root_dir"`
+	WorkDir   string         `json:"work_dir"`
 }
 
 func Start(ctx context.Context) (*Service, error) {
@@ -121,20 +123,31 @@ func executeGenerateRequest(parent context.Context, req generateRequest) (string
 	if strings.TrimSpace(req.Command) == "" {
 		return "", errors.New("command is required")
 	}
-	if strings.TrimSpace(req.Cwd) == "" {
-		return "", errors.New("cwd is required")
+	if strings.TrimSpace(req.RootDir) == "" {
+		return "", errors.New("root_dir is required")
+	}
+	if strings.TrimSpace(req.WorkDir) == "" {
+		return "", errors.New("work_dir is required")
 	}
 
-	cwdAbs, err := filepath.Abs(req.Cwd)
+	rootDirAbs, err := filepath.Abs(req.RootDir)
 	if err != nil {
-		return "", fmt.Errorf("resolve cwd: %w", err)
+		return "", fmt.Errorf("resolve root_dir: %w", err)
+	}
+	workDirAbs, err := filepath.Abs(req.WorkDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve work_dir: %w", err)
+	}
+	if err := os.MkdirAll(workDirAbs, 0o755); err != nil {
+		return "", fmt.Errorf("create work_dir: %w", err)
 	}
 	payload := generatorStdioRequest{
 		Operation: req.Operation,
 		Params:    req.Params,
 		Seed:      req.Seed,
 		SeedMode:  req.SeedMode,
-		Cwd:       cwdAbs,
+		RootDir:   rootDirAbs,
+		WorkDir:   workDirAbs,
 	}
 	stdin, err := json.Marshal(payload)
 	if err != nil {
@@ -146,7 +159,7 @@ func executeGenerateRequest(parent context.Context, req generateRequest) (string
 
 	shell, shellArgs := commandShell()
 	cmd := exec.CommandContext(ctx, shell, append(shellArgs, req.Command)...)
-	cmd.Dir = cwdAbs
+	cmd.Dir = rootDirAbs
 	cmd.Stdin = bytes.NewReader(stdin)
 
 	var stdout bytes.Buffer
@@ -165,7 +178,7 @@ func executeGenerateRequest(parent context.Context, req generateRequest) (string
 		return "", fmt.Errorf("generator failed: %w", err)
 	}
 
-	path, err := parseGeneratorOutput(stdout.Bytes(), cwdAbs)
+	path, err := parseGeneratorOutput(stdout.Bytes(), workDirAbs)
 	if err != nil {
 		errText := strings.TrimSpace(stderr.String())
 		if errText != "" {

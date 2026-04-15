@@ -17,6 +17,8 @@ import (
 type Options struct {
 	ScriptPath    string
 	Cwd           string
+	GenBaseDir    string
+	WorkDir       string
 	OutputPath    string
 	FreezePhysics bool
 	PackResources bool
@@ -33,6 +35,9 @@ func Export(opts Options) error {
 	}
 	if opts.OutputPath == "" {
 		return errors.New("output path is required")
+	}
+	if opts.GenBaseDir == "" {
+		return errors.New("generator base directory is required")
 	}
 	if filepath.Ext(opts.OutputPath) != ".blend" {
 		return errors.New("--output must end with .blend")
@@ -51,6 +56,12 @@ func Export(opts Options) error {
 	if err := os.MkdirAll(filepath.Dir(opts.OutputPath), 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
+
+	workDir, err := utils.AllocateGeneratorWorkDir(opts.GenBaseDir)
+	if err != nil {
+		return err
+	}
+	opts.WorkDir = workDir
 
 	generatorCtx, cancelGenerator := context.WithCancel(context.Background())
 	generatorService, err := generator.Start(generatorCtx)
@@ -90,7 +101,8 @@ func buildBlenderExportArgs(opts Options, libPath string) []string {
 		"--script", opts.ScriptPath,
 		"--libpath", libPath,
 		"--output", opts.OutputPath,
-		"--cwd", opts.Cwd,
+		"--root-dir", opts.Cwd,
+		"--work-dir", opts.WorkDir,
 		"--seed-mode", string(opts.Seed.Mode),
 		"--generator-port", fmt.Sprintf("%d", opts.GeneratorPort),
 	}

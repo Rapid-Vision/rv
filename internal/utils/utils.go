@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Rapid-Vision/rv/rvlib"
+	"github.com/google/uuid"
 )
 
 var blenderEnvBlockedKeys = map[string]struct{}{
@@ -222,6 +223,23 @@ type ExportPaths struct {
 	OutputPath string
 }
 
+type GeneratorPaths struct {
+	RootDir    string
+	GenBaseDir string
+}
+
+func AllocateGeneratorWorkDir(genBaseDir string) (string, error) {
+	if strings.TrimSpace(genBaseDir) == "" {
+		return "", errors.New("generator base directory is required")
+	}
+
+	workDir := filepath.Join(filepath.Clean(genBaseDir), uuid.NewString())
+	if err := os.MkdirAll(workDir, 0o755); err != nil {
+		return "", fmt.Errorf("create generator work directory: %w", err)
+	}
+	return filepath.Clean(workDir), nil
+}
+
 func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, error) {
 	if scriptPathArg == "" {
 		return RuntimePaths{}, errors.New("script path is required")
@@ -253,6 +271,33 @@ func ResolveRuntimePaths(scriptPathArg string, cwdArg string) (RuntimePaths, err
 	return RuntimePaths{
 		ScriptPath: filepath.Clean(scriptAbs),
 		Cwd:        filepath.Clean(cwdAbs),
+	}, nil
+}
+
+func ResolveGeneratorPaths(rootDir string, genDirArg string) (GeneratorPaths, error) {
+	if rootDir == "" {
+		return GeneratorPaths{}, errors.New("root directory is required")
+	}
+
+	rootAbs, err := filepath.Abs(rootDir)
+	if err != nil {
+		return GeneratorPaths{}, fmt.Errorf("resolve root directory: %w", err)
+	}
+
+	genDirArg = strings.TrimSpace(genDirArg)
+	genBaseDir := ""
+	if genDirArg == "" {
+		genBaseDir = filepath.Join(rootAbs, "generated")
+	} else if filepath.IsAbs(genDirArg) {
+		genBaseDir = filepath.Clean(genDirArg)
+	} else {
+		genBaseDir = filepath.Join(rootAbs, genDirArg)
+	}
+	genBaseDir = filepath.Clean(genBaseDir)
+
+	return GeneratorPaths{
+		RootDir:    filepath.Clean(rootAbs),
+		GenBaseDir: genBaseDir,
 	}, nil
 }
 

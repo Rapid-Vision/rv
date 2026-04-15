@@ -23,7 +23,8 @@ def parse_args():
     parser.add_argument("--script", type=str, required=True)
     parser.add_argument("--libpath", type=str, required=True)
     parser.add_argument("--output", type=str, required=True)
-    parser.add_argument("--cwd", type=str, required=True)
+    parser.add_argument("--root-dir", type=str, required=True)
+    parser.add_argument("--work-dir", type=str, required=True)
     parser.add_argument("--seed-mode", type=str, default="rand")
     parser.add_argument("--seed-value", type=int, default=None)
     parser.add_argument("--freeze-physics", action="store_true")
@@ -36,14 +37,16 @@ def set_json_prop(id_data, key, value):
     id_data[key] = json.dumps(value, sort_keys=True)
 
 
-def attach_scene_metadata(scene_instance, script_path, cwd):
+def attach_scene_metadata(scene_instance, script_path, root_dir, work_dir):
     scene = bpy.context.scene
     generated_collection = bpy.data.collections.get("Generated")
 
     scene_payload = {
         "schema_version": EXPORT_SCHEMA_VERSION,
         "script_path": script_path,
-        "cwd": cwd,
+        "cwd": root_dir,
+        "root_dir": root_dir,
+        "work_dir": work_dir,
         "resolution": scene_instance.resolution,
         "time_limit": scene_instance.time_limit,
         "seed": scene_instance.seed,
@@ -148,11 +151,11 @@ def pack_resources():
 def main():
     args = parse_args()
 
-    bootstrap_runtime(args.libpath, args.cwd)
+    bootstrap_runtime(args.libpath, args.root_dir)
 
     import rv.internal as rvi
 
-    rvi._configure_generator_runtime(args.generator_port, args.cwd)
+    rvi._configure_generator_runtime(args.generator_port, args.root_dir, args.work_dir)
     scene_class = rvi._internal_load_scene_class(args.script)
     rvi._internal_begin_run(purge_orphans=True)
     scene_instance = scene_class(output_dir=None)
@@ -165,7 +168,7 @@ def main():
     if args.pack_resources:
         pack_resources()
 
-    attach_scene_metadata(scene_instance, args.script, args.cwd)
+    attach_scene_metadata(scene_instance, args.script, args.root_dir, args.work_dir)
     attach_object_metadata(scene_instance)
     attach_material_metadata(scene_instance)
     save_scene(args.output)

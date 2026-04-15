@@ -27,7 +27,8 @@ def parse_args():
     parser.add_argument("--port", type=int, default=5757)
     parser.add_argument("--script", type=str)
     parser.add_argument("--libpath", type=str)
-    parser.add_argument("--cwd", type=str)
+    parser.add_argument("--root-dir", type=str)
+    parser.add_argument("--work-dir", type=str)
     parser.add_argument("--preview-files", action="store_true")
     parser.add_argument("--preview-out", type=str, default=None)
     parser.add_argument("--no-window", action="store_true")
@@ -258,12 +259,17 @@ def run_headless_loop():
 
 ARGS = parse_args()
 
-bootstrap_runtime(ARGS.libpath, ARGS.cwd)
+if ARGS.root_dir is None:
+    raise ValueError("--root-dir is required")
+if ARGS.work_dir is None:
+    raise ValueError("--work-dir is required")
+
+bootstrap_runtime(ARGS.libpath, ARGS.root_dir)
 
 import rv.internal as rvi  # noqa: E402
 
 RESOLUTION = rvi._internal_parse_resolution(ARGS.resolution)
-rvi._configure_generator_runtime(ARGS.generator_port, ARGS.cwd)
+rvi._configure_generator_runtime(ARGS.generator_port, ARGS.root_dir, ARGS.work_dir)
 
 if ARGS.no_window and not ARGS.preview_files:
     raise ValueError("--no-window requires --preview-files")

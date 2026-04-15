@@ -18,6 +18,7 @@ var (
 	renderResolution            string
 	renderOutputDir             string
 	renderCwd                   string
+	renderGenDir                string
 	renderGPUBackend            string
 	renderTimeLimit             float64
 	renderMaxSamples            int
@@ -49,6 +50,7 @@ func init() {
 	renderCmd.Flags().Float64Var(&renderNoiseThreshold, "noise-threshold", 0, "Cycles adaptive noise threshold value")
 	renderCmd.Flags().StringVarP(&renderOutputDir, "output", "o", "./out", "Output directory")
 	renderCmd.Flags().StringVar(&renderCwd, "cwd", "", "Working directory for resolving relative paths (defaults to script directory)")
+	renderCmd.Flags().StringVar(&renderGenDir, "gen-dir", "", "Generator base directory (defaults to <root_dir>/generated; relative paths resolve from root_dir)")
 	renderCmd.Flags().StringVar(&renderSeed, "seed", string(seed.RandomMode), "Scene seed mode: rand, seq, or a concrete integer")
 }
 
@@ -77,6 +79,11 @@ func runRender(cmd *cobra.Command, args []string) {
 		GPUBackend: renderGPUBackend,
 		Seed:       seedCfg,
 	}
+	generatorPaths, err := utils.ResolveGeneratorPaths(paths.Cwd, renderGenDir)
+	if err != nil {
+		logs.Err.Fatalln("Failed to resolve generator paths:", err)
+	}
+	opts.GenBaseDir = generatorPaths.GenBaseDir
 	applyOptionalRenderFlags(cmd, &opts)
 
 	if _, err := render.Render(opts); err != nil {

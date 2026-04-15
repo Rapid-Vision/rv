@@ -12,11 +12,10 @@ def read_request() -> dict:
     return json.loads(raw)
 
 
-def make_output_path(cwd: str, seed: int | None) -> str:
-    output_dir = os.path.join(cwd, "generated")
-    os.makedirs(output_dir, exist_ok=True)
+def make_output_path(work_dir: str, seed: int | None) -> str:
+    os.makedirs(work_dir, exist_ok=True)
     suffix = "none" if seed is None else str(seed)
-    return os.path.join(output_dir, f"seed_{suffix}.png")
+    return os.path.join(work_dir, f"seed_{suffix}.png")
 
 
 def draw_centered_text(
@@ -33,8 +32,9 @@ def draw_centered_text(
 def main() -> None:
     request = read_request()
     seed = request.get("seed")
-    cwd = request["cwd"]
-    output_path = make_output_path(cwd, seed)
+    _root_dir = request["root_dir"]
+    work_dir = request["work_dir"]
+    output_path = make_output_path(work_dir, seed)
 
     width, height = 1024, 1024
     image = Image.new("RGB", (width, height), (242, 240, 233))
@@ -51,7 +51,6 @@ def main() -> None:
 
     text = str(seed)
     text = text[:10] + "\n" + text[10:]
-    print(seed, len(text), file=sys.stderr)
     font = ImageFont.load_default(size=100)
     draw_centered_text(draw, (width, height), text, font)
 

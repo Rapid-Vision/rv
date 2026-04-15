@@ -21,6 +21,7 @@ import (
 type Options struct {
 	ScriptPathArg string
 	CwdArg        string
+	GenDirArg     string
 	PreviewFiles  bool
 	PreviewOut    string
 	NoWindow      bool
@@ -45,6 +46,14 @@ func Preview(opts Options) {
 	}
 	scriptPath := paths.ScriptPath
 	cwdAbs := paths.Cwd
+	generatorPaths, err := utils.ResolveGeneratorPaths(cwdAbs, opts.GenDirArg)
+	if err != nil {
+		logs.Err.Fatalln("Failed to resolve generator paths:", err)
+	}
+	workDir, err := utils.AllocateGeneratorWorkDir(generatorPaths.GenBaseDir)
+	if err != nil {
+		logs.Err.Fatalln("Failed to allocate generator work directory:", err)
+	}
 
 	if err := validateOptions(opts); err != nil {
 		logs.Err.Fatalln("Invalid preview options:", err)
@@ -87,7 +96,7 @@ func Preview(opts Options) {
 	}
 
 	// Start Blender
-	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, libPath, port)...)
+	cmd := exec.Command(blenderPath, buildBlenderPreviewArgs(opts, scriptPath, cwdAbs, workDir, libPath, port)...)
 	cmd.Env = utils.BlenderCommandEnv()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -156,7 +165,7 @@ func validateOptions(opts Options) error {
 	return nil
 }
 
-func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, libPath string, port int) []string {
+func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, workDir string, libPath string, port int) []string {
 	opts.Seed = seed.Normalize(opts.Seed)
 	gpuBackend := normalizedGPUBackend(opts.GPUBackend)
 	args := []string{
@@ -175,7 +184,8 @@ func buildBlenderPreviewArgs(opts Options, scriptPath string, cwdAbs string, lib
 		"--port", fmt.Sprintf("%d", port),
 		"--script", scriptPath,
 		"--libpath", libPath,
-		"--cwd", cwdAbs,
+		"--root-dir", cwdAbs,
+		"--work-dir", workDir,
 		"--resolution", fmt.Sprintf("%d,%d", opts.Resolution[0], opts.Resolution[1]),
 		"--gpu-backend", gpuBackend,
 		"--seed-mode", string(opts.Seed.Mode),

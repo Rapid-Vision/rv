@@ -10,6 +10,7 @@ func TestBuildBlenderRenderArgs_SeedFlags(t *testing.T) {
 	opts := RenderOptions{
 		ScriptPath:    "/work/scene.py",
 		Cwd:           "/work",
+		WorkDir:       "/work/generated/run-1",
 		ImageNum:      4,
 		Procs:         2,
 		Resolution:    [2]int{640, 480},
@@ -29,6 +30,9 @@ func TestBuildBlenderRenderArgs_SeedFlags(t *testing.T) {
 	assertContains(t, args, "5")
 	assertContains(t, args, "--generator-port")
 	assertContains(t, args, "9090")
+	assertContains(t, args, "--root-dir")
+	assertContains(t, args, "--work-dir")
+	assertContains(t, args, "/work/generated/run-1")
 }
 
 func TestRenderSeedBase(t *testing.T) {
