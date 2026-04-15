@@ -167,6 +167,9 @@ func TestAllocateGeneratorWorkDir_CreatesUUIDSubdir(t *testing.T) {
 	if !strings.HasPrefix(workDir, genBaseDir+string(filepath.Separator)) {
 		t.Fatalf("unexpected work dir: got=%q", workDir)
 	}
+	if !strings.HasPrefix(filepath.Base(workDir), generatorWorkDirPrefix) {
+		t.Fatalf("expected work dir name to start with %q, got %q", generatorWorkDirPrefix, filepath.Base(workDir))
+	}
 	if _, err := os.Stat(workDir); err != nil {
 		t.Fatalf("stat work dir: %v", err)
 	}
@@ -197,26 +200,43 @@ func TestCleanupGeneratorWorkDirs_RetainAll(t *testing.T) {
 
 func TestCleanupGeneratorWorkDirs_RetainLast(t *testing.T) {
 	genBaseDir := filepath.Join(t.TempDir(), "generated")
-	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, "keep"))
-	otherDir := mustMkdirAll(t, filepath.Join(genBaseDir, "other"))
+	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, generatorWorkDirPrefix+"keep"))
+	otherDir := mustMkdirAll(t, filepath.Join(genBaseDir, generatorWorkDirPrefix+"other"))
+	unmanagedDir := mustMkdirAll(t, filepath.Join(genBaseDir, "other"))
 
 	if err := CleanupGeneratorWorkDirs(genBaseDir, GeneratorRetainLast, keepDir); err != nil {
 		t.Fatalf("cleanup retain last: %v", err)
 	}
 	assertExists(t, keepDir)
 	assertNotExists(t, otherDir)
+	assertExists(t, unmanagedDir)
 }
 
 func TestCleanupGeneratorWorkDirs_RetainNone(t *testing.T) {
 	genBaseDir := filepath.Join(t.TempDir(), "generated")
-	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, "keep"))
-	otherDir := mustMkdirAll(t, filepath.Join(genBaseDir, "other"))
+	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, generatorWorkDirPrefix+"keep"))
+	otherDir := mustMkdirAll(t, filepath.Join(genBaseDir, generatorWorkDirPrefix+"other"))
+	unmanagedDir := mustMkdirAll(t, filepath.Join(genBaseDir, "other"))
 
 	if err := CleanupGeneratorWorkDirs(genBaseDir, GeneratorRetainNone, keepDir); err != nil {
 		t.Fatalf("cleanup retain none: %v", err)
 	}
 	assertNotExists(t, keepDir)
 	assertNotExists(t, otherDir)
+	assertExists(t, unmanagedDir)
+}
+
+func TestCleanupGeneratorWorkDirs_IgnoresUnmanagedDirectories(t *testing.T) {
+	genBaseDir := filepath.Join(t.TempDir(), "generated")
+	keepDir := mustMkdirAll(t, filepath.Join(genBaseDir, generatorWorkDirPrefix+"keep"))
+	unmanagedDir := mustMkdirAll(t, filepath.Join(genBaseDir, "shared"))
+
+	if err := CleanupGeneratorWorkDirs(genBaseDir, GeneratorRetainLast, keepDir); err != nil {
+		t.Fatalf("cleanup retain last: %v", err)
+	}
+
+	assertExists(t, keepDir)
+	assertExists(t, unmanagedDir)
 }
 
 func mustMkdirAll(t *testing.T, path string) string {

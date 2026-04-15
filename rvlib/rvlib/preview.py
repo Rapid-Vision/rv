@@ -59,6 +59,7 @@ HTTPD = None
 STOP_EVENT = threading.Event()
 RERUN_INDEX = 0
 CURRENT_WORK_DIR = None
+GENERATOR_WORK_DIR_PREFIX = "_rv_"
 
 
 def iter_files(root_dir):
@@ -125,7 +126,7 @@ def reset_preview_scene_state():
 
 def allocate_work_dir(gen_base_dir: str) -> str:
     os.makedirs(gen_base_dir, exist_ok=True)
-    work_dir = os.path.join(gen_base_dir, str(uuid.uuid4()))
+    work_dir = os.path.join(gen_base_dir, f"{GENERATOR_WORK_DIR_PREFIX}{uuid.uuid4()}")
     os.makedirs(work_dir, exist_ok=True)
     return work_dir
 
@@ -137,6 +138,8 @@ def cleanup_generator_work_dirs(gen_base_dir: str, retain: str, keep_work_dir: s
     keep_work_dir = None if keep_work_dir is None else os.path.realpath(keep_work_dir)
     for entry in os.scandir(gen_base_dir):
         if not entry.is_dir():
+            continue
+        if not entry.name.startswith(GENERATOR_WORK_DIR_PREFIX):
             continue
 
         target = os.path.realpath(entry.path)

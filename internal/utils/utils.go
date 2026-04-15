@@ -231,9 +231,10 @@ type GeneratorPaths struct {
 type GeneratorRetention string
 
 const (
-	GeneratorRetainAll  GeneratorRetention = "all"
-	GeneratorRetainLast GeneratorRetention = "last"
-	GeneratorRetainNone GeneratorRetention = "none"
+	GeneratorRetainAll     GeneratorRetention = "all"
+	GeneratorRetainLast    GeneratorRetention = "last"
+	GeneratorRetainNone    GeneratorRetention = "none"
+	generatorWorkDirPrefix                    = "_rv_"
 )
 
 func ParseGeneratorRetention(raw string) (GeneratorRetention, error) {
@@ -251,7 +252,7 @@ func AllocateGeneratorWorkDir(genBaseDir string) (string, error) {
 		return "", errors.New("generator base directory is required")
 	}
 
-	workDir := filepath.Join(filepath.Clean(genBaseDir), uuid.NewString())
+	workDir := filepath.Join(filepath.Clean(genBaseDir), generatorWorkDirPrefix+uuid.NewString())
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
 		return "", fmt.Errorf("create generator work directory: %w", err)
 	}
@@ -279,6 +280,9 @@ func CleanupGeneratorWorkDirs(genBaseDir string, retain GeneratorRetention, keep
 	var errs []string
 	for _, entry := range entries {
 		if !entry.IsDir() {
+			continue
+		}
+		if !strings.HasPrefix(entry.Name(), generatorWorkDirPrefix) {
 			continue
 		}
 
